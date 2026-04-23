@@ -1,0 +1,122 @@
+[
+  {
+    "trial": 1,
+    "accuracy": 0,
+    "total_tokens": 551,
+    "reasoning_tokens": 485,
+    "num_predict": 4096,
+    "moves_extracted": 11,
+    "moves_captured": 11,
+    "v_score": 1.5,
+    "elapsed_sec": 27.0,
+    "early_stop": "move_loop_repeat"
+  },
+  {
+    "trial": 2,
+    "accuracy": 0,
+    "total_tokens": 832,
+    "reasoning_tokens": 654,
+    "num_predict": 4096,
+    "moves_extracted": 0,
+    "moves_captured": 0,
+    "v_score": 1.0,
+    "elapsed_sec": 45.74,
+    "early_stop": null
+  },
+  {
+    "trial": 3,
+    "accuracy": 0,
+    "total_tokens": 523,
+    "reasoning_tokens": 335,
+    "num_predict": 4096,
+    "moves_extracted": 0,
+    "moves_captured": 0,
+    "v_score": 1.0,
+    "elapsed_sec": 24.8,
+    "early_stop": null
+  },
+  {
+    "trial": 4,
+    "accuracy": 0,
+    "total_tokens": 776,
+    "reasoning_tokens": 698,
+    "num_predict": 4096,
+    "moves_extracted": 14,
+    "moves_captured": 14,
+    "v_score": 0.966667,
+    "elapsed_sec": 39.86,
+    "early_stop": null
+  },
+  {
+    "trial": 5,
+    "accuracy": 0,
+    "total_tokens": 501,
+    "reasoning_tokens": 433,
+    "num_predict": 4096,
+    "moves_extracted": 11,
+    "moves_captured": 11,
+    "v_score": 1.5,
+    "elapsed_sec": 23.4,
+    "early_stop": "move_loop_repeat"
+  },
+  {
+    "trial": 6,
+    "accuracy": 0,
+    "total_tokens": 1487,
+    "reasoning_tokens": 0,
+    "num_predict": 4096,
+    "moves_extracted": 9,
+    "moves_captured": 9,
+    "v_score": 1.5,
+    "elapsed_sec": 89.48,
+    "early_stop": "move_loop_repeat"
+  },
+  {
+    "trial": 7,
+    "accuracy": 1,
+    "total_tokens": 1225,
+    "reasoning_tokens": 0,
+    "num_predict": 4096,
+    "moves_extracted": 15,
+    "moves_captured": 15,
+    "v_score": 0.0,
+    "elapsed_sec": 71.81,
+    "early_stop": "goal_reached"
+  },
+  {
+    "trial": 8,
+    "accuracy": 0,
+    "total_tokens": 740,
+    "reasoning_tokens": 680,
+    "num_predict": 4096,
+    "moves_extracted": 7,
+    "moves_captured": 7,
+    "v_score": 1.3,
+    "elapsed_sec": 41.11,
+    "early_stop": null
+  },
+  {
+    "trial": 9,
+    "accuracy": 0,
+    "total_tokens": 866,
+    "reasoning_tokens": 829,
+    "num_predict": 4096,
+    "moves_extracted": 0,
+    "moves_captured": 0,
+    "v_score": 1.0,
+    "elapsed_sec": 43.11,
+    "early_stop": null
+  },
+  {
+    "trial": 10,
+    "accuracy": 0,
+    "total_tokens": 755,
+    "reasoning_tokens": 687,
+    "num_predict": 4096,
+    "moves_extracted": 14,
+    "moves_captured": 14,
+    "v_score": 2.8,
+    "elapsed_sec": 41.14,
+    "early_stop": null
+  }
+]

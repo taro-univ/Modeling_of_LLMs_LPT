@@ -1,0 +1,122 @@
+[
+  {
+    "trial": 1,
+    "accuracy": 1,
+    "total_tokens": 615,
+    "reasoning_tokens": 593,
+    "num_predict": 4096,
+    "moves_extracted": 3,
+    "moves_captured": 3,
+    "v_score": 0.0,
+    "elapsed_sec": 30.19,
+    "early_stop": "goal_reached"
+  },
+  {
+    "trial": 2,
+    "accuracy": 0,
+    "total_tokens": 1392,
+    "reasoning_tokens": 1372,
+    "num_predict": 4096,
+    "moves_extracted": 3,
+    "moves_captured": 3,
+    "v_score": 1.0,
+    "elapsed_sec": 82.35,
+    "early_stop": null
+  },
+  {
+    "trial": 3,
+    "accuracy": 1,
+    "total_tokens": 1483,
+    "reasoning_tokens": 0,
+    "num_predict": 4096,
+    "moves_extracted": 4,
+    "moves_captured": 4,
+    "v_score": 0.5,
+    "elapsed_sec": 98.89,
+    "early_stop": "goal_reached"
+  },
+  {
+    "trial": 4,
+    "accuracy": 1,
+    "total_tokens": 798,
+    "reasoning_tokens": 778,
+    "num_predict": 4096,
+    "moves_extracted": 3,
+    "moves_captured": 3,
+    "v_score": 0.0,
+    "elapsed_sec": 40.63,
+    "early_stop": "goal_reached"
+  },
+  {
+    "trial": 5,
+    "accuracy": 1,
+    "total_tokens": 119,
+    "reasoning_tokens": 99,
+    "num_predict": 4096,
+    "moves_extracted": 3,
+    "moves_captured": 3,
+    "v_score": 0.0,
+    "elapsed_sec": 5.16,
+    "early_stop": "goal_reached"
+  },
+  {
+    "trial": 6,
+    "accuracy": 1,
+    "total_tokens": 522,
+    "reasoning_tokens": 502,
+    "num_predict": 4096,
+    "moves_extracted": 3,
+    "moves_captured": 3,
+    "v_score": 0.0,
+    "elapsed_sec": 23.73,
+    "early_stop": "goal_reached"
+  },
+  {
+    "trial": 7,
+    "accuracy": 0,
+    "total_tokens": 1352,
+    "reasoning_tokens": 1312,
+    "num_predict": 4096,
+    "moves_extracted": 1,
+    "moves_captured": 1,
+    "v_score": 1.5,
+    "elapsed_sec": 84.64,
+    "early_stop": null
+  },
+  {
+    "trial": 8,
+    "accuracy": 1,
+    "total_tokens": 896,
+    "reasoning_tokens": 0,
+    "num_predict": 4096,
+    "moves_extracted": 3,
+    "moves_captured": 3,
+    "v_score": 0.0,
+    "elapsed_sec": 51.18,
+    "early_stop": "goal_reached"
+  },
+  {
+    "trial": 9,
+    "accuracy": 1,
+    "total_tokens": 583,
+    "reasoning_tokens": 451,
+    "num_predict": 4096,
+    "moves_extracted": 3,
+    "moves_captured": 3,
+    "v_score": 0.0,
+    "elapsed_sec": 30.45,
+    "early_stop": "goal_reached"
+  },
+  {
+    "trial": 10,
+    "accuracy": 0,
+    "total_tokens": 840,
+    "reasoning_tokens": 728,
+    "num_predict": 4096,
+    "moves_extracted": 0,
+    "moves_captured": 0,
+    "v_score": 1.0,
+    "elapsed_sec": 43.35,
+    "early_stop": null
+  }
+]

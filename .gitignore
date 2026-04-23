@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# 実験結果バイナリ（隠れ状態 npz、大容量）
+results/**/*.npz
+
+# 生成画像（再生成可能）
+figures/
+
+# test を含むファイル・ディレクトリ
+test_results/
+*test*
+
+# Claude Code 設定（個人環境依存）
+.claude/
+
+# Docker
+.env

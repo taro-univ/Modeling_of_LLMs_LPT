@@ -1,0 +1,48 @@
+services:
+  hanoi-minimal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    tty: true
+    stdin_open: true
+    volumes:
+      - .:/app          # ホスト側でファイルを編集するとコンテナに即反映される
+      - ~/.cache/huggingface:/root/.cache/huggingface  # モデルキャッシュを永続化
+    environment:
+      - PYTHONPATH=/app
+      # Ollama は WSL2 ホスト上で動作。host.docker.internal 経由でアクセス
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - DATABASE_URL=postgresql://exp_user:exp_pass@db:5432/experiments
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: experiments
+      POSTGRES_USER: exp_user
+      POSTGRES_PASSWORD: exp_pass
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"     # ホストから psql / DBeaver 等で直接接続可
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U exp_user -d experiments"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
