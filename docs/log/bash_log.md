@@ -232,3 +232,27 @@ mkdir -p /home/shona/Modeling_of_LLMs_LPT/docs/Programming_Guide && mv /home/sho
 find /home/shona/Modeling_of_LLMs_LPT/docs/Programming_Guide -type d
 ```
 
+## 2026-04-23 21:06:13
+
+```bash
+git log --oneline && echo "---" && git branch -a && echo "---" && git remote -v
+```
+
+## 2026-04-23 21:06:16
+
+```bash
+cat /home/shona/Modeling_of_LLMs_LPT/.gitignore 2>/dev/null || echo "no .gitignore"
+```
+
+## 2026-04-23 21:06:22
+
+```bash
+mkdir -p /home/shona/Modeling_of_LLMs_LPT/docs/Programming_Guide/Git_Explanation
+```
+
+## 2026-04-23 21:08:15
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/docs/Programming_Guide/Git_Explanation/
+```
+
