@@ -21,14 +21,14 @@ ENV PYTHONPATH=/app
 WORKDIR /app
 
 # -------------------------------------------------------
-# PyTorch (CUDA 12.8 対応ホイール)
+# 最小実験用 Python 依存パッケージ (torch はローカル用プレースホルダ)
+# -------------------------------------------------------
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# -------------------------------------------------------
+# PyTorch (CUDA 12.8 対応ホイール) — requirements.txt の torch を上書き
 # -------------------------------------------------------
 RUN pip3 install --no-cache-dir \
     torch torchvision torchaudio \
     --index-url https://download.pytorch.org/whl/cu128
-
-# -------------------------------------------------------
-# 最小実験用 Python 依存パッケージ
-# -------------------------------------------------------
-COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt

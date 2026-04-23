@@ -1,7 +1,11 @@
 numpy
 requests
 matplotlib>=3.7.0
+scipy>=1.11.0
 transformers>=4.45.0
 bitsandbytes>=0.43.0
 accelerate>=0.34.0
 safetensors>=0.4.0
+psycopg2-binary>=2.9.0
+# local only (Docker installs CUDA wheel via --index-url separately)
+torch
