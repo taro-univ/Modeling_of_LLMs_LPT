@@ -17,7 +17,7 @@ for T in 0.2 0.3 0.4 0.5 0.6; do
     echo "  N=${N}  T=${T}  trials=${TRIALS}  n_shot=${N_SHOT}"
     echo "=========================================="
 
-    python3 runners/run_hf.py \
+    python3 runners/run_local.py \
         --N           ${N}       \
         --trials      ${TRIALS}  \
         --n-shot      ${N_SHOT}  \

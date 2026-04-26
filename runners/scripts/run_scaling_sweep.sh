@@ -24,8 +24,8 @@
 #   bash run_scaling_sweep.sh --model Llama8B --trials 20 --ns "3 4 5"
 #   bash run_scaling_sweep.sh --dry-run
 #
-# 注意: QwenInstruct7B は run_hf.py の <think> プリフィルが非対応のため、
-#       --model-id 変更に加えて run_hf.py の think-prefill 処理を無効化してから実行すること。
+# 注意: QwenInstruct7B は run_local.py の <think> プリフィルが非対応のため、
+#       --model-id 変更に加えて run_local.py の think-prefill 処理を無効化してから実行すること。
 
 set -e
 
@@ -77,7 +77,7 @@ case "$MODEL_TAG" in
         WEIGHT_GB=3.5
         KV_BYTES_PER_TOKEN=114688   # 2 × 28L × 4H_kv × 128d × 2bytes
         echo "[WARNING] QwenInstruct7B は <think> プリフィル非対応モデルです。"
-        echo "          run_hf.py の think-prefill 処理を無効化してから実行してください。"
+        echo "          run_local.py の think-prefill 処理を無効化してから実行してください。"
         echo "          続行しますか? [y/N]"
         read -r ans
         [[ "$ans" =~ ^[Yy]$ ]] || { echo "中止しました。"; exit 1; }
@@ -233,7 +233,7 @@ for N in "${NS[@]}"; do
             fi
         fi
 
-        CMD="python3 runners/run_hf.py \
+        CMD="python3 runners/run_local.py \
             --model-id    ${MODEL_ID}  \
             --N           ${N}         \
             --trials      ${TRIALS}    \

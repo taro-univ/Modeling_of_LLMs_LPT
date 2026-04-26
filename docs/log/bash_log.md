@@ -256,3 +256,51 @@ mkdir -p /home/shona/Modeling_of_LLMs_LPT/docs/Programming_Guide/Git_Explanation
 ls /home/shona/Modeling_of_LLMs_LPT/docs/Programming_Guide/Git_Explanation/
 ```
 
+## 2026-04-26 19:47:14
+
+```bash
+find /home/shona/Modeling_of_LLMs_LPT -name "*.py" | head -30 && echo "---" && ls /home/shona/Modeling_of_LLMs_LPT/runners/
+```
+
+## 2026-04-26 19:47:15
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/ 2>/dev/null && echo "---" && ls /home/shona/Modeling_of_LLMs_LPT/docs/
+```
+
+## 2026-04-26 20:02:49
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/runners/scripts/ && grep -r "run_hf" /home/shona/Modeling_of_LLMs_LPT/ --include="*.sh" --include="*.py" --include="*.md" -l
+```
+
+## 2026-04-26 20:02:53
+
+```bash
+grep -n "run_hf" /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_temp_sweep.sh /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_phase_diagram.sh /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_pq_sweep.sh /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_scaling_sweep.sh /home/shona/Modeling_of_LLMs_LPT/db/import_existing.py
+```
+
+## 2026-04-26 20:03:14
+
+```bash
+cp /home/shona/Modeling_of_LLMs_LPT/runners/run_hf.py /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py && rm /home/shona/Modeling_of_LLMs_LPT/runners/run_hf.py
+```
+
+## 2026-04-26 20:03:20
+
+```bash
+sed -i 's|runners/run_hf\.py|runners/run_local.py|g' \
+  /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_temp_sweep.sh \
+  /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_phase_diagram.sh \
+  /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_pq_sweep.sh \
+  /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_scaling_sweep.sh && \
+sed -i 's|run_hf\.py|run_local.py|g' \
+  /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_scaling_sweep.sh
+```
+
+## 2026-04-26 20:03:24
+
+```bash
+grep -n "run_hf" /home/shona/Modeling_of_LLMs_LPT/runners/scripts/*.sh
+```
+

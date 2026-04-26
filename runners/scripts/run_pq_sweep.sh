@@ -69,7 +69,7 @@ for N in 3 4 5; do
             fi
         fi
 
-        CMD="python3 runners/run_hf.py \
+        CMD="python3 runners/run_local.py \
             --N           ${N}       \
             --trials      ${TRIALS}  \
             --n-shot      ${N_SHOT}  \
