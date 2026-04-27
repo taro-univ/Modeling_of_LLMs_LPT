@@ -58,3 +58,50 @@ sed -i 's|run_hf\.py|run_local.py|g' \
 grep -n "run_hf" /home/shona/Modeling_of_LLMs_LPT/runners/scripts/*.sh
 ```
 
+## 2026-04-27 13:37:56
+
+```bash
+python3 -c "
+import numpy as np
+
+hidden_size = 4096
+num_moves   = 3
+capture_layers = {'layer_top': -1, 'layer_mid': -16, 'layer_low': -24}
+
+# 正常ケース
+hs = {k: np.random.randn(num_moves, hidden_size).astype(np.float32) for k in capture_layers}
+
+# T4-1
+assert set(hs.keys()) == set(capture_layers.keys()), 'T4-1 失敗'
+print('T4-1 OK')
+
+# T4-2
+for k, arr in hs.items():
+    assert arr.shape == (num_moves, hidden_size), f'T4-2 失敗: {k}'
+print('T4-2 OK')
+
+# T4-3
+for k, arr in hs.items():
+    assert np.isfinite(arr).all(), f'T4-3 失敗: {k}'
+print('T4-3 OK')
+
+# T4-3 NaN ケース
+hs_bad = hs.copy()
+hs_bad['layer_top'] = hs_bad['layer_top'].copy()
+hs_bad['layer_top'][0, 0] = float('nan')
+bad_keys = [k for k, arr in hs_bad.items() if not np.isfinite(arr).all()]
+assert bad_keys == ['layer_top'], f'NaN 検出失敗: {bad_keys}'
+print('T4-3 NaN 検出 OK:', bad_keys)
+
+# T4-4
+move_texts = ['Move 1 from A to C', 'Move 2 from A to B', 'Move 1 from C to B']
+move_steps = np.array([10, 25, 40], dtype=np.int32)
+assert len(move_texts) == move_steps.shape[0] == num_moves
+print('T4-4 OK')
+
+# T4-5
+assert '__fallback__' not in move_texts
+print('T4-5 OK')
+"
+```
+

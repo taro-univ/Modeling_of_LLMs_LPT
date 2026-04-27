@@ -304,3 +304,382 @@ sed -i 's|run_hf\.py|run_local.py|g' \
 grep -n "run_hf" /home/shona/Modeling_of_LLMs_LPT/runners/scripts/*.sh
 ```
 
+## 2026-04-27 12:38:18
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/
+```
+
+## 2026-04-27 12:38:21
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/runners/
+```
+
+## 2026-04-27 12:38:21
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/docs/
+```
+
+## 2026-04-27 12:38:31
+
+```bash
+grep -n "EarlyStopConfig\|_MOVE_RE\|_estimate_reasoning_tokens\|calc_default_trials\|calc_num_predict\|calc_think_budget_ratio\|check_early_stop" /home/shona/Modeling_of_LLMs_LPT/runners/run.py | head -60
+```
+
+## 2026-04-27 12:38:32
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/runners/ && test -f /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py && echo "EXISTS" || echo "NOT EXISTS"
+```
+
+## 2026-04-27 12:42:22
+
+```bash
+python3 -c "
+import ast
+with open('runners/run_local.py') as f:
+    src = f.read()
+try:
+    ast.parse(src)
+    print('構文OK')
+except SyntaxError as e:
+    print(f'構文エラー: {e}')
+"
+```
+
+## 2026-04-27 12:42:25
+
+```bash
+grep -n "ModelProfile\|resolve_model_profile\|think_mode\|_estimate_reasoning_tokens_with_profile\|_profile" /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+```
+
+## 2026-04-27 12:43:09
+
+```bash
+grep -n "CAPTURE_LAYERS" /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+```
+
+## 2026-04-27 12:44:42
+
+```bash
+python3 -c "
+import ast
+with open('runners/run_local.py') as f:
+    src = f.read()
+try:
+    ast.parse(src)
+    print('構文OK')
+except SyntaxError as e:
+    print(f'構文エラー: {e}')
+" && grep -n "CAPTURE_LAYERS\|make_capture_layers\|_capture_layers\|capture_layers" /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+```
+
+## 2026-04-27 12:45:33
+
+```bash
+grep -n "output_dir\|output\|base\|summary_path\|model_slug" /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py | grep -v "^.*#"
+```
+
+## 2026-04-27 12:46:43
+
+```bash
+python3 -c "
+def model_id_to_slug(model_id):
+    return model_id.split('/')[-1].lower()
+
+cases = [
+    ('deepseek-ai/DeepSeek-R1-Distill-Qwen-7B',  'deepseek-r1-distill-qwen-7b'),
+    ('deepseek-ai/DeepSeek-R1-Distill-Qwen-14B', 'deepseek-r1-distill-qwen-14b'),
+    ('deepseek-ai/DeepSeek-R1-Distill-Llama-8B', 'deepseek-r1-distill-llama-8b'),
+    ('Qwen/Qwen3-8B',                             'qwen3-8b'),
+    ('Qwen/Qwen3-14B',                            'qwen3-14b'),
+]
+for model_id, expected in cases:
+    got = model_id_to_slug(model_id)
+    status = 'OK' if got == expected else 'FAIL'
+    print(f'  [{status}] {model_id} -> {got}')
+"
+```
+
+## 2026-04-27 12:48:17
+
+```bash
+grep -n "MODEL_ID\|model_id\|model=" /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+```
+
+## 2026-04-27 12:49:11
+
+```bash
+python3 -c "
+import ast
+with open('runners/run_local.py') as f:
+    src = f.read()
+ast.parse(src)
+print('構文OK')
+" && grep -n "MODEL_ID" /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+```
+
+## 2026-04-27 12:50:12
+
+```bash
+grep -n "^def \|^class \|^@dataclass" /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+```
+
+## 2026-04-27 13:10:45
+
+```bash
+python3 -c "
+import ast
+with open('runners/test_model_architecture.py') as f:
+    src = f.read()
+ast.parse(src)
+print('構文OK')
+"
+```
+
+## 2026-04-27 13:11:01
+
+```bash
+python3 -c "
+import sys; sys.path.insert(0, '.')
+# torch なしでインポートできるか確認（型定義・ヘルパーのみなので通るはず）
+from runners.test_model_architecture import ok, warn, fail, print_group, print_summary
+# 動作確認
+results = [
+    ok('T0-1', 'num_hidden_layers = 48'),
+    warn('T0-5', 'enable_thinking 非対応 → think_mode=\"prefill\" を使用'),
+    fail('T0-4', 'system ロール拒否'),
+]
+print_group('T0', results)
+exit_code = print_summary(results)
+print(f'exit_code={exit_code}')
+"
+```
+
+## 2026-04-27 13:16:31
+
+```bash
+python3 -c "
+import ast
+with open('runners/test_model_architecture.py') as f:
+    src = f.read()
+ast.parse(src)
+print('構文OK')
+"
+```
+
+## 2026-04-27 13:23:09
+
+```bash
+python3 -c "
+import ast
+with open('runners/test_model_architecture.py') as f:
+    src = f.read()
+ast.parse(src)
+print('構文OK')
+" && grep -n "^def \|^class " /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
+```
+
+## 2026-04-27 13:25:26
+
+```bash
+wc -l /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py && tail -5 /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
+```
+
+## 2026-04-27 13:25:35
+
+```bash
+grep -n "extract_moves_from_text\|_MOVE_RE" /home/shona/Modeling_of_LLMs_LPT/envs/hanoi_env.py | head -20
+```
+
+## 2026-04-27 13:25:36
+
+```bash
+grep -n "_MOVE_RE" /home/shona/Modeling_of_LLMs_LPT/runners/run.py | head -5
+```
+
+## 2026-04-27 13:33:52
+
+```bash
+python3 -c "
+import ast
+with open('runners/test_model_architecture.py') as f:
+    src = f.read()
+ast.parse(src)
+print('構文OK')
+" && grep -n "^def " /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
+```
+
+## 2026-04-27 13:35:57
+
+```bash
+tail -5 /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
+```
+
+## 2026-04-27 13:36:18
+
+```bash
+python3 -c "
+import ast
+with open('runners/test_model_architecture.py') as f:
+    src = f.read()
+ast.parse(src)
+print('構文OK')
+" && grep -n "^def run_t" /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
+```
+
+## 2026-04-27 13:36:38
+
+```bash
+python3 -c "
+import re
+_MOVE_RE_WITH_DISK = re.compile(r'Move\s+(\d+)\s+from\s+([ABC])\s+to\s+([ABC])', re.IGNORECASE)
+
+# 正常ケース
+text_ok = 'Move 1 from A to C\nMove 2 from A to B\nMove 1 from C to B'
+matches = _MOVE_RE_WITH_DISK.findall(text_ok)
+print('正常:', matches)
+
+# 自己ループあり
+text_loop = 'Move 1 from A to A\nMove 2 from B to C'
+matches2 = _MOVE_RE_WITH_DISK.findall(text_loop)
+self_loops = [(d, s, t) for d, s, t in matches2 if s.upper() == t.upper()]
+print('自己ループ:', self_loops)
+
+# disk 番号範囲外 (N=2)
+text_oob = 'Move 3 from A to C\nMove 1 from A to B'
+matches3 = _MOVE_RE_WITH_DISK.findall(text_oob)
+out_of_range = [(d, s, t) for d, s, t in matches3 if not (1 <= int(d) <= 2)]
+print('範囲外:', out_of_range)
+"
+```
+
+## 2026-04-27 13:37:21
+
+```bash
+tail -5 /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
+```
+
+## 2026-04-27 13:37:43
+
+```bash
+python3 -c "
+import ast
+with open('runners/test_model_architecture.py') as f:
+    src = f.read()
+ast.parse(src)
+print('構文OK')
+" && grep -n "^def run_t" /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
+```
+
+## 2026-04-27 13:37:56
+
+```bash
+python3 -c "
+import numpy as np
+
+hidden_size = 4096
+num_moves   = 3
+capture_layers = {'layer_top': -1, 'layer_mid': -16, 'layer_low': -24}
+
+# 正常ケース
+hs = {k: np.random.randn(num_moves, hidden_size).astype(np.float32) for k in capture_layers}
+
+# T4-1
+assert set(hs.keys()) == set(capture_layers.keys()), 'T4-1 失敗'
+print('T4-1 OK')
+
+# T4-2
+for k, arr in hs.items():
+    assert arr.shape == (num_moves, hidden_size), f'T4-2 失敗: {k}'
+print('T4-2 OK')
+
+# T4-3
+for k, arr in hs.items():
+    assert np.isfinite(arr).all(), f'T4-3 失敗: {k}'
+print('T4-3 OK')
+
+# T4-3 NaN ケース
+hs_bad = hs.copy()
+hs_bad['layer_top'] = hs_bad['layer_top'].copy()
+hs_bad['layer_top'][0, 0] = float('nan')
+bad_keys = [k for k, arr in hs_bad.items() if not np.isfinite(arr).all()]
+assert bad_keys == ['layer_top'], f'NaN 検出失敗: {bad_keys}'
+print('T4-3 NaN 検出 OK:', bad_keys)
+
+# T4-4
+move_texts = ['Move 1 from A to C', 'Move 2 from A to B', 'Move 1 from C to B']
+move_steps = np.array([10, 25, 40], dtype=np.int32)
+assert len(move_texts) == move_steps.shape[0] == num_moves
+print('T4-4 OK')
+
+# T4-5
+assert '__fallback__' not in move_texts
+print('T4-5 OK')
+"
+```
+
+## 2026-04-27 13:39:00
+
+```bash
+tail -5 /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
+```
+
+## 2026-04-27 13:39:28
+
+```bash
+python3 -c "
+import ast
+with open('runners/test_model_architecture.py') as f:
+    src = f.read()
+ast.parse(src)
+print('構文OK')
+" && grep -n "^def run_t\|^_T5" /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
+```
+
+## 2026-04-27 13:39:42
+
+```bash
+python3 -c "
+required = {'accuracy', 'early_stop', 'num_moves', 'temperature', 'N'}
+
+# 正常ケース
+results_ok = [
+    {'trial': 1, 'accuracy': 1, 'early_stop': 'goal_reached', 'num_moves': 3, 'temperature': 0.2, 'N': 2},
+    {'trial': 2, 'accuracy': 0, 'early_stop': None,           'num_moves': 7, 'temperature': 0.2, 'N': 2},
+    {'trial': 3, 'accuracy': 1, 'early_stop': 'goal_reached', 'num_moves': 3, 'temperature': 0.2, 'N': 2},
+]
+acc = sum(r['accuracy'] for r in results_ok)
+ordered = sum(1 for r in results_ok if r.get('early_stop') in ('goal_reached', None))
+missing = [f\"trial {r['trial']}: {required - r.keys()}\" for r in results_ok if required - r.keys()]
+print(f'T5-1: accuracy_sum={acc} >= 1 → {\"PASS\" if acc >= 1 else \"FAIL\"}')
+print(f'T5-2: ordered={ordered}/3 >= 2 → {\"PASS\" if ordered >= 2 else \"FAIL\"}')
+print(f'T5-3: missing={missing} → {\"PASS\" if not missing else \"FAIL\"}')
+
+# 不正ケース（フィールド欠損）
+results_bad = [{'trial': 1, 'accuracy': 0, 'early_stop': 'move_loop_repeat'}]
+missing_bad = [f\"trial {r['trial']}: {required - r.keys()}\" for r in results_bad if required - r.keys()]
+print(f'T5-3 欠損ケース: {missing_bad}')
+"
+```
+
+## 2026-04-27 13:40:37
+
+```bash
+tail -4 /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
+```
+
+## 2026-04-27 13:41:13
+
+```bash
+python3 -c "
+import ast
+with open('runners/test_model_architecture.py') as f:
+    src = f.read()
+ast.parse(src)
+print('構文OK')
+" && grep -n "^def \|^if __name__" /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
+```
+

@@ -50,7 +50,31 @@ _MOVE_RE_WITH_DISK = re.compile(
 # 定数
 # ===========================================================================
 
-MODEL_ID = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+@dataclass
+class ModelProfile:
+    """モデルごとの推論設定（think 起動方式とタグ）を保持する。"""
+    model_id:        str
+    think_mode:      str   # "prefill" | "chat_template" | "none"
+    think_open_tag:  str = "<think>"
+    think_close_tag: str = "</think>"
+
+
+def resolve_model_profile(model_id: str) -> ModelProfile:
+    """model_id のプレフィックスマッチで ModelProfile を自動選択する。"""
+    lm = model_id.lower()
+    if lm.startswith("qwen/qwen3"):
+        # Qwen3 は apply_chat_template の enable_thinking=True で thinking を起動する
+        return ModelProfile(model_id=model_id, think_mode="chat_template")
+    # DeepSeek-R1-Distill 系（Qwen/Llama ベース）は <think> プリフィルで起動する
+    return ModelProfile(model_id=model_id, think_mode="prefill")
+
+
+def model_id_to_slug(model_id: str) -> str:
+    """HuggingFace model_id からファイルシステム安全なスラグを生成する。
+
+    "org/ModelName" → "modelname"（組織名を除いた名前部分を小文字化）
+    """
+    return model_id.split("/")[-1].lower()
 
 
 # ===========================================================================
@@ -99,13 +123,17 @@ def build_few_shot_messages(env: TowerOfHanoiEnv, n_shot: int) -> list[dict]:
     messages.append({"role": "user", "content": env.get_prompt()})
     return messages
 
-# 保存対象レイヤーインデックス（負のインデックスで指定）
-# hidden_states は (embedding + 28 transformer) = 29 要素のタプル
-CAPTURE_LAYERS: dict[str, int] = {
-    "layer_m1":  -1,   # 最終出力層 (layer 28)
-    "layer_m8":  -8,   # 中間後半層 (layer 21)
-    "layer_m16": -16,  # 中間層    (layer 13)
-}
+def make_capture_layers(num_hidden_layers: int) -> dict[str, int]:
+    """層数に依存しない相対深度でキャプチャ層を決定する。
+
+    負インデックスで返す。hidden_states タプルは (embedding + N transformer) の
+    N+1 要素なので、abs(idx) <= num_hidden_layers が有効範囲。
+    """
+    return {
+        "layer_top":  -1,                              # 100% 深度（最終層）
+        "layer_mid":  -(num_hidden_layers // 2),       #  50% 深度
+        "layer_low":  -(num_hidden_layers * 3 // 4),   #  25% 深度
+    }
 
 
 # ===========================================================================
@@ -172,6 +200,20 @@ class GenerationResult:
     move_texts: list[str]     # 検出された手の文字列リスト
 
 
+def _estimate_reasoning_tokens_with_profile(
+    text: str, total_tokens: int, profile: ModelProfile
+) -> int:
+    """profile の think タグを使って reasoning_tokens を近似する。"""
+    open_tag = re.escape(profile.think_open_tag)
+    close_tag = re.escape(profile.think_close_tag)
+    match = re.search(f'{open_tag}(.*?){close_tag}', text, re.DOTALL | re.IGNORECASE)
+    if not match:
+        return 0
+    think_len = len(match.group(1))
+    total_len = max(len(text), 1)
+    return int(total_tokens * (think_len / total_len))
+
+
 def generate_with_hidden_states(
     model: AutoModelForCausalLM,
     tokenizer: AutoTokenizer,
@@ -183,6 +225,8 @@ def generate_with_hidden_states(
     temperature: float = 0.6,
     repetition_penalty: float = 1.1,
     n_shot: int = 0,
+    profile: Optional[ModelProfile] = None,
+    capture_layers: Optional[dict[str, int]] = None,
 ) -> GenerationResult:
     """
     トークンを 1 つずつ生成するカスタムループ。
@@ -212,12 +256,22 @@ def generate_with_hidden_states(
             {"role": "user",   "content": prompt},
         ]
 
-    # Qwen 系モデルはチャットテンプレート必須。
-    # <think> をプリフィルして DeepSeek-R1 の推論モードを強制起動する。
-    formatted = tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
-    )
-    formatted += "<think>\n"
+    # think_mode に応じてチャットテンプレートの適用方法を切り替える。
+    # profile が None の場合は後方互換として "prefill" と同じ挙動にする。
+    _profile = profile or ModelProfile(model_id="unknown", think_mode="prefill")
+    if _profile.think_mode == "chat_template":
+        # Qwen3 系: enable_thinking=True でトークナイザーが thinking モードを制御する
+        formatted = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True,
+            enable_thinking=True,
+        )
+    else:
+        formatted = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        if _profile.think_mode == "prefill":
+            # DeepSeek-R1 系: <think> をプリフィルして推論モードを強制起動する
+            formatted += _profile.think_open_tag + "\n"
     input_ids = tokenizer(formatted, return_tensors="pt").input_ids.to(device)
 
     # 生成トークンを蓄積するバッファ
@@ -227,7 +281,11 @@ def generate_with_hidden_states(
     stop_reason: Optional[str] = None
 
     # 隠れ状態バッファ: {layer_key: list of 1D numpy array}
-    hs_buffer: dict[str, list[np.ndarray]] = {k: [] for k in CAPTURE_LAYERS}
+    _capture_layers = (
+        capture_layers if capture_layers is not None
+        else make_capture_layers(model.config.num_hidden_layers)
+    )
+    hs_buffer: dict[str, list[np.ndarray]] = {k: [] for k in _capture_layers}
     move_steps_list: list[int] = []
     move_texts_list: list[str] = []
 
@@ -275,7 +333,7 @@ def generate_with_hidden_states(
 
         if current_move_count > prev_move_count:
             for mv_idx in range(prev_move_count, current_move_count):
-                for layer_key, layer_idx in CAPTURE_LAYERS.items():
+                for layer_key, layer_idx in _capture_layers.items():
                     hs_tensor = outputs.hidden_states[layer_idx][0, -1, :]
                     hs_buffer[layer_key].append(hs_tensor.float().cpu().numpy())
                 move_steps_list.append(step)
@@ -321,15 +379,19 @@ def generate_with_hidden_states(
                 break
 
     total_tokens = len(generated_ids)
-    # <think> をプリフィルしているため、生成テキストは </think> を含む形になる。
-    # reasoning_tokens 推定のため <think> を先頭に補って渡す。
-    reasoning_tokens = _estimate_reasoning_tokens("<think>\n" + accumulated_text, total_tokens)
+    # prefill モードでは think_open_tag がプロンプト側にあるため先頭に補って渡す
+    reasoning_text = (
+        _profile.think_open_tag + "\n" + accumulated_text
+        if _profile.think_mode == "prefill"
+        else accumulated_text
+    )
+    reasoning_tokens = _estimate_reasoning_tokens_with_profile(reasoning_text, total_tokens, _profile)
 
     # moves が1本も取れなかった場合（常磁性相: no_move_catchall 等）、
     # 最終トークンの hidden state をフォールバックとして記録する。
     # これにより P(q) 解析で常磁性相とスピングラス相を比較できる。
     if not move_steps_list and generated_ids and 'last_outputs' in dir():
-        for layer_key, layer_idx in CAPTURE_LAYERS.items():
+        for layer_key, layer_idx in _capture_layers.items():
             hs_tensor = last_outputs.hidden_states[layer_idx][0, -1, :]
             hs_buffer[layer_key].append(hs_tensor.float().cpu().numpy())
         move_steps_list.append(step)
@@ -338,7 +400,7 @@ def generate_with_hidden_states(
     # list[np.ndarray] → np.ndarray of shape (num_moves, hidden_size)
     hidden_states_np: dict[str, np.ndarray] = {}
     num_captured = len(move_steps_list)
-    for layer_key in CAPTURE_LAYERS:
+    for layer_key in _capture_layers:
         if hs_buffer[layer_key]:
             hidden_states_np[layer_key] = np.stack(hs_buffer[layer_key], axis=0)
         else:
@@ -362,6 +424,7 @@ def generate_with_hidden_states(
 def run_experiment_hf(
     N: int,
     trials: int,
+    model_id: str,
     model: AutoModelForCausalLM,
     tokenizer: AutoTokenizer,
     num_predict: Optional[int] = None,
@@ -370,6 +433,8 @@ def run_experiment_hf(
     temperature: float = 0.6,
     repetition_penalty: float = 1.1,
     n_shot: int = 2,
+    profile: Optional[ModelProfile] = None,
+    capture_layers: Optional[dict[str, int]] = None,
 ) -> list[dict]:
     """
     N 枚ハノイの塔で trials 回の推論を実行し、結果リストを返す。
@@ -395,7 +460,7 @@ def run_experiment_hf(
 
     es_label = "有効" if early_stop_cfg is not None else "無効"
     print(f"\n{'='*60}")
-    print(f"  Tower of Hanoi (HF)  N={N}  trials={trials}  model={MODEL_ID}")
+    print(f"  Tower of Hanoi (HF)  N={N}  trials={trials}  model={model_id}")
     print(f"  最短手数 (2^N-1): {env.min_moves}")
     print(f"  num_predict: {num_predict_}")
     print(f"  早期終了:    {es_label}")
@@ -418,6 +483,8 @@ def run_experiment_hf(
             temperature=temperature,
             repetition_penalty=repetition_penalty,
             n_shot=n_shot,
+            profile=profile,
+            capture_layers=capture_layers,
         )
         elapsed = time.time() - t_start
 
@@ -428,9 +495,12 @@ def run_experiment_hf(
         result: dict = {
             "trial":            trial,
             "accuracy":         accuracy,
+            "N":                N,
+            "temperature":      temperature,
             "total_tokens":     result_gen.total_tokens,
             "reasoning_tokens": result_gen.reasoning_tokens,
             "num_predict":      num_predict_,
+            "num_moves":        len(moves),
             "moves_extracted":  len(moves),
             "moves_captured":   int(result_gen.move_steps.shape[0]),
             "v_score":          v_score,
@@ -500,8 +570,11 @@ def parse_args() -> argparse.Namespace:
                         help="円盤の枚数")
     parser.add_argument("--trials",      type=int,   default=None,
                         help="試行回数（省略時は N に応じて自動設定）")
-    parser.add_argument("--model-id",    type=str,   default=MODEL_ID,
-                        help=f"HuggingFace モデル ID (default: {MODEL_ID})")
+    parser.add_argument(
+        "--model-id", type=str,
+        default="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+        help="HuggingFace モデル ID (default: deepseek-ai/DeepSeek-R1-Distill-Qwen-7B)",
+    )
     parser.add_argument("--device",      type=str,   default="cuda:0",
                         help="デバイス (default: cuda:0)")
     parser.add_argument("--num_predict", type=int,   default=None,
@@ -553,8 +626,11 @@ def main() -> None:
     # 出力ディレクトリの解決
     output_dir: Optional[Path] = None
     if not args.no_save_hidden:
-        base = args.output_dir or f"results/hanoi/results_N{args.N}_hf"
-        output_dir = Path(base)
+        if args.output_dir:
+            output_dir = Path(args.output_dir)
+        else:
+            slug = model_id_to_slug(args.model_id)
+            output_dir = Path(f"results/hanoi/{slug}/N{args.N}")
 
     # summary.json の保存先を確定（meta.json の書き出し先に使う）
     summary_path = Path(args.output) if args.output else (
@@ -578,12 +654,21 @@ def main() -> None:
             json.dump(meta, f, ensure_ascii=False, indent=2)
         print(f"メタデータを保存しました: {meta_path}")
 
+    # モデルプロファイル解決（think 起動方式の自動選択）
+    profile = resolve_model_profile(args.model_id)
+    print(f"[INFO] ModelProfile: think_mode={profile.think_mode}")
+
     # モデルロード
     model, tokenizer = load_model_and_tokenizer(args.model_id, args.device)
+
+    # モデルの層数から CAPTURE_LAYERS を動的に決定する
+    capture_layers = make_capture_layers(model.config.num_hidden_layers)
+    print(f"[INFO] capture_layers: {capture_layers}")
 
     results = run_experiment_hf(
         N=args.N,
         trials=trials,
+        model_id=args.model_id,
         model=model,
         tokenizer=tokenizer,
         num_predict=args.num_predict,
@@ -592,6 +677,8 @@ def main() -> None:
         temperature=args.temperature,
         repetition_penalty=args.repetition_penalty,
         n_shot=args.n_shot,
+        profile=profile,
+        capture_layers=capture_layers,
     )
 
     print_summary(results, args.N)

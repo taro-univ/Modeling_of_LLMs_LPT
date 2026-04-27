@@ -18,24 +18,8 @@ docker compose down
 コンテナ内では `/app` がプロジェクトルートにマウントされる。
 `PYTHONPATH=/app` が設定済みなので `python runners/run_hf.py` のように直接実行できる。
 
-### 主な実験コマンド（コンテナ内）
 
-```bash
-# 単発実行（N=ディスク数、T=生成温度）
-python runners/run_hf.py --N 4 --temperature 0.8
 
-# Temperature スイープ
-bash runners/scripts/run_temp_sweep.sh
-
-# フルグリッドスイープ（相図用）
-bash runners/scripts/run_phase_diagram.sh
-
-# P(q) 計測スイープ
-bash runners/scripts/run_pq_sweep.sh
-
-# スケーリング則スイープ
-bash runners/scripts/run_scaling_sweep.sh
-```
 
 ### 実験後の DB 同期（コンテナ内）
 
@@ -46,60 +30,6 @@ bash db/sync.sh
 `meta.json` が存在するディレクトリを自動検出して PostgreSQL に取り込む。
 `run_hf.py` は実験開始時に `meta.json` を自動生成するため、手動操作は不要。
 
-### 解析スクリプト（プロジェクトルートから）
-
-```bash
-PYTHONPATH=. python3 analysis/analyze_phase_diagram.py
-PYTHONPATH=. python3 analysis/analyze_pq.py
-PYTHONPATH=. python3 analysis/analyze_slowing.py
-```
-
----
-
-## ディレクトリ構造
-
-```
-.
-├── runners/          # 実験実行スクリプト
-│   ├── run.py        # Ollama API 版（旧メイン）
-│   ├── run_hf.py     # HuggingFace 版（現メイン）
-│   └── scripts/      # シェルスクリプト（スイープ自動化）
-│
-├── analysis/         # 解析・可視化スクリプト
-│   ├── analyze_phase_diagram.py  # 相図の描画
-│   ├── analyze_pq.py             # P(q) 分布（スピングラス判定）
-│   ├── analyze_slowing.py        # 臨界減速シグナル
-│   ├── analyze_temp_sweep.py     # 温度スイープ解析
-│   └── plot_scaling.py           # スケーリング則プロット
-│
-├── envs/
-│   └── hanoi_env.py  # ハノイの塔の環境（合法手判定・状態管理）
-│
-├── db/
-│   ├── init.sql       # PostgreSQL スキーマ定義
-│   ├── sync.sh        # 実験結果を DB に一括同期
-│   └── sync_one.py    # 単ディレクトリの同期
-│
-├── results/hanoi/     # 実験結果（JSON + npz）
-│   ├── phase_diagram/ # グリッドスイープ結果
-│   ├── pq_sweep/      # P(q) 計測結果
-│   └── temp_sweep/    # 温度スイープ結果
-│
-├── figures/           # 生成された図（再生成可能、Git 管理外）
-├── docs/              # 設計ドキュメント・実験アイデア
-└── docker-compose.yml / Dockerfile
-```
-
-### データ管理ルール
-
-| データ種別 | Git | DB |
-|---|---|---|
-| `summary.json`（試行サマリ） | ○ | ○ |
-| `meta.json`（実験メタデータ） | ○ | ○ |
-| `*.npz`（隠れ状態ベクトル） | × | × |
-| `figures/` | × | × |
-
-`*.npz` はサイズが大きいためローカルのみ保存。解析は `summary.json` を主データとする。
 
 ---
 
@@ -196,3 +126,9 @@ Markdown の斜体記法（`_text_`）と競合するため以下を徹底する
 
 - 数式内でアンダースコアを多用する場合は `\_` とエスケープするか、ブロック表示にする。
 - 変数名・ラベルにアンダースコアが含まれる場合は `\text{dtype\_bytes}` のように `\text{}` で囲む。
+
+### その他
+実験の詳細についてはdocsに保存してある各mdファイルを参照すること
+
+archiveフォルダーについては、実験済みのものを保存してあるため
+言及がない限り参照しないでよい
