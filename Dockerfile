@@ -27,8 +27,8 @@ COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # -------------------------------------------------------
-# PyTorch (CUDA 12.8 対応ホイール) — requirements.txt の torch を上書き
+# PyTorch (CUDA 13.0 対応ホイール) — requirements.txt の torch を上書き
 # -------------------------------------------------------
 RUN pip3 install --no-cache-dir \
     torch torchvision torchaudio \
-    --index-url https://download.pytorch.org/whl/cu128
+    --index-url https://download.pytorch.org/whl/cu130

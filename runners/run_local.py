@@ -170,11 +170,12 @@ def load_model_and_tokenizer(
         model_id,
         quantization_config=bnb_config,
         device_map=device,
-        torch_dtype=torch.bfloat16,
+        dtype=torch.bfloat16,
+        trust_remote_code=True,
     )
     model.eval()
 
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -227,6 +228,7 @@ def generate_with_hidden_states(
     n_shot: int = 0,
     profile: Optional[ModelProfile] = None,
     capture_layers: Optional[dict[str, int]] = None,
+    disable_goal_stop: bool = False,
 ) -> GenerationResult:
     """
     トークンを 1 つずつ生成するカスタムループ。
@@ -343,10 +345,11 @@ def generate_with_hidden_states(
             prev_move_count = current_move_count
 
             # ゴール到達を検知したら即停止（以降の手が hidden state を汚染するのを防ぐ）
-            extracted = env.extract_moves_from_text(accumulated_text)
-            if env.goal_reached(extracted):
-                stop_reason = "goal_reached"
-                break
+            if not disable_goal_stop:
+                extracted = env.extract_moves_from_text(accumulated_text)
+                if env.goal_reached(extracted):
+                    stop_reason = "goal_reached"
+                    break
 
         # 次ステップの入力は今生成したトークンのみ（KV キャッシュを活用）
         current_input_ids = torch.tensor([[next_token_id]], device=device)

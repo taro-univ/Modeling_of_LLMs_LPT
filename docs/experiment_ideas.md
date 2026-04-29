@@ -237,3 +237,81 @@ p-spin 結合 $J_p$ はモデルの重みで固定されるため、
 | 5: 臨界減速 | ★★ 中 | 低（既存 npz で可） | **B** |
 | 4: n-shot 制御変数 | ★★ 中 | 低（$J_p$ 検証につながる） | **B** |
 | 3: LoCM 定義の比較 | ★ 低 | 低 | **C** |
+
+---
+
+## 実装候補（コード改善）
+
+### Algorithm E: 最終手からの停滞アーリーストップ
+
+#### 背景
+
+T=1.2 付近（秩序-崩壊相境界の高温側）で、`moves=1` だけ出力してフリーズする試行が発生する。
+既存の Algorithm D (`no_move_catchall`) は `moves=0` のみを対象とするため、`moves≥1` の場合は
+`num_predict` を使い切るまで生成が続き、1 試行 200 秒超となる。
+
+#### 提案
+
+> 最後の手が出てから `stagnation_ratio × num_predict` トークン分、新たな手が出なければ打ち切る。
+
+```python
+# EarlyStopConfig に追加するパラメータ案
+stagnation_ratio: float = 0.20   # num_predict × 0.20 tok 経過で打ち切り
+enable_stagnation: bool = True
+```
+
+`check_early_stop` 内で `last_move_token_pos` を引数として受け取り、
+`current_token_pos - last_move_token_pos > num_predict * stagnation_ratio` で発動。
+
+#### 検証済み事項
+
+- 秩序相（acc=1）の試行は平均 534 tok・最大 1621 tok 以内に全手が完成 → 閾値 800 tok 超えない
+- PM 相の stuck ケースは 1 手後に 1000+ tok 停滞 → 800 tok 閾値で正しく打ち切り可能
+- SG 相（`move_loop_repeat`）は Algorithm C が先に発動 → 干渉なし
+- `moves=3 & accuracy=0`（正しい手数だが不正解）は停滞なく完了するため Algorithm E 不要
+
+#### 注意点
+
+- 閾値を固定値でなく `num_predict × ratio` にすることで N が大きい場合にも対応が必要
+- N が大きいほど手と手の間の推論時間も伸びる可能性があるため、ratio の最適値を要検証
+- 実装前に N=3〜5 のデータが揃ってから閾値を再調整すること
+
+---
+
+## 実験 "Collapse-Phase Sweep"（T≥1.0 領域の精密解析）
+
+### 位置づけ
+
+メインスイープ（`full_sweep`）は T=0.1〜1.0 の秩序相〜相境界を対象とする。
+T≥1.0 は全 N で acc≈0（崩壊相）であり、相図の描画には不要。
+しかし崩壊相の**内部構造**（SG vs PM の境界・崩壊モードの温度依存性）は
+別実験として精密に解析する価値がある。
+
+### 前提条件
+
+- **Algorithm E の実装完了後**に実施（T≥1.0 は低速試行が多発するため必須）
+- `--sweep-type collapse_phase` として `full_sweep` とは独立したディレクトリに保存
+
+### パラメータ案
+
+```
+T      = 1.0, 1.1, 1.2, 1.3, 1.5, 1.8, 2.0, 2.5, 3.0
+N      = 3, 4, 5   （N=2 は T=1.0 で既に崩壊済みのためスキップ）
+trials = 30        （P(q) 解析に十分な統計量）
+```
+
+### 解析対象指標
+
+- P(q) 分布の双峰性（SG相）vs q≈0 集中（PM相）
+- fallback rate（no_move_catchall 比率）の T 依存性
+- q_EA の T 依存性 → SG→PM 転移温度 $T_{SG→PM}(N)$ の推定
+
+### スクリプト案（Algorithm E 実装後）
+
+```bash
+bash runners/scripts/run_full_sweep.sh \
+  --ts "1.0 1.1 1.2 1.3 1.5 1.8 2.0 2.5 3.0" \
+  --ns "3 4 5" \
+  --trials 30 \
+  --analyze
+```

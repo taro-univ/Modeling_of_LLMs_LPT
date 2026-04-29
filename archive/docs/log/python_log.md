@@ -112,3 +112,18 @@
 ## 2026-04-27 13:41:05
 - **File**: /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
 
+## 2026-04-28 11:30:29
+- **File**: /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
+
+## 2026-04-28 11:31:51
+- **File**: /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+
+## 2026-04-29 01:58:44
+- **File**: /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+
+## 2026-04-29 01:58:51
+- **File**: /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+
+## 2026-04-29 01:59:02
+- **File**: /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
+

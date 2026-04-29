@@ -1,0 +1,7 @@
+{
+  "environment": "hanoi",
+  "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+  "N": 2,
+  "temperature": 0.1,
+  "sweep_type": "full_sweep"
+}
