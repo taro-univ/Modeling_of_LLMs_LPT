@@ -112,3 +112,298 @@ EOF
 )" && git push
 ```
 
+## 2026-04-29 13:49:04
+
+```bash
+find /home/shona/Modeling_of_LLMs_LPT/results -name "summary.json" | head -20
+```
+
+## 2026-04-29 13:49:08
+
+```bash
+find /home/shona/Modeling_of_LLMs_LPT/results -name "summary.json" | grep -E "N5|N4" | head -20
+```
+
+## 2026-04-29 13:49:10
+
+```bash
+cat /home/shona/Modeling_of_LLMs_LPT/results/hanoi/phase_diagram/N5_T2_0/summary.json | python3 -c "
+import json,sys
+data=json.load(sys.stdin)
+tokens=[d.get('total_tokens',0) for d in data]
+thinking=[d.get('reasoning_tokens',0) for d in data]
+es=[d.get('early_stop','') for d in data]
+print(f'trials={len(data)}')
+print(f'total_tokens: min={min(tokens)} avg={sum(tokens)//len(tokens)} max={max(tokens)}')
+print(f'thinking_tokens: avg={sum(thinking)//len(thinking)} max={max(thinking)}')
+print(f'early_stop counts: {dict((e, es.count(e)) for e in set(es))}')
+"
+```
+
+## 2026-04-29 14:26:15
+
+```bash
+for f in /home/shona/Modeling_of_LLMs_LPT/results/hanoi/phase_diagram/N5_T*/summary.json; do
+    T=$(echo $f | grep -oP 'T[\d_]+' | tr '_' '.')
+    python3 -c "
+import json
+data=json.load(open('$f'))
+tokens=[d.get('total_tokens',0) for d in data]
+acc=[d.get('accuracy',0) for d in data]
+es=[str(d.get('early_stop','')) for d in data]
+print(f'$T  n={len(data)}  acc={sum(acc)/len(acc):.2f}  tok_max={max(tokens)}  tok_avg={sum(tokens)//len(tokens)}  es={dict((e,es.count(e)) for e in set(es))}')
+"
+done
+```
+
+## 2026-04-29 14:26:28
+
+```bash
+for f in /home/shona/Modeling_of_LLMs_LPT/results/hanoi/phase_diagram/N3_T*/summary.json; do
+    T=$(echo $f | grep -oP 'T[\d_]+' | tr '_' '.')
+    python3 -c "
+import json
+data=json.load(open('$f'))
+# Filter successful trials
+success=[d for d in data if d.get('accuracy')==1]
+if success:
+    tokens=[d.get('total_tokens',0) for d in success]
+    print(f'$T  success={len(success)}/{len(data)}  tok_max={max(tokens)}  tok_avg={sum(tokens)//len(tokens)}')
+"
+done
+```
+
+## 2026-04-29 14:26:48
+
+```bash
+grep -n "num_predict\|max_new_tokens\|calc_num\|4096\|8192" /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py | head -30
+```
+
+## 2026-04-29 17:07:55
+
+```bash
+wc -l /home/shona/Modeling_of_LLMs_LPT/docs/Collapse-Phase_Sweep_plan.md && grep "^### Step\|^## " /home/shona/Modeling_of_LLMs_LPT/docs/Collapse-Phase_Sweep_plan.md
+```
+
+## 2026-04-30 01:10:37
+
+```bash
+grep "TS_STR" /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_full_sweep.sh
+```
+
+## 2026-04-30 01:10:39
+
+```bash
+find results/hanoi/full_sweep -name "summary.json" | sort | sed 's|results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/||'
+```
+
+## 2026-04-30 01:15:09
+
+```bash
+ls /home/shona/Research_LLM/envs/
+```
+
+## 2026-04-30 01:33:55
+
+```bash
+python3 -c "
+import math
+puzzles = {
+    'Hanoi':   {n: 2**n - 1 for n in range(2, 7)},
+    'Frog':    {n: n*n + 2*n for n in range(1, 6)},
+    'Pancake': {3:3, 4:4, 5:5, 6:7, 7:8, 8:9},  # pancake numbers p(n)
+}
+print('=== LoCM 対応表 ===')
+for puzzle, table in puzzles.items():
+    for n, moves in table.items():
+        locm = math.log2(moves)
+        print(f'{puzzle:8s} N={n}: {moves:3d} moves  LoCM={locm:.2f}')
+    print()
+"
+
+```
+
+## 2026-04-30 01:39:44
+
+```bash
+python3 - <<'EOF'
+from collections import deque
+
+def min_moves_river(N, capacity):
+    """BFS for missionaries and cannibals"""
+    start = (N, N, True)
+    goal = (0, 0, False)
+    if start == goal:
+        return 0
+    
+    def neighbors(state):
+        lm, lc, boat_left = state
+        rm, rc = N - lm, N - lc
+        nxt = []
+        for m in range(capacity + 1):
+            for c in range(capacity + 1):
+                if m + c == 0 or m + c > capacity:
+                    continue
+                if boat_left:
+                    if m > lm or c > lc: continue
+                    nl, nc = lm - m, lc - c
+                    nr, nrc = rm + m, rc + c
+                    nb = False
+                else:
+                    if m > rm or c > rc: continue
+                    nl, nc = lm + m, lc + c
+                    nr, nrc = rm - m, rc - c
+                    nb = True
+                # safety check
+                if nl > 0 and nc > nl: continue
+                if nr > 0 and nrc > nr: continue
+                nxt.append((nl, nc, nb))
+        return nxt
+    
+    visited = {start}
+    q = deque([(start, 0)])
+    while q:
+        cur, d = q.popleft()
+        for nxt in neighbors(cur):
+            if nxt == goal: return d + 1
+            if nxt not in visited:
+                visited.add(nxt)
+                q.append((nxt, d + 1))
+    return -1  # unsolvable
+
+import math
+print("N  cap  moves  LoCM   solvable")
+for N in [2, 3, 4, 5]:
+    for cap in [2, 3, 4]:
+        m = min_moves_river(N, cap)
+        if m > 0:
+            print(f"N={N}  cap={cap}  moves={m:3d}  LoCM={math.log2(m):.2f}  ✓")
+        else:
+            print(f"N={N}  cap={cap}  moves= —              ✗ unsolvable")
+    print()
+EOF
+
+```
+
+## 2026-04-30 07:13:47
+
+```bash
+ls results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/ | grep N6
+```
+
+## 2026-04-30 07:13:56
+
+```bash
+ls results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/N6_T0_3/
+```
+
+## 2026-04-30 07:15:59
+
+```bash
+python3 -c "
+import numpy as np
+d = np.load('results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/N6_T0_1/trial_001_hidden.npz', allow_pickle=True)
+print('keys:', list(d.keys()))
+for k in d.keys():
+    arr = d[k]
+    print(f'{k}: shape={arr.shape}, dtype={arr.dtype}')
+"
+
+```
+
+## 2026-04-30 07:16:58
+
+```bash
+python3 analysis/cosine_sim_phase.py
+```
+
+## 2026-04-30 13:32:15
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/ | head -30
+```
+
+## 2026-04-30 13:32:15
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/analysis/
+```
+
+## 2026-04-30 13:32:18
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/ | wc -l && ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/ | tail -10
+```
+
+## 2026-04-30 13:32:19
+
+```bash
+cat /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/N3_T0_7/summary.json | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d[:2], indent=2))"
+```
+
+## 2026-04-30 13:32:30
+
+```bash
+grep -n "default\|argparse\|dir\|base_dir" /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_phase_diagram.py | head -20
+```
+
+## 2026-04-30 13:32:31
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/N3_T0_7/
+```
+
+## 2026-04-30 13:32:50
+
+```bash
+docker compose ps
+```
+
+## 2026-04-30 13:40:18
+
+```bash
+python3 -c "import numpy as np; d = np.load('/home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/N3_T0_7/trial_001_hidden.npz', allow_pickle=True); print(list(d.keys()))"
+```
+
+## 2026-04-30 13:49:34
+
+```bash
+grep "no_move_ratio" /home/shona/Modeling_of_LLMs_LPT/runners/run.py
+```
+
+## 2026-04-30 13:51:41
+
+```bash
+grep -n "stagnation" /home/shona/Modeling_of_LLMs_LPT/runners/run.py
+```
+
+## 2026-04-30 13:55:08
+
+```bash
+grep -n "stagnation\|chunk_count\|last_move_chunk\|prev_n_moves" /home/shona/Modeling_of_LLMs_LPT/runners/run.py
+```
+
+## 2026-04-30 13:57:53
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/tests/ 2>/dev/null || echo "NOT FOUND"
+```
+
+## 2026-04-30 14:01:02
+
+```bash
+diff /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_full_sweep.sh /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_collapse_phase_sweep.sh
+```
+
+## 2026-04-30 14:05:35
+
+```bash
+bash /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_collapse_phase_sweep.sh --dry-run 2>&1 | head -15
+```
+
+## 2026-04-30 14:07:04
+
+```bash
+bash /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_collapse_phase_sweep.sh --dry-run 2>&1 | head -12
+```
+

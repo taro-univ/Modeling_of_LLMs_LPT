@@ -153,18 +153,25 @@ class EarlyStopConfig:
 
     loop_min_count : int
         loop_window 内で同一手が何回出現したら打ち切るか。
+
+    stagnation_ratio : float
+        最後の手が出てから新たな手が出ないまま
+        num_predict のこの割合のチャンク数が経過したら打ち切る。
+        Algorithm E: Stagnation After Move。
     """
     think_budget_ratio: float = 0.70
-    no_move_ratio: float = 0.50
+    no_move_ratio: float = 0.25
     max_move_multiplier: float = 1.5
     loop_window: int = 6
     loop_min_count: int = 2
+    stagnation_ratio: float = 0.20
 
     # 各アルゴリズムの有効化フラグ
     enable_think_budget: bool = True
     enable_no_move: bool = True
     enable_move_ceiling: bool = True
     enable_move_loop: bool = True
+    enable_stagnation: bool = True
 
 
 # ===========================================================================
@@ -318,6 +325,9 @@ def query_ollama(
     accumulated   = ""
     total_tokens  = 0
     stop_reason: Optional[str] = None
+    chunk_count     = 0
+    last_move_chunk = None
+    prev_n_moves    = 0
 
     try:
         with requests.post(url, json=body, stream=True, timeout=timeout) as resp:
@@ -328,9 +338,23 @@ def query_ollama(
                 chunk = json.loads(raw_line)
                 accumulated  += chunk.get("response", "")
                 total_tokens  = chunk.get("eval_count", total_tokens)
+                chunk_count  += 1
 
                 if chunk.get("done"):
                     break
+
+                # Algorithm E: last_move_chunk を更新（毎チャンク、軽量）
+                if early_stop_cfg is not None and early_stop_cfg.enable_stagnation:
+                    n_moves = len(_MOVE_RE.findall(accumulated))
+                    if n_moves > prev_n_moves:
+                        last_move_chunk = chunk_count
+                        prev_n_moves    = n_moves
+
+                    if last_move_chunk is not None:
+                        gap = chunk_count - last_move_chunk
+                        if gap > num_predict * early_stop_cfg.stagnation_ratio:
+                            stop_reason = "stagnation_after_move"
+                            break
 
                 # 早期終了チェック（50 文字おきに評価 → オーバーヘッド最小化）
                 if early_stop_cfg is not None and len(accumulated) % 50 < 5:

@@ -477,7 +477,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dir",   type=str, default="results/hanoi/pq_sweep",
                         help="pq_sweep 結果ディレクトリ")
     parser.add_argument("--layer", type=str, default=LAYER_DEFAULT,
-                        choices=["layer_m1", "layer_m8", "layer_m16"],
                         help="解析対象レイヤー (default: layer_m8)")
     parser.add_argument("--ns",    type=int, nargs="+", default=NS_DEFAULT)
     parser.add_argument("--ts",    type=float, nargs="+", default=TS_DEFAULT)

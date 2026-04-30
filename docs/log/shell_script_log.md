@@ -58,3 +58,41 @@ EOF
 )" && git push
 ```
 
+## 2026-04-30 01:10:37
+
+```bash
+grep "TS_STR" /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_full_sweep.sh
+```
+
+## 2026-04-30 07:15:59
+
+```bash
+python3 -c "
+import numpy as np
+d = np.load('results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/N6_T0_1/trial_001_hidden.npz', allow_pickle=True)
+print('keys:', list(d.keys()))
+for k in d.keys():
+    arr = d[k]
+    print(f'{k}: shape={arr.shape}, dtype={arr.dtype}')
+"
+
+```
+
+## 2026-04-30 14:01:02
+
+```bash
+diff /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_full_sweep.sh /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_collapse_phase_sweep.sh
+```
+
+## 2026-04-30 14:05:35
+
+```bash
+bash /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_collapse_phase_sweep.sh --dry-run 2>&1 | head -15
+```
+
+## 2026-04-30 14:07:04
+
+```bash
+bash /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_collapse_phase_sweep.sh --dry-run 2>&1 | head -12
+```
+

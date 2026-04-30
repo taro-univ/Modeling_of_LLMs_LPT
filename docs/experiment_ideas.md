@@ -242,39 +242,96 @@ p-spin 結合 $J_p$ はモデルの重みで固定されるため、
 
 ## 実装候補（コード改善）
 
-### Algorithm E: 最終手からの停滞アーリーストップ
+### Algorithm E: 最終手からの停滞アーリーストップ + Algorithm D 閾値改訂
 
-#### 背景
+#### 解消対象ボトルネック
 
-T=1.2 付近（秩序-崩壊相境界の高温側）で、`moves=1` だけ出力してフリーズする試行が発生する。
-既存の Algorithm D (`no_move_catchall`) は `moves=0` のみを対象とするため、`moves≥1` の場合は
-`num_predict` を使い切るまで生成が続き、1 試行 200 秒超となる。
+データ探索（`phase_diagram`, `pq_sweep`）から、実験を長引かせている原因が 4 つ特定された。
 
-#### 提案
+| # | ボトルネック | 代表例 | 損失時間 |
+|---|---|---|---|
+| B1 | moves=1 後の長時間停滞 | N4_T1_5 trial9 (883s), pq_sweep N4_T1_2 trial19 (556s) | 200〜880s |
+| B2 | Algorithm D の `no_move_ratio=0.50` が高すぎて PM 相全体が遅い | N4_T2_0 全試行 163〜177s, N5_T2_0 全試行 155〜183s | 160〜210s/trial |
+| B3 | moves≥2 後の停滞（Algorithm E の対象だが moves=1 限定の記述になっていた） | N5_T1_2 trial8 (moves=4, 198s), trial7 (moves=15, 157s) | 100〜200s |
+| B4 | `len(text)/3.5` による文字数近似のズレ（reasoning=0 試行で特に大きい） | T=2.0 で発動 total_tokens が 1500〜1640 とばらつく | B2 対策で緩和 |
 
-> 最後の手が出てから `stagnation_ratio × num_predict` トークン分、新たな手が出なければ打ち切る。
+---
+
+#### Algorithm E の設計（B1・B3 を解消）
+
+> **最後の手が出てから `stagnation_ratio × num_predict` トークン分、新たな手が出なければ打ち切る。**
+> moves=1 に限定せず、`last_move_token_pos` を基点とした moves≥1 全般を対象とする。
 
 ```python
-# EarlyStopConfig に追加するパラメータ案
-stagnation_ratio: float = 0.20   # num_predict × 0.20 tok 経過で打ち切り
+# EarlyStopConfig に追加するパラメータ
+stagnation_ratio: float = 0.20   # num_predict × 0.20 tok 無手で打ち切り
 enable_stagnation: bool = True
 ```
 
-`check_early_stop` 内で `last_move_token_pos` を引数として受け取り、
-`current_token_pos - last_move_token_pos > num_predict * stagnation_ratio` で発動。
+`check_early_stop` の呼び出し側で現在の累積トークン位置（`current_token_pos`）と
+最後に手が抽出された位置（`last_move_token_pos`）を管理し、次の条件で発動する。
 
-#### 検証済み事項
+```python
+if last_move_token_pos is not None:
+    gap = current_token_pos - last_move_token_pos
+    if gap > num_predict * stagnation_ratio:
+        return "stagnation_after_move"
+```
 
-- 秩序相（acc=1）の試行は平均 534 tok・最大 1621 tok 以内に全手が完成 → 閾値 800 tok 超えない
-- PM 相の stuck ケースは 1 手後に 1000+ tok 停滞 → 800 tok 閾値で正しく打ち切り可能
-- SG 相（`move_loop_repeat`）は Algorithm C が先に発動 → 干渉なし
-- `moves=3 & accuracy=0`（正しい手数だが不正解）は停滞なく完了するため Algorithm E 不要
+`last_move_token_pos` はストリーミングループ内で `moves = _MOVE_RE.findall(accumulated)` の
+件数が増えるたびに `current_token_pos` で更新する。
 
-#### 注意点
+**誤発動しないことを確認済みのケース:**
 
-- 閾値を固定値でなく `num_predict × ratio` にすることで N が大きい場合にも対応が必要
-- N が大きいほど手と手の間の推論時間も伸びる可能性があるため、ratio の最適値を要検証
-- 実装前に N=3〜5 のデータが揃ってから閾値を再調整すること
+- 秩序相（acc=1）: 全手が平均 534 tok・最大 1621 tok 以内に完成 → stagnation 閾値 (4096×0.20=819 tok) を超えない
+- SG 相（`move_loop_repeat`）: Algorithm C が先に発動するため Algorithm E と衝突しない
+- moves 数は正しいが不正解（e.g., moves=7 で acc=0）: 手が途切れずに完了するため停滞なし
+
+**N が大きい場合の注意:**
+
+- N が増えると手と手の間の推論時間も伸びる可能性がある
+- `stagnation_ratio × num_predict` を固定比率にすることで N=6 (num_predict=8192) でも自動スケールする
+- N=6 以上のデータが揃い次第 ratio を再検証すること（現時点の根拠は N=3〜5）
+
+---
+
+#### Algorithm D 閾値改訂（B2・B4 を緩和）
+
+**変更内容:** `no_move_ratio` を `0.50` → `0.25` に引き下げる。
+
+```python
+# EarlyStopConfig の変更
+no_move_ratio: float = 0.25   # 旧: 0.50
+```
+
+**根拠:**
+
+- PM 相（T≥1.5）では moves=0 の試行が `no_move_ratio=0.50` (≈ 2048 est_tok) まで待つことで
+  1 試行あたり 160〜210s かかっていた
+- `no_move_ratio=0.25` (≈ 1024 est_tok) にすれば発動を約半分の時点に前倒しでき、
+  **1 試行あたり 80〜100s 節約**できる
+
+**誤発動リスクの確認:**
+
+- 秩序相（T<1.0）の最初の手は N=3〜5 いずれも 500 tok 以内に出現しており、
+  閾値 1024 est_tok ≈ 3584 chars を超える前に手が抽出される → 誤発動しない
+- 境界付近（T≈1.0）の試行は moves=0 でも reasoning が長く続くが、
+  Algorithm A（think_budget）が先に発動するケースが多く、D との干渉は軽微
+
+**B4（文字数近似のズレ）について:**
+
+`no_move_ratio` を 0.25 に引き下げることで発動の絶対位置が前倒しになり、
+ズレの影響（±20%）が小さくなる。`eval_count` ベースへの切り替えは将来課題とする。
+
+---
+
+#### 実装優先順序
+
+1. `no_move_ratio` を 0.25 に変更（1 行の変更、即効性が高い）
+2. `EarlyStopConfig` に `stagnation_ratio` / `enable_stagnation` を追加
+3. `query_ollama` のストリーミングループに `last_move_token_pos` 更新ロジックを追加
+4. `check_early_stop` に `stagnation_after_move` 条件を追加（または呼び出し側で処理）
+5. Collapse-Phase Sweep 実験を実施して閾値を再検証
 
 ---
 
