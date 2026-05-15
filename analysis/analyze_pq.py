@@ -89,11 +89,18 @@ def load_condition(
     accuracy   = [r["accuracy"]              for r in summary] if summary else []
     early_stop = [r.get("early_stop")        for r in summary] if summary else []
 
+    pm_rate = (
+        sum(1 for es in early_stop if es in ("no_move_catchall", "move_ceiling"))
+        / len(early_stop)
+        if early_stop else float("nan")
+    )
+
     return {
         "hidden":      hidden_list,
-        "is_fallback": is_fallback_list,
+        "is_fallback": is_fallback_list,  # npz由来：qEA/自己相関計算で使用
         "accuracy":    accuracy,
         "early_stop":  early_stop,
+        "pm_rate":     pm_rate,           # summary.json由来：相分類で使用
         "n_trials":    len(hidden_list),
         "N": N, "T": T,
     }
@@ -197,11 +204,15 @@ PHASE_COLORS = {
 }
 
 
-def classify_phase(q_ea: float, fallback_rate: float, accuracy: float) -> str:
-    """q_EA と fallback 率から相を大まかに分類する。"""
+def classify_phase(q_ea: float, pm_rate: float, fallback_rate: float, accuracy: float) -> str:
+    """q_EA と PM率から相を分類する。
+    pm_rate（summary.json の no_move_catchall 比率）を優先し、
+    summary.json がない場合（nan）は fallback_rate（npz 由来）で代替する。
+    """
     if accuracy > 0.4:
         return "ordered"
-    if fallback_rate > 0.6:
+    effective_pm = pm_rate if not np.isnan(pm_rate) else fallback_rate
+    if effective_pm > 0.6:
         return "paramagnetic"
     if not np.isnan(q_ea) and q_ea > 0.70:
         return "spin_glass"
@@ -217,6 +228,7 @@ def plot_pq_distributions(
     ns: list[int],
     ts: list[float],
     out_path: Path,
+    layer: str = LAYER_DEFAULT,
 ) -> None:
     """
     P(q) 分布をグリッド状に配置した図を生成する。
@@ -227,7 +239,7 @@ def plot_pq_distributions(
         figsize=(2.2 * len(ts), 2.0 * len(ns)),
         sharex=True, sharey=False,
     )
-    fig.suptitle("P(q) Overlap Distribution  (layer_m8)", fontsize=12, y=1.01)
+    fig.suptitle(f"P(q) Overlap Distribution  ({layer})", fontsize=12, y=1.01)
 
     for i, N in enumerate(ns):
         for j, T in enumerate(ts):
@@ -242,16 +254,17 @@ def plot_pq_distributions(
                 continue
 
             q_vals = compute_pq(cond)
-            fb_rate = sum(cond["is_fallback"]) / cond["n_trials"]
             acc = float(np.mean(cond["accuracy"])) if cond["accuracy"] else 0.0
             q_ea = compute_qea(cond)
-            phase = classify_phase(q_ea, fb_rate, acc)
+            fb_rate = sum(cond["is_fallback"]) / cond["n_trials"]
+            phase = classify_phase(q_ea, cond["pm_rate"], fb_rate, acc)
             color = PHASE_COLORS[phase]
 
             ax.hist(q_vals, bins=Q_BINS, color=color, alpha=0.75, density=True)
             ax.axvline(np.nanmean(q_vals), color="k", lw=1.2, ls="--", alpha=0.7)
 
-            label = f"q̄={np.nanmean(q_vals):.2f}\nfb={fb_rate:.0%}"
+            pm_str = f"{cond['pm_rate']:.0%}" if not np.isnan(cond["pm_rate"]) else "N/A"
+            label = f"q̄={np.nanmean(q_vals):.2f}\npm={pm_str}"
             ax.text(0.04, 0.93, label, transform=ax.transAxes,
                     fontsize=6, va="top", color="black")
 
@@ -283,6 +296,7 @@ def plot_summary(
     ns: list[int],
     ts: list[float],
     out_path: Path,
+    layer: str = LAYER_DEFAULT,
 ) -> None:
     """
     4 パネルのサマリー図を生成する:
@@ -298,7 +312,7 @@ def plot_summary(
     ax3 = fig.add_subplot(gs[1, 0])
     ax4 = fig.add_subplot(gs[1, 1])
 
-    fig.suptitle("P(q) Analysis Summary  (pq_sweep, layer_m8)", fontsize=13)
+    fig.suptitle(f"P(q) Analysis Summary  ({layer})", fontsize=13)
     colors = plt.cm.tab10(np.linspace(0, 0.6, len(ns)))
 
     # --- (1) q_EA vs T ---
@@ -320,33 +334,38 @@ def plot_summary(
     ax1.legend(fontsize=9)
     ax1.grid(True, alpha=0.3)
 
-    # --- (2) fallback 率 vs T ---
-    ax2.set_title("Fallback rate  vs  Temperature\n(paramagnetic phase indicator)")
+    # --- (2) PM率 vs T ---
+    ax2.set_title("PM rate  vs  Temperature\n(no_move_catchall fraction)")
     for idx, N in enumerate(ns):
-        fb_row, ts_valid = [], []
+        pm_row, ts_valid = [], []
         for T in ts:
             cond = all_conds.get((N, T))
             if cond is None:
                 continue
-            fb = sum(cond["is_fallback"]) / cond["n_trials"]
-            fb_row.append(fb)
+            pm_row.append(cond["pm_rate"])
             ts_valid.append(T)
-        ax2.plot(ts_valid, fb_row, "s-", color=colors[idx],
+        ax2.plot(ts_valid, pm_row, "s-", color=colors[idx],
                  linewidth=1.8, markersize=6, label=f"N={N}")
     ax2.axhline(0.5, color="gray", ls="--", alpha=0.6, label="50%")
     ax2.set_xlabel("Temperature  T")
-    ax2.set_ylabel("Fallback rate")
+    ax2.set_ylabel("PM rate  (no_move_catchall)")
     ax2.set_ylim(-0.05, 1.05)
     ax2.legend(fontsize=9)
     ax2.grid(True, alpha=0.3)
 
-    # --- (3) C(Δt) — 代表条件 ---
+    # --- (3) C(Δt) — 代表条件（データセット内の実T値から自動選択） ---
     ax3.set_title(r"Time autocorrelation  $C(\Delta t)$")
+    T_lo  = ts[len(ts) // 4]
+    T_mid = ts[len(ts) // 2]
+    T_hi  = ts[-1]
+    N_lo  = ns[0]
+    N_hi  = ns[-1]
+    palette = ["#1f77b4", "#ff7f0e", "#d62728", "#9467bd"]
     rep_conds = [
-        (5, 0.2, "N5 T=0.2  [spin glass]",   "#ff7f0e"),
-        (3, 0.2, "N3 T=0.2  [ordered]",       "#1f77b4"),
-        (3, 1.5, "N3 T=1.5  [paramagnetic]",  "#d62728"),
-        (4, 0.8, "N4 T=0.8  [mixed]",         "#9467bd"),
+        (N_lo,  T_lo,  f"N={N_lo}  T={T_lo}",  palette[0]),
+        (N_lo,  T_hi,  f"N={N_lo}  T={T_hi}",  palette[2]),
+        (N_hi,  T_lo,  f"N={N_hi}  T={T_lo}",  palette[1]),
+        (N_hi,  T_mid, f"N={N_hi}  T={T_mid}", palette[3]),
     ]
     max_lag = 8
     for N, T, label, color in rep_conds:
@@ -380,10 +399,10 @@ def plot_summary(
             cond = all_conds.get((N, T))
             if cond is None:
                 continue
-            fb   = sum(cond["is_fallback"]) / cond["n_trials"]
             acc  = float(np.mean(cond["accuracy"])) if cond["accuracy"] else 0.0
             qea  = compute_qea(cond)
-            phase = classify_phase(qea, fb, acc)
+            fb   = sum(cond["is_fallback"]) / cond["n_trials"]
+            phase = classify_phase(qea, cond["pm_rate"], fb, acc)
             mat[i, j] = phase_to_int[phase]
 
     im = ax4.imshow(mat, aspect="auto", origin="lower",
@@ -416,7 +435,7 @@ def print_report(
     print("  P(q) Analysis Report")
     print(f"{'='*80}")
 
-    header = f"{'N':>3} {'T':>5} | {'q_EA':>6} | {'q̄_inter':>8} | {'q_std':>6} | {'fb%':>5} | {'acc':>5} | phase"
+    header = f"{'N':>3} {'T':>5} | {'q_EA':>6} | {'q̄_inter':>8} | {'q_std':>6} | {'pm%':>5} | {'acc':>5} | phase"
     print(header)
     print("-" * len(header))
 
@@ -427,43 +446,48 @@ def print_report(
                 continue
             q_vals = compute_pq(cond)
             qea    = compute_qea(cond)
-            fb     = sum(cond["is_fallback"]) / cond["n_trials"]
             acc    = float(np.mean(cond["accuracy"])) if cond["accuracy"] else 0.0
-            phase  = classify_phase(qea, fb, acc)
+            pm     = cond["pm_rate"]
+            fb     = sum(cond["is_fallback"]) / cond["n_trials"]
+            phase  = classify_phase(qea, pm, fb, acc)
 
             q_mean = np.nanmean(q_vals)
             q_std  = np.nanstd(q_vals)
             qea_s  = f"{qea:.3f}" if not np.isnan(qea) else "  nan"
+            pm_s   = f"{pm:.0%}" if not np.isnan(pm) else " N/A"
 
             print(f"{N:>3} {T:>5.1f} | {qea_s:>6} | {q_mean:>8.4f} | {q_std:>6.4f}"
-                  f" | {fb:>4.0%} | {acc:>5.2f} | {phase}")
+                  f" | {pm_s:>5} | {acc:>5.2f} | {phase}")
         print()
 
     # スピングラス・常磁性の境界推定
     print(f"\n{'='*80}")
-    print("  崩壊モード遷移温度 T_SG→PM（fallback率 = 50% 交差点）")
+    print("  崩壊モード遷移温度 T_SG→PM（PM率 = 50% 交差点、no_move_catchall 基準）")
     print(f"{'='*80}")
     for N in ns:
-        fb_vals, ts_valid = [], []
+        pm_vals, ts_valid = [], []
         for T in ts:
             cond = all_conds.get((N, T))
             if cond is None:
                 continue
-            fb = sum(cond["is_fallback"]) / cond["n_trials"]
-            fb_vals.append(fb)
+            pm = cond["pm_rate"]
+            if np.isnan(pm):
+                continue
+            pm_vals.append(pm)
             ts_valid.append(T)
 
         T_trans = None
         for j in range(len(ts_valid) - 1):
-            if fb_vals[j] < 0.5 <= fb_vals[j + 1]:
-                slope  = (fb_vals[j+1] - fb_vals[j]) / (ts_valid[j+1] - ts_valid[j])
-                T_trans = ts_valid[j] + (0.5 - fb_vals[j]) / slope
+            if pm_vals[j] < 0.5 <= pm_vals[j + 1]:
+                slope  = (pm_vals[j+1] - pm_vals[j]) / (ts_valid[j+1] - ts_valid[j])
+                T_trans = ts_valid[j] + (0.5 - pm_vals[j]) / slope
                 break
 
         if T_trans is not None:
             print(f"  N={N}: T_{{SG→PM}} ≈ {T_trans:.2f}")
         else:
-            print(f"  N={N}: 遷移が範囲内に見つからない（fb最大={max(fb_vals):.0%}）")
+            pm_max = max(pm_vals) if pm_vals else float("nan")
+            print(f"  N={N}: 遷移が範囲内に見つからない（PM率最大={pm_max:.0%}）")
 
 
 # ===========================================================================
@@ -508,8 +532,8 @@ def main() -> None:
     print(f"[INFO] {len(all_conds)} 条件をロードしました。")
 
     print_report(all_conds, args.ns, args.ts)
-    plot_pq_distributions(all_conds, args.ns, args.ts, Path(args.out_dist))
-    plot_summary(all_conds, args.ns, args.ts, Path(args.out_summary))
+    plot_pq_distributions(all_conds, args.ns, args.ts, Path(args.out_dist), layer=layer)
+    plot_summary(all_conds, args.ns, args.ts, Path(args.out_summary), layer=layer)
 
     print("\n[DONE]")
     print(f"  P(q) 分布グリッド : {args.out_dist}")

@@ -96,3 +96,67 @@ bash /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_collapse_phase_sweep.s
 bash /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_collapse_phase_sweep.sh --dry-run 2>&1 | head -12
 ```
 
+## 2026-05-01 17:55:12
+
+```bash
+python3 -c "
+import numpy as np
+from pathlib import Path
+base = Path('results/hanoi/collapse_phase/deepseek-r1-distill-qwen-7b')
+# N4の確認
+d = np.load(base/'N4_T1_1/trial_001_hidden.npz', allow_pickle=True)
+print('N4 keys:', list(d.keys()))
+# load_conditionのシミュレーション
+for N in [3,4,5,6]:
+    tag = '1_1'
+    cdir = base / f'N{N}_T{tag}'
+    npzs = sorted(cdir.glob('trial_*_hidden.npz'))
+    hidden = []
+    for npz in npzs:
+        d = np.load(npz, allow_pickle=True)
+        if 'layer_mid' not in d:
+            print(f'N{N} T1_1: layer_mid MISSING in', npz.name)
+        else:
+            hidden.append(d['layer_mid'].shape)
+    print(f'N{N} T1_1: {len(hidden)} trials loaded')
+"
+```
+
+## 2026-05-01 20:27:58
+
+```bash
+python3 -c "
+import numpy as np
+d = np.load('results/hanoi/collapse_phase/deepseek-r1-distill-qwen-7b/N3_T1_1/trial_001_hidden.npz', allow_pickle=True)
+print('layer_mid shape:', d['layer_mid'].shape)
+print('move_texts:', list(d['move_texts'])[:3])
+"
+```
+
+## 2026-05-07 23:37:51
+
+```bash
+docker compose exec hanoi-minimal bash -c "bash runners/scripts/run_collapse_phase_sweep.sh --models 'deepseek-ai/DeepSeek-R1-Distill-Qwen-14B' --trials 30" > /tmp/collapse_14b.log 2>&1
+```
+
+## 2026-05-10 18:33:12
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/runners/scripts/ && head -50 /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_collapse_phase_sweep.sh && echo '---' && head -50 /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_scaling_sweep.sh
+```
+
+## 2026-05-10 21:06:04
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/ 2>/dev/null | head -5; echo "---"; find /home/shona/Modeling_of_LLMs_LPT/results -name "*.npz" 2>/dev/null | head -3; echo "---npz inspect---"; python3 -c "
+import numpy as np, sys, glob
+files = sorted(glob.glob('/home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/*/N3_T0_6/*.npz'))[:1]
+if files:
+    f = files[0]
+    print('file:', f)
+    d = np.load(f)
+    for k in d.files:
+        print(f'  {k}: shape={d[k].shape}, dtype={d[k].dtype}')
+" 2>&1 | head -30
+```
+
