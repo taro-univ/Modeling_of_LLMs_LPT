@@ -228,14 +228,37 @@ Stage 4〜5 完了報告
 
 ## Stage 6: 実験実行
 
-GATE C 通過後、orchestration が実験コマンドを実行する：
+GATE C 通過後、オーケストレーションは **Pipeline Orchestrator エージェント** に委譲する。
+
+> **Stage 6 の鉄則**：GATE C 通過後はオーケストレーションが直接スクリプトを叩かない。
+> 必ず Pipeline Orchestrator（`.claude/agents/pipeline-orchestrator.md`）を `Agent(subagent_type="general-purpose", ...)` で起動し、以下の情報を渡す。
+
+```python
+# オーケストレーション → Pipeline Orchestrator への委譲（Claude Code 内で実行）
+Agent(
+    subagent_type="general-purpose",
+    description="Run sweep + post-processing",
+    prompt="""
+You are the Pipeline Orchestrator. Follow the instructions in
+.claude/agents/pipeline-orchestrator.md exactly.
+
+Parameters for this run:
+- model_list: ["<model_id_1>", "<model_id_2>", ...]
+- sweep_type: "full_sweep"   # or "collapse_phase_sweep" or "both"
+- trials: 25
+- run_pq_classify: true
+
+Execute Phase 1 → Phase 2 → Phase 3 → Phase 4 in order.
+Report back with the completion report from Phase 4.
+"""
+)
+```
+
+**単発実験（スイープではなく 1 条件のみ確認したい場合）はオーケストレーションが直接実行してよい：**
 
 ```bash
-# 単発実験
-python3 runners/run_local.py --N 3 --trials 5 --temperature 0.6
-
-# スイープ
-bash runners/scripts/run_full_sweep.sh --analyze
+docker compose exec hanoi-minimal bash -c \
+    "PYTHONPATH=/app python3 runners/run_local.py --N 3 --trials 5 --temperature 0.6"
 ```
 
 ---

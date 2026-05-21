@@ -306,6 +306,7 @@ archiveフォルダーについては、実験済みのものを保存してあ�
 | **実装エージェント** | コーディング担当。仕様書（`specs/final/`）を読み込みコードを書き換える。**OOP で機能別に綺麗に分離した設計を徹底。** | **Codex CLI（GPT-5.5）** |
 | **品質チェックエージェント** | コード品質審査。実装後に差分をチェックする。実装エージェントとは独立（`.claude/agents/quality-check-agent.md`） | Claude Code（Sonnet） |
 | **リサーチエージェント** | 文献調査の単一窓口。user・フィジックス・実装チームへ参考文献を供給する潤滑油役（`.claude/agents/research-agent.md`） | Claude Code（Sonnet） |
+| **パイプラインオーケストレーター** | GATE C 通過後の「スイープ実行 → DB 同期 → 進捗更新」を自動化する裏方（役割定義は `.claude/agents/pipeline-orchestrator.md`） | Claude Code（Sonnet サブエージェント） |
 
 ### Codex（実装エージェント）の呼び出しルール
 
@@ -313,9 +314,12 @@ archiveフォルダーについては、実験済みのものを保存してあ�
 
 ```bash
 # Codex への実装委譲コマンド（spec_id を実際の ID に置き換える）
-codex --task-file specs/final/SPEC-YYYY-MM-DD-NNN.md \
-      --agent-profile .claude/agents/implementation-agent.md \
-      --auto-approve
+cat specs/final/SPEC-YYYY-MM-DD-NNN.md | \
+  codex exec \
+    -s danger-full-access \
+    -m gpt-5.5 \
+    -o /tmp/codex_SPEC-YYYY-MM-DD-NNN_output.md \
+    - > /tmp/codex_SPEC-YYYY-MM-DD-NNN.log 2>&1
 ```
 
 > **完了後の必須手順**：Codex の実行ログと `git diff` を確認し、Stage 5（品質チェック → physics 事後確認）へ進むこと。
@@ -332,6 +336,31 @@ codex --task-file specs/final/SPEC-YYYY-MM-DD-NNN.md \
 - 何か怪しい状況（フィジックス／オーケストレーションが疑問を提示）が起きたら、リサーチエージェントが文献を拾う
 - 提案先は user だけでなく**他エージェントにも横展開**する（実装チームに「この理論があるからこう書ける」と教える、フィジックスに参考文献を渡す）
 - **各エージェント内で個別に文献調査をしない**（重複と品質ばらつきを避ける）
+
+### パイプラインオーケストレーターの呼び出しルール
+
+オーケストレーション（Claude Code）は GATE C 通過後、**自分でスイープスクリプトを叩かず**、必ず Pipeline Orchestrator サブエージェントを起動する。
+
+**起動条件**：
+1. ユーザーが「実験GO」を明示した（GATE C 通過）
+2. 実験対象モデル・パラメータが確定している
+
+**起動方法**（Claude Code の `Agent` ツールを使用）：
+```
+subagent_type: "general-purpose"
+prompt: ".claude/agents/pipeline-orchestrator.md の指示に従い、以下のパラメータで実行:
+  model_list: [...]
+  sweep_type: full_sweep or collapse_phase_sweep
+  trials: 25
+  run_pq_classify: true"
+```
+
+**完了後の必須手順**：Pipeline Orchestrator の完了レポートを確認し、エラーがあればユーザーに報告する。
+
+**例外（直接実行してよいケース）**：
+- 単発実験（1 条件だけ確認したい場合）
+- デバッグ目的のドライラン（`--dry-run`）
+- GPU メモリチェック（`runners/scripts/check_gpu_memory.sh`）
 
 ---
 
