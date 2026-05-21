@@ -143,15 +143,17 @@ analysis/*.py
 
 ### early_stop の種類と物理的解釈
 
-| 値 | 意味 | 対応する相 |
+| 値 | アルゴリズム | 暫定的な相対応 |
 |---|---|---|
-| `goal_reached` | 正解手列を完成 | 秩序相 (Ordered) |
-| `move_loop_repeat` / `move_loop_reverse` | 手がループして脱出できない | スピングラス相 (SG) |
-| `no_move_catchall` / `move_ceiling` / `stagnation_after_move` / `think_budget` | 手をほとんど出力しない | 常磁性相 (PM) |
+| `goal_reached` | run_local.py | 秩序相 (Ordered) |
+| `move_loop_repeat` / `move_loop_reverse` | C | スピングラス相 (SG) |
+| `no_move_catchall` | D | 常磁性相 (PM) |
+| `move_ceiling` | B | 常磁性相 (PM) |
+| `stagnation_after_move` | E | **未確定**（SG / PM 両解釈あり、SPEC-2026-05-21-001 で調査中） |
+| `think_budget` | A | **相分類から除外**（測定上の打ち切り。censored data として扱う） |
 
-`early_stop` ラベルは `runners/run.py` のアルゴリズム A〜E が出力する：
-A=`think_budget`, B=`move_ceiling`, C=`move_loop_*`, D=`no_move_catchall`, E=`stagnation_after_move`。
-`run_local.py` は更に `goal_reached`（ゴール到達検知で即停止）を発行する。
+> 相対応の詳細・問題点は `docs/phase_classification_review.md` を参照。
+> 現行の分類アルゴリズムは physics-agent 審査で**不合格（要再設計）**と判定されており、P(q) ベース再設計を進行中。
 
 ---
 
@@ -207,8 +209,7 @@ N
      0.2  1.0  2.0
 ```
 
-相境界のスケーリング則：$T_c(N) = A \cdot N^{-\alpha}$（または指数型）。
-指数 $\alpha$ のモデル普遍性がこの研究の主要検証命題。
+相境界のスケーリング則 $T_c(N) = A \cdot N^{-\alpha}$ は暫定的な作業枠組み（`research_state/hypotheses.md` 参照）。
 
 ---
 
@@ -272,13 +273,13 @@ archiveフォルダーについては、実験済みのものを保存してあ�
 
 ### 対象モデル（5 種）
 
-| モデル | ステータス |
-|---|---|
-| `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` | full_sweep 完了 / collapse_phase ほぼ完了（N3\_T1\_0 未実行） |
-| `deepseek-ai/DeepSeek-R1-Distill-Qwen-14B` | full_sweep ほぼ完了（N6\_T0\_8 要再実行）/ collapse_phase 完了 |
-| `meta-llama/Meta-Llama-3-8B`（系列）| 未着手 |
-| `Qwen/Qwen3-7B` | 未着手 |
-| `Qwen/Qwen3-14B` | 未着手 |
+- `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B`
+- `deepseek-ai/DeepSeek-R1-Distill-Qwen-14B`
+- `meta-llama/Meta-Llama-3-8B`（系列）
+- `Qwen/Qwen3-7B`
+- `Qwen/Qwen3-14B`
+
+> 各モデルの sweep 進捗は `research_state/results_summary.md` を参照（ここには書かない）。
 
 ### 計算資源
 
