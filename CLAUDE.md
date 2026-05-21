@@ -172,7 +172,13 @@ A=`think_budget`, B=`move_ceiling`, C=`move_loop_*`, D=`no_move_catchall`, E=`st
 - **`envs/hanoi_env.py`** は単一ファイルの自己完結 env（`BaseEnv` 抽象基底 + `TowerOfHanoiEnv`）。
   `evaluate_state()` が推論ポテンシャル $V(x) = \lambda_d \hat D + \lambda_p \cdot \text{illegal}$ を返す（$V=0$ がゴール、$V=1$ が初期状態、$V>1$ は違法手）。
 - **DB スキーマ**は `experiments`（条件セット）と `trials`（試行）の 2 テーブル。`(environment, model, N, sweep_type, temperature)` の組で重複検出するため、同条件の再実行は DB 上は 1 行に保たれる（`db/sync_one.py` の `CHECK_DUPLICATE`）。
-- **隠れ状態 npz は `.gitignore` 対象**（`results/**/*.npz`）。`figures/` も再生成可能としてコミットしない。`summary.json` と `meta.json` のみが Git 管理。
+- **静的/動的ファイルの分離**：Git 管理対象はコード・ドキュメント・`summary.json`・`meta.json` のみ。
+  - `.gitignore` 対象：`results/**/*.npz`（隠れ状態）、`figures/`（再生成可能）
+  - 参照資料（PDF 等）は `assets/` に格納する。
+- **figures の構造**：`figures/<sweep_type>/<model-slug>/<図名>.png` に統一。
+  旧命名・モデル名なしの png は `figures/legacy/` に退避済み。
+- **旧形式 results の所在**：`archive/results_legacy/` に移行済み（`phase_diagram/`, `pq_sweep/`, `temp_sweep/`, `results_N*_hf/`, 初期単発 JSON）。
+  物理ファイルは Docker 所有のため `results/hanoi/` 内に残存するが `.gitignore` で除外済み。
 
 ---
 
@@ -268,8 +274,8 @@ archiveフォルダーについては、実験済みのものを保存してあ�
 
 | モデル | ステータス |
 |---|---|
-| `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` | full + collapse_phase 完了 |
-| `deepseek-ai/DeepSeek-R1-Distill-Qwen-14B` | 未着手 |
+| `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` | full_sweep 完了 / collapse_phase ほぼ完了（N3\_T1\_0 未実行） |
+| `deepseek-ai/DeepSeek-R1-Distill-Qwen-14B` | full_sweep ほぼ完了（N6\_T0\_8 要再実行）/ collapse_phase 完了 |
 | `meta-llama/Meta-Llama-3-8B`（系列）| 未着手 |
 | `Qwen/Qwen3-7B` | 未着手 |
 | `Qwen/Qwen3-14B` | 未着手 |
@@ -277,7 +283,7 @@ archiveフォルダーについては、実験済みのものを保存してあ�
 ### 計算資源
 
 - **RTX 5070, 12 GB VRAM, 1 枚**（CUDA 13.1）
-- 14B 級は **NF4 量子化必須**。実機での乗り確認は未済（`open_questions.md` U7）
+- 14B 級は **NF4 量子化必須**。RTX 5070 12GB でのロード・生成は**実機確認済み**（`open_questions.md` U7 解消）
 
 ### 締切
 

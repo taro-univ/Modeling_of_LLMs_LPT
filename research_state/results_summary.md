@@ -4,7 +4,7 @@
 
 詳細な数値・図表は `docs/Modeling_idea.md`、`results/hanoi/full_sweep/`、`results/hanoi/collapse_phase/` を参照。
 
-最終更新前提：deepseek-r1-distill-qwen-7B のみ完全データあり、他 4 モデルは未着手。
+最終更新：2026-05-21。7B・14B のデータ収集はほぼ完了。残り 3 モデルは未着手。
 
 ---
 
@@ -60,17 +60,25 @@ SG 相シグナル (`move_loop_repeat`) は $T = 0.7$–$1.0$ でピーク、$T 
 
 | モデル | full_sweep ($T \leq 1.0$) | collapse_phase ($T > 1.0$) | hidden state npz |
 |---|---|---|---|
-| deepseek-r1-distill-qwen-7B | 完了 | 進行中（最新コミット `cb4467c`）| 取得済み（解析未着手） |
-| deepseek-r1-distill-qwen-14B | 未着手 | — | — |
+| deepseek-r1-distill-qwen-7B | **50/50 完了** ✅ | **36/37**（N3\_T1\_0 のみ未実行） | 取得済み（解析未着手） |
+| deepseek-r1-distill-qwen-14B | **47/48**（N6\_T0\_8 が途中クラッシュ・要再実行） | **36/36 完了** ✅ | 取得済み（解析未着手） |
 | llama 8B 系 | 未着手 | — | — |
 | Qwen3 7B | 未着手 | — | — |
 | Qwen3 14B | 未着手 | — | — |
+
+### missing セルの詳細
+
+| セル | 状態 | 対処 |
+|---|---|---|
+| 14B / full\_sweep / N6\_T0\_8 | meta.json + npz 17本あり（25 試行中にクラッシュ） | `run_full_sweep.sh` で再実行（冪等スキップが入らないので手動で実行） |
+| 7B / collapse\_phase / N3\_T1\_0 | meta.json のみ（実験未完了） | T=1.0 は full\_sweep で取得済みのため優先度低。必要なら再実行 |
 
 ---
 
 ## 未実施で重要なもの
 
-- **他 4 モデル** の全 sweep（普遍性検証の前提）
+- **14B / N6\_T0\_8 の補完**（クラッシュ分の再実行）
+- **残り 3 モデル**（llama 8B 系 / Qwen3 7B / Qwen3 14B）の全 sweep（普遍性検証の前提）
 - **他パズル**（解一意制約のもと、branching factor / 状態空間構造の異なるもの）の実装と sweep
-- **$P(q)$ の系統的解析**（npz は揃っているが解析パイプラインが未整備）
+- **$P(q)$ の系統的解析**（7B・14B の npz は揃っているが解析パイプラインが未整備）
 - 上記 3 つのモデリング案のフィッティング

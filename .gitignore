@@ -9,12 +9,22 @@ build/
 # 実験結果バイナリ（隠れ状態 npz、大容量）
 results/**/*.npz
 
+# 旧形式 results（archive/ へ移行済み、Docker 所有で物理削除不可の残骸）
+results/hanoi/phase_diagram/
+results/hanoi/pq_sweep/
+results/hanoi/temp_sweep/
+results/hanoi/results_N2_hf/
+results/hanoi/results_N3_hf/
+results/hanoi/results_N2_main.json
+results/hanoi/results_N3_main.json
+results/hanoi/results_N4_main.json
+
 # 生成画像（再生成可能）
+# 構造: figures/<sweep_type>/<model-slug>/<図名>.png
 figures/
 
-# test を含むファイル・ディレクトリ
+# テスト成果物
 test_results/
-*test*
 
 # Claude Code 設定（個人環境依存）
 .claude/

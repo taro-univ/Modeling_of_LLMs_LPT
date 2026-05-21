@@ -60,9 +60,9 @@ H4 段階 2。**最終フェーズの抽象論点**。
 
 未計測。`results/hanoi/.../meta.json` の timestamp から推定可能なはずだが未着手。
 
-### U7：14B 級モデルの 12GB VRAM 適合性
+### ~~U7：14B 級モデルの 12GB VRAM 適合性~~（解消済み）
 
-RTX 5070 (12GB) で deepseek-14B / Qwen3-14B が NF4 量子化で実機ロード・生成可能かの**実機確認が未済**。`runners/test_model_architecture.py` で確認できる。乗らなければモデル選定の見直しが必要。
+deepseek-r1-distill-qwen-14B の NF4 量子化で RTX 5070 12GB へのロード・生成が**実機確認済み**（full_sweep・collapse_phase の全試行が完走）。Qwen3-14B は未確認だが同サイズ帯なので問題ないと想定。
 
 ### U8：他パズルの具体的選定
 
