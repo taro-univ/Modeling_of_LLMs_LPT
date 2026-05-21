@@ -184,6 +184,54 @@ _MOVE_RE = re.compile(
 )
 
 
+def _check_think_budget(text: str, num_predict: int, cfg: EarlyStopConfig) -> Optional[str]:
+    """Algorithm A: thinking トークンが予算を超えたら "think_budget" を返す。"""
+    if not cfg.enable_think_budget:
+        return None
+    think_open   = re.search(r'<think>(.*)', text, re.DOTALL | re.IGNORECASE)
+    think_closed = bool(re.search(r'</think>', text, re.IGNORECASE))
+    if think_open and not think_closed:
+        think_tokens_est = len(think_open.group(1)) / 3.5  # 文字数 / 3.5 でトークン近似
+        if think_tokens_est > num_predict * cfg.think_budget_ratio:
+            return "think_budget"
+    return None
+
+
+def _check_no_move(text: str, num_predict: int, cfg: EarlyStopConfig) -> Optional[str]:
+    """Algorithm D: 一定テキスト量で手が 0 本なら "no_move_catchall" を返す。"""
+    if not cfg.enable_no_move:
+        return None
+    if len(text) / 3.5 > num_predict * cfg.no_move_ratio:
+        if len(_MOVE_RE.findall(text)) == 0:
+            return "no_move_catchall"
+    return None
+
+
+def _check_move_ceiling(n_moves: int, min_moves: int, cfg: EarlyStopConfig) -> Optional[str]:
+    """Algorithm B: 手数が上限を超えたら "move_ceiling" を返す。"""
+    if cfg.enable_move_ceiling and n_moves > min_moves * cfg.max_move_multiplier:
+        return "move_ceiling"
+    return None
+
+
+def _check_move_loop(moves: list, cfg: EarlyStopConfig) -> Optional[str]:
+    """Algorithm C: ループ（繰り返し手または往復手）を検出して理由を返す。"""
+    if not cfg.enable_move_loop or len(moves) < cfg.loop_window:
+        return None
+    recent = moves[-cfg.loop_window:]
+    # C-1: 同一手の繰り返し
+    for mv in set(recent):
+        if recent.count(mv) >= cfg.loop_min_count:
+            return "move_loop_repeat"
+    # C-2: 往復手（A→B の直後に B→A）
+    for i in range(len(recent) - 1):
+        src1, dst1 = recent[i]
+        src2, dst2 = recent[i + 1]
+        if src1 == dst2 and dst1 == src2:
+            return "move_loop_reverse"
+    return None
+
+
 def check_early_stop(
     text: str,
     num_predict: int,
@@ -214,60 +262,14 @@ def check_early_stop(
         - "move_loop_repeat"  : Algorithm C（同一手の繰り返し）
         - "move_loop_reverse" : Algorithm C（往復手）
     """
-    # ------------------------------------------------------------------
-    # Algorithm A: Think Budget
-    # ------------------------------------------------------------------
-    if cfg.enable_think_budget:
-        think_open = re.search(r'<think>(.*)', text, re.DOTALL | re.IGNORECASE)
-        think_closed = bool(re.search(r'</think>', text, re.IGNORECASE))
-        if think_open and not think_closed:
-            # 文字数 / 3.5 でトークン数を近似（DeepSeek-R1 系の経験則）
-            think_chars = len(think_open.group(1))
-            think_tokens_est = think_chars / 3.5
-            if think_tokens_est > num_predict * cfg.think_budget_ratio:
-                return "think_budget"
-
-    # ------------------------------------------------------------------
-    # Algorithm D: No Move Catch-All
-    # <think>タグなしのプレーンテキスト応答など、A/B/C が不発になる
-    # ケースを補足する。累積テキストが no_move_ratio を超えても
-    # 手が1つも抽出されていなければ打ち切る。
-    # ------------------------------------------------------------------
-    if cfg.enable_no_move:
-        text_tokens_est = len(text) / 3.5
-        if text_tokens_est > num_predict * cfg.no_move_ratio:
-            moves_so_far = _MOVE_RE.findall(text)
-            if len(moves_so_far) == 0:
-                return "no_move_catchall"
-
-    # ------------------------------------------------------------------
-    # Algorithm B & C: Move フォーマットを逐次抽出
-    # ------------------------------------------------------------------
-    moves = _MOVE_RE.findall(text)  # list of (src, dst)
-    n_moves = len(moves)
-
-    # Algorithm B: Move Count Ceiling
-    if cfg.enable_move_ceiling:
-        if n_moves > min_moves * cfg.max_move_multiplier:
-            return "move_ceiling"
-
-    # Algorithm C: Move Loop Detection
-    if cfg.enable_move_loop and n_moves >= cfg.loop_window:
-        recent = moves[-cfg.loop_window:]
-
-        # C-1: 同一手の繰り返し（同じ src→dst が loop_min_count 回以上）
-        for mv in set(recent):
-            if recent.count(mv) >= cfg.loop_min_count:
-                return "move_loop_repeat"
-
-        # C-2: 往復手（A→B の直後に B→A）
-        for i in range(len(recent) - 1):
-            src1, dst1 = recent[i]
-            src2, dst2 = recent[i + 1]
-            if src1 == dst2 and dst1 == src2:
-                return "move_loop_reverse"
-
-    return None
+    if reason := _check_think_budget(text, num_predict, cfg):
+        return reason
+    if reason := _check_no_move(text, num_predict, cfg):
+        return reason
+    moves = _MOVE_RE.findall(text)
+    if reason := _check_move_ceiling(len(moves), min_moves, cfg):
+        return reason
+    return _check_move_loop(moves, cfg)
 
 
 # ===========================================================================

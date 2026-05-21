@@ -41,6 +41,49 @@ Q_CENTERS = (Q_BINS[:-1] + Q_BINS[1:]) / 2
 # データロード
 # ===========================================================================
 
+def _load_npz_for_condition(cdir: Path, layer: str) -> tuple[list, list]:
+    """
+    ディレクトリ内の trial_*_hidden.npz を読み込み、
+    hidden state リストと fallback フラグリストを返す。
+
+    Returns:
+        (hidden_list, is_fallback_list)
+    """
+    hidden_list: list[np.ndarray] = []
+    is_fallback_list: list[bool] = []
+    for npz_path in sorted(cdir.glob("trial_*_hidden.npz")):
+        d = np.load(npz_path, allow_pickle=True)
+        if layer not in d:
+            continue
+        H = d[layer].astype(np.float32)   # (steps, D)
+        texts = list(d["move_texts"])
+        is_fb = (len(texts) > 0 and texts[0] == "__fallback__")
+        hidden_list.append(H)
+        is_fallback_list.append(is_fb)
+    return hidden_list, is_fallback_list
+
+
+def _parse_summary(summary_path: Path, early_stop_keys: tuple[str, ...]) -> tuple[list, list, float]:
+    """
+    summary.json を読み込み accuracy・early_stop リストと pm_rate を返す。
+    ファイルが存在しない場合は空リストと nan を返す。
+
+    Returns:
+        (accuracy, early_stop, pm_rate)
+    """
+    if not summary_path.exists():
+        return [], [], float("nan")
+    with open(summary_path) as f:
+        summary = json.load(f)
+    accuracy = [r["accuracy"] for r in summary]
+    early_stop = [r.get("early_stop") for r in summary]
+    pm_rate = (
+        sum(1 for es in early_stop if es in early_stop_keys) / len(early_stop)
+        if early_stop else float("nan")
+    )
+    return accuracy, early_stop, pm_rate
+
+
 def load_condition(
     base_dir: Path,
     N: int,
@@ -59,41 +102,15 @@ def load_condition(
     """
     tag  = f"{T:.1f}".replace(".", "_")
     cdir = base_dir / f"N{N}_T{tag}"
-    summary_path = cdir / "summary.json"
     if not cdir.exists():
         return None
 
-    summary = []
-    if summary_path.exists():
-        with open(summary_path) as f:
-            summary = json.load(f)
-
-    hidden_list: list[np.ndarray] = []
-    is_fallback_list: list[bool]  = []
-
-    npz_files = sorted(cdir.glob("trial_*_hidden.npz"))
-    for i, npz_path in enumerate(npz_files):
-        d = np.load(npz_path, allow_pickle=True)
-        if layer not in d:
-            continue
-        H = d[layer].astype(np.float32)           # (steps, D)
-        texts = list(d["move_texts"])
-        is_fb = (len(texts) > 0 and texts[0] == "__fallback__")
-
-        hidden_list.append(H)
-        is_fallback_list.append(is_fb)
-
+    hidden_list, is_fallback_list = _load_npz_for_condition(cdir, layer)
     if not hidden_list:
         return None
 
-    accuracy   = [r["accuracy"]              for r in summary] if summary else []
-    early_stop = [r.get("early_stop")        for r in summary] if summary else []
-
-    pm_rate = (
-        sum(1 for es in early_stop if es in ("no_move_catchall", "move_ceiling"))
-        / len(early_stop)
-        if early_stop else float("nan")
-    )
+    pm_keys = ("no_move_catchall", "move_ceiling")
+    accuracy, early_stop, pm_rate = _parse_summary(cdir / "summary.json", pm_keys)
 
     return {
         "hidden":      hidden_list,
@@ -220,6 +237,50 @@ def classify_phase(q_ea: float, pm_rate: float, fallback_rate: float, accuracy: 
 
 
 # ===========================================================================
+# plot_pq_distributions — サブパネル helper
+# ===========================================================================
+
+def _render_pq_cell(
+    ax: plt.Axes,
+    cond: dict,
+    i: int,
+    j: int,
+    N: int,
+    T: float,
+) -> None:
+    """plot_pq_distributions の 1 セル（N, T）を描画する。"""
+    q_vals = compute_pq(cond)
+    acc = float(np.mean(cond["accuracy"])) if cond["accuracy"] else 0.0
+    q_ea = compute_qea(cond)
+    fb_rate = sum(cond["is_fallback"]) / cond["n_trials"]
+    phase = classify_phase(q_ea, cond["pm_rate"], fb_rate, acc)
+    color = PHASE_COLORS[phase]
+
+    ax.hist(q_vals, bins=Q_BINS, color=color, alpha=0.75, density=True)
+    ax.axvline(np.nanmean(q_vals), color="k", lw=1.2, ls="--", alpha=0.7)
+
+    pm_str = f"{cond['pm_rate']:.0%}" if not np.isnan(cond["pm_rate"]) else "N/A"
+    label = f"q̄={np.nanmean(q_vals):.2f}\npm={pm_str}"
+    ax.text(0.04, 0.93, label, transform=ax.transAxes,
+            fontsize=6, va="top", color="black")
+
+    if i == 0:
+        ax.set_title(f"T={T}", fontsize=8)
+    if j == 0:
+        ax.set_ylabel(f"N={N}", fontsize=8)
+    ax.set_xlim(-0.1, 1.05)
+    ax.tick_params(labelsize=6)
+
+
+def _render_pq_cell_na(ax: plt.Axes) -> None:
+    """データがない（N/A）セルを描画する。"""
+    ax.text(0.5, 0.5, "N/A", ha="center", va="center",
+            transform=ax.transAxes, fontsize=8, color="gray")
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+
+# ===========================================================================
 # メイン描画
 # ===========================================================================
 
@@ -245,35 +306,10 @@ def plot_pq_distributions(
         for j, T in enumerate(ts):
             ax = axes[i][j] if len(ns) > 1 else axes[j]
             cond = all_conds.get((N, T))
-
             if cond is None:
-                ax.text(0.5, 0.5, "N/A", ha="center", va="center",
-                        transform=ax.transAxes, fontsize=8, color="gray")
-                ax.set_xticks([])
-                ax.set_yticks([])
-                continue
-
-            q_vals = compute_pq(cond)
-            acc = float(np.mean(cond["accuracy"])) if cond["accuracy"] else 0.0
-            q_ea = compute_qea(cond)
-            fb_rate = sum(cond["is_fallback"]) / cond["n_trials"]
-            phase = classify_phase(q_ea, cond["pm_rate"], fb_rate, acc)
-            color = PHASE_COLORS[phase]
-
-            ax.hist(q_vals, bins=Q_BINS, color=color, alpha=0.75, density=True)
-            ax.axvline(np.nanmean(q_vals), color="k", lw=1.2, ls="--", alpha=0.7)
-
-            pm_str = f"{cond['pm_rate']:.0%}" if not np.isnan(cond["pm_rate"]) else "N/A"
-            label = f"q̄={np.nanmean(q_vals):.2f}\npm={pm_str}"
-            ax.text(0.04, 0.93, label, transform=ax.transAxes,
-                    fontsize=6, va="top", color="black")
-
-            if i == 0:
-                ax.set_title(f"T={T}", fontsize=8)
-            if j == 0:
-                ax.set_ylabel(f"N={N}", fontsize=8)
-            ax.set_xlim(-0.1, 1.05)
-            ax.tick_params(labelsize=6)
+                _render_pq_cell_na(ax)
+            else:
+                _render_pq_cell(ax, cond, i, j, N, T)
 
     # 凡例
     from matplotlib.patches import Patch
@@ -289,6 +325,140 @@ def plot_pq_distributions(
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     print(f"[SAVE] {out_path}")
     plt.close(fig)
+
+
+# ===========================================================================
+# plot_summary — サブパネル helpers
+# ===========================================================================
+
+def _plot_qea_vs_t(
+    ax: plt.Axes,
+    all_conds: dict[tuple[int, float], dict],
+    ns: list[int],
+    ts: list[float],
+    colors: np.ndarray,
+) -> None:
+    """(1) q_EA vs T を描画する。"""
+    ax.set_title("q_EA  vs  Temperature")
+    for idx, N in enumerate(ns):
+        qea_row, ts_valid = [], []
+        for T in ts:
+            cond = all_conds.get((N, T))
+            if cond is None:
+                continue
+            qea_row.append(compute_qea(cond))
+            ts_valid.append(T)
+        ax.plot(ts_valid, qea_row, "o-", color=colors[idx],
+                linewidth=1.8, markersize=6, label=f"N={N}")
+    ax.set_xlabel("Temperature  T")
+    ax.set_ylabel(r"$q_{EA}$")
+    ax.set_ylim(0.4, 1.02)
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+
+def _plot_pm_rate_vs_t(
+    ax: plt.Axes,
+    all_conds: dict[tuple[int, float], dict],
+    ns: list[int],
+    ts: list[float],
+    colors: np.ndarray,
+) -> None:
+    """(2) PM率 vs T を描画する。"""
+    ax.set_title("PM rate  vs  Temperature\n(no_move_catchall fraction)")
+    for idx, N in enumerate(ns):
+        pm_row, ts_valid = [], []
+        for T in ts:
+            cond = all_conds.get((N, T))
+            if cond is None:
+                continue
+            pm_row.append(cond["pm_rate"])
+            ts_valid.append(T)
+        ax.plot(ts_valid, pm_row, "s-", color=colors[idx],
+                linewidth=1.8, markersize=6, label=f"N={N}")
+    ax.axhline(0.5, color="gray", ls="--", alpha=0.6, label="50%")
+    ax.set_xlabel("Temperature  T")
+    ax.set_ylabel("PM rate  (no_move_catchall)")
+    ax.set_ylim(-0.05, 1.05)
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+
+def _plot_autocorr(
+    ax: plt.Axes,
+    all_conds: dict[tuple[int, float], dict],
+    ns: list[int],
+    ts: list[float],
+) -> None:
+    """(3) 時間自己相関 C(Δt) を代表条件で描画する。"""
+    ax.set_title(r"Time autocorrelation  $C(\Delta t)$")
+    T_lo  = ts[len(ts) // 4]
+    T_mid = ts[len(ts) // 2]
+    T_hi  = ts[-1]
+    N_lo  = ns[0]
+    N_hi  = ns[-1]
+    palette = ["#1f77b4", "#ff7f0e", "#d62728", "#9467bd"]
+    rep_conds = [
+        (N_lo,  T_lo,  f"N={N_lo}  T={T_lo}",  palette[0]),
+        (N_lo,  T_hi,  f"N={N_lo}  T={T_hi}",  palette[2]),
+        (N_hi,  T_lo,  f"N={N_hi}  T={T_lo}",  palette[1]),
+        (N_hi,  T_mid, f"N={N_hi}  T={T_mid}", palette[3]),
+    ]
+    max_lag = 8
+    for N, T, label, color in rep_conds:
+        cond = all_conds.get((N, T))
+        if cond is None:
+            continue
+        C = compute_autocorr(cond, max_lag=max_lag)
+        lags = np.arange(1, max_lag + 1)
+        valid = ~np.isnan(C)
+        if valid.any():
+            ax.plot(lags[valid], C[valid], "o-", color=color,
+                    linewidth=1.8, markersize=6, label=label)
+    ax.set_xlabel(r"$\Delta t$  (move steps)")
+    ax.set_ylabel(r"$C(\Delta t)$")
+    ax.set_ylim(0.4, 1.02)
+    ax.legend(fontsize=8)
+    ax.grid(True, alpha=0.3)
+
+
+def _plot_phase_heatmap(
+    ax: plt.Axes,
+    all_conds: dict[tuple[int, float], dict],
+    ns: list[int],
+    ts: list[float],
+) -> None:
+    """(4) 相分類ヒートマップを描画する。"""
+    ax.set_title("Phase classification")
+    phase_to_int = {"ordered": 3, "spin_glass": 2, "mixed": 1, "paramagnetic": 0}
+    int_to_label = {3: "ordered", 2: "spin glass", 1: "mixed", 0: "paramagnetic"}
+    cmap_phases  = plt.cm.colors.ListedColormap(
+        [PHASE_COLORS["paramagnetic"], PHASE_COLORS["mixed"],
+         PHASE_COLORS["spin_glass"],   PHASE_COLORS["ordered"]]
+    )
+
+    mat = np.full((len(ns), len(ts)), np.nan)
+    for i, N in enumerate(ns):
+        for j, T in enumerate(ts):
+            cond = all_conds.get((N, T))
+            if cond is None:
+                continue
+            acc   = float(np.mean(cond["accuracy"])) if cond["accuracy"] else 0.0
+            qea   = compute_qea(cond)
+            fb    = sum(cond["is_fallback"]) / cond["n_trials"]
+            phase = classify_phase(qea, cond["pm_rate"], fb, acc)
+            mat[i, j] = phase_to_int[phase]
+
+    im = ax.imshow(mat, aspect="auto", origin="lower",
+                   vmin=-0.5, vmax=3.5, cmap=cmap_phases,
+                   extent=[ts[0]-0.1, ts[-1]+0.1, ns[0]-0.5, ns[-1]+0.5])
+    cbar = plt.colorbar(im, ax=ax, ticks=[0, 1, 2, 3])
+    cbar.ax.set_yticklabels([int_to_label[i] for i in [0, 1, 2, 3]], fontsize=8)
+    ax.set_xlabel("Temperature  T")
+    ax.set_ylabel("Disk count  N")
+    ax.set_yticks(ns)
+    ax.set_xticks(ts)
+    ax.tick_params(axis="x", rotation=45)
 
 
 def plot_summary(
@@ -315,106 +485,10 @@ def plot_summary(
     fig.suptitle(f"P(q) Analysis Summary  ({layer})", fontsize=13)
     colors = plt.cm.tab10(np.linspace(0, 0.6, len(ns)))
 
-    # --- (1) q_EA vs T ---
-    ax1.set_title("q_EA  vs  Temperature")
-    for idx, N in enumerate(ns):
-        qea_row, ts_valid = [], []
-        for T in ts:
-            cond = all_conds.get((N, T))
-            if cond is None:
-                continue
-            qea = compute_qea(cond)
-            qea_row.append(qea)
-            ts_valid.append(T)
-        ax1.plot(ts_valid, qea_row, "o-", color=colors[idx],
-                 linewidth=1.8, markersize=6, label=f"N={N}")
-    ax1.set_xlabel("Temperature  T")
-    ax1.set_ylabel(r"$q_{EA}$")
-    ax1.set_ylim(0.4, 1.02)
-    ax1.legend(fontsize=9)
-    ax1.grid(True, alpha=0.3)
-
-    # --- (2) PM率 vs T ---
-    ax2.set_title("PM rate  vs  Temperature\n(no_move_catchall fraction)")
-    for idx, N in enumerate(ns):
-        pm_row, ts_valid = [], []
-        for T in ts:
-            cond = all_conds.get((N, T))
-            if cond is None:
-                continue
-            pm_row.append(cond["pm_rate"])
-            ts_valid.append(T)
-        ax2.plot(ts_valid, pm_row, "s-", color=colors[idx],
-                 linewidth=1.8, markersize=6, label=f"N={N}")
-    ax2.axhline(0.5, color="gray", ls="--", alpha=0.6, label="50%")
-    ax2.set_xlabel("Temperature  T")
-    ax2.set_ylabel("PM rate  (no_move_catchall)")
-    ax2.set_ylim(-0.05, 1.05)
-    ax2.legend(fontsize=9)
-    ax2.grid(True, alpha=0.3)
-
-    # --- (3) C(Δt) — 代表条件（データセット内の実T値から自動選択） ---
-    ax3.set_title(r"Time autocorrelation  $C(\Delta t)$")
-    T_lo  = ts[len(ts) // 4]
-    T_mid = ts[len(ts) // 2]
-    T_hi  = ts[-1]
-    N_lo  = ns[0]
-    N_hi  = ns[-1]
-    palette = ["#1f77b4", "#ff7f0e", "#d62728", "#9467bd"]
-    rep_conds = [
-        (N_lo,  T_lo,  f"N={N_lo}  T={T_lo}",  palette[0]),
-        (N_lo,  T_hi,  f"N={N_lo}  T={T_hi}",  palette[2]),
-        (N_hi,  T_lo,  f"N={N_hi}  T={T_lo}",  palette[1]),
-        (N_hi,  T_mid, f"N={N_hi}  T={T_mid}", palette[3]),
-    ]
-    max_lag = 8
-    for N, T, label, color in rep_conds:
-        cond = all_conds.get((N, T))
-        if cond is None:
-            continue
-        C = compute_autocorr(cond, max_lag=max_lag)
-        lags = np.arange(1, max_lag + 1)
-        valid = ~np.isnan(C)
-        if valid.any():
-            ax3.plot(lags[valid], C[valid], "o-", color=color,
-                     linewidth=1.8, markersize=6, label=label)
-    ax3.set_xlabel(r"$\Delta t$  (move steps)")
-    ax3.set_ylabel(r"$C(\Delta t)$")
-    ax3.set_ylim(0.4, 1.02)
-    ax3.legend(fontsize=8)
-    ax3.grid(True, alpha=0.3)
-
-    # --- (4) 相分類ヒートマップ ---
-    ax4.set_title("Phase classification")
-    phase_to_int = {"ordered": 3, "spin_glass": 2, "mixed": 1, "paramagnetic": 0}
-    int_to_label = {3: "ordered", 2: "spin glass", 1: "mixed", 0: "paramagnetic"}
-    cmap_phases  = plt.cm.colors.ListedColormap(
-        [PHASE_COLORS["paramagnetic"], PHASE_COLORS["mixed"],
-         PHASE_COLORS["spin_glass"],   PHASE_COLORS["ordered"]]
-    )
-
-    mat = np.full((len(ns), len(ts)), np.nan)
-    for i, N in enumerate(ns):
-        for j, T in enumerate(ts):
-            cond = all_conds.get((N, T))
-            if cond is None:
-                continue
-            acc  = float(np.mean(cond["accuracy"])) if cond["accuracy"] else 0.0
-            qea  = compute_qea(cond)
-            fb   = sum(cond["is_fallback"]) / cond["n_trials"]
-            phase = classify_phase(qea, cond["pm_rate"], fb, acc)
-            mat[i, j] = phase_to_int[phase]
-
-    im = ax4.imshow(mat, aspect="auto", origin="lower",
-                    vmin=-0.5, vmax=3.5, cmap=cmap_phases,
-                    extent=[ts[0]-0.1, ts[-1]+0.1, ns[0]-0.5, ns[-1]+0.5])
-    cbar = plt.colorbar(im, ax=ax4, ticks=[0, 1, 2, 3])
-    cbar.ax.set_yticklabels([int_to_label[i] for i in [0, 1, 2, 3]], fontsize=8)
-    ax4.set_xlabel("Temperature  T")
-    ax4.set_ylabel("Disk count  N")
-    ax4.set_yticks(ns)
-    ax4.set_xticks(ts)
-    ax4.tick_params(axis="x", rotation=45)
+    _plot_qea_vs_t(ax1, all_conds, ns, ts, colors)
+    _plot_pm_rate_vs_t(ax2, all_conds, ns, ts, colors)
+    _plot_autocorr(ax3, all_conds, ns, ts)
+    _plot_phase_heatmap(ax4, all_conds, ns, ts)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
@@ -423,18 +497,15 @@ def plot_summary(
 
 
 # ===========================================================================
-# コンソールレポート
+# print_report — セクション helpers
 # ===========================================================================
 
-def print_report(
+def _print_main_table(
     all_conds: dict[tuple[int, float], dict],
     ns: list[int],
     ts: list[float],
 ) -> None:
-    print(f"\n{'='*80}")
-    print("  P(q) Analysis Report")
-    print(f"{'='*80}")
-
+    """精度・q_EA・pm率・相分類のテーブルを出力する。"""
     header = f"{'N':>3} {'T':>5} | {'q_EA':>6} | {'q̄_inter':>8} | {'q_std':>6} | {'pm%':>5} | {'acc':>5} | phase"
     print(header)
     print("-" * len(header))
@@ -460,7 +531,13 @@ def print_report(
                   f" | {pm_s:>5} | {acc:>5.2f} | {phase}")
         print()
 
-    # スピングラス・常磁性の境界推定
+
+def _print_transition_temperatures(
+    all_conds: dict[tuple[int, float], dict],
+    ns: list[int],
+    ts: list[float],
+) -> None:
+    """SG→PM 遷移温度（PM率=50%交差点）を出力する。"""
     print(f"\n{'='*80}")
     print("  崩壊モード遷移温度 T_SG→PM（PM率 = 50% 交差点、no_move_catchall 基準）")
     print(f"{'='*80}")
@@ -476,18 +553,42 @@ def print_report(
             pm_vals.append(pm)
             ts_valid.append(T)
 
-        T_trans = None
-        for j in range(len(ts_valid) - 1):
-            if pm_vals[j] < 0.5 <= pm_vals[j + 1]:
-                slope  = (pm_vals[j+1] - pm_vals[j]) / (ts_valid[j+1] - ts_valid[j])
-                T_trans = ts_valid[j] + (0.5 - pm_vals[j]) / slope
-                break
+        T_trans = _find_crossing(pm_vals, ts_valid, threshold=0.5)
 
         if T_trans is not None:
             print(f"  N={N}: T_{{SG→PM}} ≈ {T_trans:.2f}")
         else:
             pm_max = max(pm_vals) if pm_vals else float("nan")
             print(f"  N={N}: 遷移が範囲内に見つからない（PM率最大={pm_max:.0%}）")
+
+
+def _find_crossing(vals: list[float], xs: list[float], threshold: float) -> Optional[float]:
+    """
+    vals が threshold を下から上へ超える点を線形補間で求める。
+    見つからない場合は None を返す。
+    """
+    for j in range(len(xs) - 1):
+        if vals[j] < threshold <= vals[j + 1]:
+            slope = (vals[j+1] - vals[j]) / (xs[j+1] - xs[j])
+            return xs[j] + (threshold - vals[j]) / slope
+    return None
+
+
+# ===========================================================================
+# コンソールレポート
+# ===========================================================================
+
+def print_report(
+    all_conds: dict[tuple[int, float], dict],
+    ns: list[int],
+    ts: list[float],
+) -> None:
+    print(f"\n{'='*80}")
+    print("  P(q) Analysis Report")
+    print(f"{'='*80}")
+
+    _print_main_table(all_conds, ns, ts)
+    _print_transition_temperatures(all_conds, ns, ts)
 
 
 # ===========================================================================

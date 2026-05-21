@@ -1704,3 +1704,1279 @@ PYTHONPATH=/app python3 analysis/cosine_sim_phase.py 2>&1 | head -200
 cat /home/shona/Modeling_of_LLMs_LPT/open_questions.md && echo "===" && cat /home/shona/Modeling_of_LLMs_LPT/research_state/hypotheses.md
 ```
 
+## 2026-05-21 12:34:08
+
+```bash
+find /home/shona/Modeling_of_LLMs_LPT -name "*.md" | grep -E "(research_state|todo|open_questions)" | head -20
+```
+
+## 2026-05-21 12:34:08
+
+```bash
+find /home/shona/Modeling_of_LLMs_LPT -name "*.py" | grep -v archive | grep -v __pycache__ | sort
+```
+
+## 2026-05-21 12:34:32
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/ 2>/dev/null | head -20 && echo "---" && ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/ 2>/dev/null | head -10
+```
+
+## 2026-05-21 12:34:32
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/runners/scripts/ 2>/dev/null
+```
+
+## 2026-05-21 12:34:36
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/ | head -20 && echo "---" && ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-14b/ | head -20
+```
+
+## 2026-05-21 12:34:37
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/collapse_phase/ 2>/dev/null | head -10 && echo "---" && ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/collapse_phase/deepseek-r1-distill-qwen-14b/ 2>/dev/null | head -20
+```
+
+## 2026-05-21 12:34:41
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/ | wc -l && ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-14b/ | wc -l && ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/collapse_phase/deepseek-r1-distill-qwen-14b/ | wc -l
+```
+
+## 2026-05-21 12:34:43
+
+```bash
+# 14B full_sweep の各セルにsummary.jsonが存在するか確認
+find /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-14b -name "summary.json" | wc -l
+# 14B collapse_phase
+find /home/shona/Modeling_of_LLMs_LPT/results/hanoi/collapse_phase/deepseek-r1-distill-qwen-14b -name "summary.json" | wc -l
+```
+
+## 2026-05-21 12:35:03
+
+```bash
+# 14B full_sweep の missing cells（summary.jsonなし）を確認
+for d in /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-14b/*/; do
+  if [ ! -f "$d/summary.json" ]; then
+    echo "MISSING: $d"
+  fi
+done
+```
+
+## 2026-05-21 12:35:04
+
+```bash
+# 7B full_sweep の全セル確認
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/ | tail -20
+```
+
+## 2026-05-21 12:35:07
+
+```bash
+# 7B full_sweep の全セルにsummary.jsonがあるか確認
+find /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b -name "summary.json" | wc -l
+# collapse_phase 7B
+find /home/shona/Modeling_of_LLMs_LPT/results/hanoi/collapse_phase/deepseek-r1-distill-qwen-7b -name "summary.json" | wc -l
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/collapse_phase/deepseek-r1-distill-qwen-7b/ | wc -l
+```
+
+## 2026-05-21 12:35:08
+
+```bash
+# 14B collapse_phase の missing cells
+for d in /home/shona/Modeling_of_LLMs_LPT/results/hanoi/collapse_phase/deepseek-r1-distill-qwen-14b/*/; do
+  if [ ! -f "$d/summary.json" ]; then
+    echo "MISSING: $d"
+  fi
+done
+```
+
+## 2026-05-21 12:35:12
+
+```bash
+# collapse_phase 14B の全セルリスト（T > 1.0 のみ期待）
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/collapse_phase/deepseek-r1-distill-qwen-14b/
+
+# 14B collapse_phase の最大N/T確認
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/collapse_phase/deepseek-r1-distill-qwen-14b/ | tail -20
+```
+
+## 2026-05-21 12:35:51
+
+```bash
+# 各モデルのスイープ完成状況を一覧化
+echo "=== 7B full_sweep ==="
+echo "  ディレクトリ数: $(ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/ | wc -l)"
+echo "  summary.json数: $(find /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b -name summary.json | wc -l)"
+
+echo "=== 7B collapse_phase ==="
+echo "  ディレクトリ数: $(ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/collapse_phase/deepseek-r1-distill-qwen-7b/ | wc -l)"
+echo "  summary.json数: $(find /home/shona/Modeling_of_LLMs_LPT/results/hanoi/collapse_phase/deepseek-r1-distill-qwen-7b -name summary.json | wc -l)"
+
+echo "=== 14B full_sweep ==="
+echo "  ディレクトリ数: $(ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-14b/ | wc -l)"
+echo "  summary.json数: $(find /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-14b -name summary.json | wc -l)"
+echo "  missing:"
+for d in /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-14b/*/; do
+  [ ! -f "$d/summary.json" ] && echo "    $(basename $d)"
+done
+
+echo "=== 14B collapse_phase ==="
+echo "  ディレクトリ数: $(ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/collapse_phase/deepseek-r1-distill-qwen-14b/ | wc -l)"
+echo "  summary.json数: $(find /home/shona/Modeling_of_LLMs_LPT/results/hanoi/collapse_phase/deepseek-r1-distill-qwen-14b -name summary.json | wc -l)"
+```
+
+## 2026-05-21 12:36:04
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-14b/N6_T0_8/ 2>&1 || echo "ディレクトリが存在しないかエラー"
+```
+
+## 2026-05-21 12:36:07
+
+```bash
+# collapse_phase 7B の missing: N3_T1_0 の状況確認
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/collapse_phase/deepseek-r1-distill-qwen-7b/N3_T1_0/ 2>&1 || echo "ディレクトリなし"
+```
+
+## 2026-05-21 12:36:10
+
+```bash
+# 解析スクリプトの簡易確認
+head -5 /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_pq.py
+head -5 /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_integrated.py
+head -5 /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_slowing.py
+head -5 /home/shona/Modeling_of_LLMs_LPT/analysis/cosine_sim_phase.py
+head -5 /home/shona/Modeling_of_LLMs_LPT/analysis/plot_scaling.py
+```
+
+## 2026-05-21 12:39:01
+
+```bash
+git diff --stat
+```
+
+## 2026-05-21 12:57:18
+
+```bash
+find /home/shona/Modeling_of_LLMs_LPT -name "*.pdf" 2>/dev/null && find /home/shona -maxdepth 3 -name "*.pdf" 2>/dev/null | head -20
+```
+
+## 2026-05-21 12:57:28
+
+```bash
+sudo apt-get install -y poppler-utils 2>&1 | tail -5
+```
+
+## 2026-05-21 12:57:32
+
+```bash
+# pdftotext で テキスト抽出を試みる
+which pdftotext 2>/dev/null || echo "not found"
+# python で抽出できるか
+python3 -c "import PyPDF2; print('ok')" 2>/dev/null || echo "no PyPDF2"
+python3 -c "import pdfplumber; print('ok')" 2>/dev/null || echo "no pdfplumber"
+python3 -c "import pymupdf; print('ok')" 2>/dev/null || echo "no pymupdf"
+python3 -c "import fitz; print('ok')" 2>/dev/null || echo "no fitz"
+```
+
+## 2026-05-21 12:57:35
+
+```bash
+pip install pymupdf --quiet 2>&1 | tail -3
+```
+
+## 2026-05-21 12:57:39
+
+```bash
+pip install pymupdf --quiet --break-system-packages 2>&1 | tail -5
+```
+
+## 2026-05-21 12:57:44
+
+```bash
+python3 - <<'EOF'
+import fitz  # pymupdf
+
+for fname in ["第4回AI開発演習#2-1.pdf", "第4回AI開発演習#2-2.pdf"]:
+    path = f"/home/shona/Modeling_of_LLMs_LPT/{fname}"
+    doc = fitz.open(path)
+    print(f"\n{'='*60}")
+    print(f"FILE: {fname}  ({doc.page_count} pages)")
+    print('='*60)
+    for i, page in enumerate(doc):
+        text = page.get_text()
+        if text.strip():
+            print(f"\n--- Page {i+1} ---")
+            print(text)
+    doc.close()
+EOF
+```
+
+## 2026-05-21 12:57:47
+
+```bash
+cat /home/shona/.claude/projects/-home-shona-Modeling-of-LLMs-LPT/4040832c-ac2b-411f-8300-c8131f1e505b/tool-results/b2ha6fftd.txt
+```
+
+## 2026-05-21 12:57:53
+
+```bash
+python3 - <<'EOF'
+import fitz
+
+for fname in ["第4回AI開発演習#2-1.pdf", "第4回AI開発演習#2-2.pdf"]:
+    path = f"/home/shona/Modeling_of_LLMs_LPT/{fname}"
+    doc = fitz.open(path)
+    print(f"\n{'='*60}")
+    print(f"FILE: {fname}  ({doc.page_count} pages)")
+    print('='*60)
+    for i, page in enumerate(doc):
+        text = page.get_text()
+        if text.strip():
+            print(f"\n--- Page {i+1} ---")
+            # 長いページは最初の1000文字だけ表示
+            print(text[:1500])
+    doc.close()
+EOF
+```
+
+## 2026-05-21 12:58:02
+
+```bash
+python3 - <<'EOF'
+import fitz
+
+path = "/home/shona/Modeling_of_LLMs_LPT/第4回AI開発演習#2-1.pdf"
+doc = fitz.open(path)
+print(f"総ページ数: {doc.page_count}")
+
+# まずページタイトル行だけ抜き出して全体構造を把握
+for i, page in enumerate(doc):
+    lines = [l.strip() for l in page.get_text().split('\n') if l.strip()]
+    # 最初の3行だけ（タイトル相当）
+    preview = ' / '.join(lines[:3])
+    print(f"  p{i+1:02d}: {preview[:100]}")
+doc.close()
+EOF
+```
+
+## 2026-05-21 12:58:08
+
+```bash
+python3 - <<'EOF'
+import fitz
+
+path = "/home/shona/Modeling_of_LLMs_LPT/第4回AI開発演習#2-2.pdf"
+doc = fitz.open(path)
+print(f"総ページ数: {doc.page_count}")
+
+for i, page in enumerate(doc):
+    lines = [l.strip() for l in page.get_text().split('\n') if l.strip()]
+    preview = ' / '.join(lines[:3])
+    print(f"  p{i+1:02d}: {preview[:100]}")
+doc.close()
+EOF
+```
+
+## 2026-05-21 12:58:17
+
+```bash
+python3 - <<'EOF'
+import fitz
+
+# コード整理に直接関係するページを詳読
+# 2-1: p23-37 (リファクタリング・コード整理系)
+# 2-2: p21-45 (AI駆動開発・インナーソース・エージェント系)
+
+path1 = "/home/shona/Modeling_of_LLMs_LPT/第4回AI開発演習#2-1.pdf"
+doc1 = fitz.open(path1)
+
+print("=== 2-1: コード整理・リファクタリング関連 (p23-37) ===")
+for i in range(22, 37):  # 0-indexed
+    page = doc1[i]
+    text = page.get_text()
+    if text.strip():
+        print(f"\n--- Page {i+1} ---")
+        print(text)
+doc1.close()
+EOF
+```
+
+## 2026-05-21 12:58:30
+
+```bash
+python3 - <<'EOF'
+import fitz
+
+path2 = "/home/shona/Modeling_of_LLMs_LPT/第4回AI開発演習#2-2.pdf"
+doc2 = fitz.open(path2)
+
+# コード整理・インナーソース・エージェント関連ページを詳読
+# p2-p15: 生成AIメリデメ・協働
+# p21-p45: ユースケース・インナーソース・エージェント
+target_pages = list(range(1, 16)) + list(range(20, 45))  # 0-indexed
+
+for i in target_pages:
+    if i >= doc2.page_count:
+        break
+    page = doc2[i]
+    text = page.get_text()
+    if text.strip():
+        print(f"\n--- Page {i+1} ---")
+        print(text)
+doc2.close()
+EOF
+```
+
+## 2026-05-21 12:58:39
+
+```bash
+python3 - <<'EOF'
+import fitz
+
+path2 = "/home/shona/Modeling_of_LLMs_LPT/第4回AI開発演習#2-2.pdf"
+doc2 = fitz.open(path2)
+
+# インナーソース・エージェント・カスタマイズ関連 (p21-45)
+for i in range(20, 45):
+    if i >= doc2.page_count:
+        break
+    page = doc2[i]
+    text = page.get_text()
+    if text.strip():
+        print(f"\n--- Page {i+1} ---")
+        print(text)
+doc2.close()
+EOF
+```
+
+## 2026-05-21 12:58:45
+
+```bash
+python3 - <<'EOF'
+import fitz
+
+path2 = "/home/shona/Modeling_of_LLMs_LPT/第4回AI開発演習#2-2.pdf"
+doc2 = fitz.open(path2)
+
+# インナーソース p30-45
+for i in range(29, 45):
+    page = doc2[i]
+    text = page.get_text()
+    if text.strip():
+        print(f"\n--- Page {i+1} ---")
+        print(text)
+doc2.close()
+EOF
+```
+
+## 2026-05-21 13:02:17
+
+```bash
+find /home/shona/Modeling_of_LLMs_LPT -not -path "*/.*" -not -path "*/archive/*" -not -path "*/__pycache__/*" | sort | head -120
+```
+
+## 2026-05-21 13:02:20
+
+```bash
+find /home/shona/Modeling_of_LLMs_LPT -not -path "*/.*" -not -path "*/archive/*" -not -path "*/__pycache__/*" -not -path "*/results/*" -not -path "*/figures/*" | sort
+```
+
+## 2026-05-21 13:02:23
+
+```bash
+cat /home/shona/Modeling_of_LLMs_LPT/.gitignore 2>/dev/null || echo "(no .gitignore)"
+```
+
+## 2026-05-21 13:02:27
+
+```bash
+# results直下の生成ファイル種別を確認
+find /home/shona/Modeling_of_LLMs_LPT/results -type f | sed 's/.*\.//' | sort | uniq -c | sort -rn
+echo "---"
+find /home/shona/Modeling_of_LLMs_LPT/figures -type f | sed 's/.*\.//' | sort | uniq -c | sort -rn
+echo "---"
+# ルート直下の散在ファイル
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/ | head -5
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/results_N2_main.json 2>/dev/null && echo "ルート直下json発見"
+```
+
+## 2026-05-21 13:02:32
+
+```bash
+# resultsの中の古い散在ファイル/ディレクトリを確認
+ls -la /home/shona/Modeling_of_LLMs_LPT/results/hanoi/
+echo "---"
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/results_N2_hf/ 2>/dev/null | head -5
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/phase_diagram/ 2>/dev/null | head -5
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/pq_sweep/ 2>/dev/null | head -5
+```
+
+## 2026-05-21 13:02:35
+
+```bash
+# refactoring.md の内容確認
+cat /home/shona/Modeling_of_LLMs_LPT/refactoring.md
+```
+
+## 2026-05-21 13:02:37
+
+```bash
+# figures/ 以下の構造
+find /home/shona/Modeling_of_LLMs_LPT/figures -type f | sort
+echo "---"
+# figures/integrated/ の中身
+ls /home/shona/Modeling_of_LLMs_LPT/figures/integrated/deepseek-r1-distill-qwen-14b/ 2>/dev/null
+```
+
+## 2026-05-21 13:05:16
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/archive/
+echo "---"
+# gitで追跡されているファイルのうち、今回操作対象のものを確認
+cd /home/shona/Modeling_of_LLMs_LPT
+git ls-files results/hanoi/ | grep -v '\.npz' | head -30
+echo "---"
+git ls-files refactoring.md 第4回AI開発演習#2-1.pdf 第4回AI開発演習#2-2.pdf
+```
+
+## 2026-05-21 13:05:22
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+# 旧形式ファイルがgitで追跡されているか確認
+git ls-files results/hanoi/results_N2_main.json results/hanoi/results_N3_main.json results/hanoi/results_N4_main.json
+git ls-files results/hanoi/phase_diagram/ | head -5
+git ls-files results/hanoi/pq_sweep/ | head -5
+git ls-files results/hanoi/temp_sweep/ | head -5
+git ls-files results/hanoi/results_N2_hf/ results/hanoi/results_N3_hf/
+```
+
+## 2026-05-21 13:05:37
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+
+# assets/ 新設してPDFを移動（git未追跡なので通常mv後にgit add）
+mkdir -p assets
+mv "第4回AI開発演習#2-1.pdf" assets/
+mv "第4回AI開発演習#2-2.pdf" assets/
+git add assets/
+
+# refactoring.md は中身が空なので削除
+rm refactoring.md
+
+echo "Phase 1 完了"
+ls assets/
+```
+
+## 2026-05-21 13:06:28
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+
+mkdir -p archive/results_legacy
+
+# 単発JSONファイル3本
+git mv results/hanoi/results_N2_main.json archive/results_legacy/
+git mv results/hanoi/results_N3_main.json archive/results_legacy/
+git mv results/hanoi/results_N4_main.json archive/results_legacy/
+
+echo "単発JSON移動完了"
+```
+
+## 2026-05-21 13:06:31
+
+```bash
+ls -la /home/shona/Modeling_of_LLMs_LPT/results/hanoi/results_N2_main.json
+# ownerがrootになっているか確認
+stat /home/shona/Modeling_of_LLMs_LPT/results/hanoi/results_N2_main.json | head -5
+```
+
+## 2026-05-21 13:07:21
+
+```bash
+ls -la /home/shona/Modeling_of_LLMs_LPT/figures/ | head -5
+stat /home/shona/Modeling_of_LLMs_LPT/archive | grep Uid
+```
+
+## 2026-05-21 13:07:28
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+
+# archive/ は shona 所有で書き込み可 → legacy results を cp してから git index を操作
+
+# --- 単発JSON (3本) ---
+cp results/hanoi/results_N2_main.json archive/results_legacy/
+cp results/hanoi/results_N3_main.json archive/results_legacy/
+cp results/hanoi/results_N4_main.json archive/results_legacy/
+git add archive/results_legacy/
+git rm --cached results/hanoi/results_N2_main.json results/hanoi/results_N3_main.json results/hanoi/results_N4_main.json
+echo "単発JSON完了"
+```
+
+## 2026-05-21 13:07:35
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+
+# --- phase_diagram/ (全 summary.json を cp) ---
+mkdir -p archive/results_legacy/phase_diagram
+find results/hanoi/phase_diagram -name "summary.json" | while read f; do
+  subdir=$(dirname "$f" | sed 's|results/hanoi/phase_diagram/||')
+  mkdir -p "archive/results_legacy/phase_diagram/$subdir"
+  cp "$f" "archive/results_legacy/phase_diagram/$subdir/"
+done
+git add archive/results_legacy/phase_diagram/
+git ls-files results/hanoi/phase_diagram/ | xargs git rm --cached
+echo "phase_diagram 完了: $(git ls-files archive/results_legacy/phase_diagram/ | wc -l) 件"
+```
+
+## 2026-05-21 13:07:45
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+
+# --- pq_sweep/ ---
+mkdir -p archive/results_legacy/pq_sweep
+find results/hanoi/pq_sweep -name "summary.json" | while read f; do
+  subdir=$(dirname "$f" | sed 's|results/hanoi/pq_sweep/||')
+  mkdir -p "archive/results_legacy/pq_sweep/$subdir"
+  cp "$f" "archive/results_legacy/pq_sweep/$subdir/"
+done
+git add archive/results_legacy/pq_sweep/
+git ls-files results/hanoi/pq_sweep/ | xargs git rm --cached
+echo "pq_sweep 完了"
+
+# --- temp_sweep/ ---
+mkdir -p archive/results_legacy/temp_sweep
+find results/hanoi/temp_sweep -name "summary.json" | while read f; do
+  subdir=$(dirname "$f" | sed 's|results/hanoi/temp_sweep/||')
+  mkdir -p "archive/results_legacy/temp_sweep/$subdir"
+  cp "$f" "archive/results_legacy/temp_sweep/$subdir/"
+done
+git add archive/results_legacy/temp_sweep/
+git ls-files results/hanoi/temp_sweep/ | xargs git rm --cached
+echo "temp_sweep 完了"
+
+# --- results_N2_hf/, results_N3_hf/ ---
+mkdir -p archive/results_legacy/results_N2_hf archive/results_legacy/results_N3_hf
+cp results/hanoi/results_N2_hf/summary.json archive/results_legacy/results_N2_hf/
+cp results/hanoi/results_N3_hf/summary.json archive/results_legacy/results_N3_hf/
+git add archive/results_legacy/results_N2_hf/ archive/results_legacy/results_N3_hf/
+git rm --cached results/hanoi/results_N2_hf/summary.json results/hanoi/results_N3_hf/summary.json
+echo "results_N*_hf 完了"
+```
+
+## 2026-05-21 13:08:02
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+
+# legacy/ にモデル名なし・旧命名を退避
+mkdir -p figures/legacy
+
+# モデル名なしのルート直下 png
+mv figures/phase_diagram.png   figures/legacy/
+mv figures/pq_dist.png         figures/legacy/
+mv figures/pq_summary.png      figures/legacy/
+mv figures/scaling.png         figures/legacy/
+mv figures/slowing_combined.png    figures/legacy/
+mv figures/slowing_fallback_rate.png figures/legacy/
+mv figures/slowing_tau_imputed.png  figures/legacy/
+mv figures/slowing_tau_valid.png    figures/legacy/
+
+# 旧命名（-distill- 欠落）
+mv "figures/deepseek-r1-qwen-7b_phase_diagram.png" figures/legacy/
+mv "figures/deepseek-r1-qwen-7b_pq_dist.png"       figures/legacy/
+mv "figures/deepseek-r1-qwen-7b_pq_summary.png"    figures/legacy/
+
+echo "legacy 退避完了"
+
+# integrated/ 以下を統一構造に整理
+# ルート直下の integrated_*.png → figures/integrated/<slug>/
+mkdir -p figures/integrated/deepseek-r1-distill-qwen-7b
+mkdir -p figures/integrated/deepseek-r1-distill-qwen-14b
+
+mv figures/deepseek-r1-distill-qwen-7b_integrated_phase.png  figures/integrated/deepseek-r1-distill-qwen-7b/phase.png
+mv figures/deepseek-r1-distill-qwen-7b_integrated_pq_dist.png figures/integrated/deepseek-r1-distill-qwen-7b/pq_dist.png
+mv figures/deepseek-r1-distill-qwen-7b_integrated_summary.png figures/integrated/deepseek-r1-distill-qwen-7b/summary.png
+
+mv figures/deepseek-r1-distill-qwen-14b_integrated_phase.png  figures/integrated/deepseek-r1-distill-qwen-14b/phase.png
+mv figures/deepseek-r1-distill-qwen-14b_integrated_pq_dist.png figures/integrated/deepseek-r1-distill-qwen-14b/pq_dist.png
+mv figures/deepseek-r1-distill-qwen-14b_integrated_summary.png figures/integrated/deepseek-r1-distill-qwen-14b/summary.png
+
+echo "integrated 整理完了"
+
+# 空ディレクトリ削除（以前の空フォルダ）
+rmdir figures/integrated/deepseek-r1-distill-qwen-14b 2>/dev/null && echo "空dir削除" || echo "空dirなし（既に使用中）"
+
+echo "---"
+find figures/ -type f | sort
+```
+
+## 2026-05-21 13:08:25
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+# *test* のパターンを削除したので test_early_stop.py が誤って除外されていないか確認
+git check-ignore -v tests/test_early_stop.py 2>&1 || echo "追跡対象 (ignore されていない) ✓"
+# assets/ が除外されていないか確認
+git check-ignore -v assets/第4回AI開発演習#2-1.pdf 2>&1 || echo "assets/ 追跡対象 ✓"
+```
+
+## 2026-05-21 13:08:38
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+git status --short
+```
+
+## 2026-05-21 13:08:54
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+
+# 未追跡の新規ファイルもステージング
+git add .gitignore CLAUDE.md research_state/results_summary.md open_questions.md
+
+git commit -m "refactor: separate static/dynamic files and archive legacy results
+
+- Add assets/ for reference PDFs (第4回AI開発演習)
+- Remove empty refactoring.md
+- Archive legacy results to archive/results_legacy/:
+    phase_diagram/ (38 cells), pq_sweep/ (17), temp_sweep/ (5),
+    results_N2/3/4_main.json, results_N2/3_hf/ → all superseded by full_sweep/
+- Reorganize figures/ into <sweep_type>/<slug>/ structure;
+    nameless/old-named PNGs → figures/legacy/
+    integrated PNGs → figures/integrated/<slug>/
+- Update .gitignore: add legacy result paths, remove *test* glob
+- Update CLAUDE.md: document static/dynamic separation and figures structure
+
+Physical files in results/hanoi/ remain (Docker root-owned, cannot mv);
+covered by .gitignore entries added above.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+```
+
+## 2026-05-21 13:11:51
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+# radon が使えるか確認（循環的複雑度・認知的複雑度の標準ツール）
+python3 -c "import radon; print('radon ok')" 2>/dev/null || echo "radon なし"
+# 標準ライブラリだけで計測できる範囲を確認
+python3 -c "import ast; print('ast ok')"
+```
+
+## 2026-05-21 13:11:55
+
+```bash
+pip install radon --quiet --break-system-packages 2>&1 | tail -3
+```
+
+## 2026-05-21 13:12:13
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+export PATH="$PATH:/home/shona/.local/bin"
+
+# 対象ファイル一覧
+PY_FILES=$(find . -name "*.py" \
+  -not -path "*/archive/*" \
+  -not -path "*/__pycache__/*" \
+  -not -path "*/.venv/*" \
+  | sort)
+
+echo "=== LOC (総行数 / コード行 / コメント行 / 空行) ==="
+python3 - <<'PYEOF'
+import ast, re
+from pathlib import Path
+
+files = sorted(Path(".").rglob("*.py"))
+files = [f for f in files if not any(p in f.parts for p in ("archive", "__pycache__", ".venv"))]
+
+print(f"{'ファイル':<55} {'LOC':>5} {'コード':>5} {'コメント':>5} {'空行':>5}")
+print("-" * 80)
+totals = [0, 0, 0, 0]
+for f in files:
+    lines = f.read_text(encoding="utf-8", errors="ignore").splitlines()
+    loc   = len(lines)
+    blank = sum(1 for l in lines if l.strip() == "")
+    comment = sum(1 for l in lines if l.strip().startswith("#"))
+    code  = loc - blank - comment
+    totals[0] += loc; totals[1] += code; totals[2] += comment; totals[3] += blank
+    print(f"{str(f):<55} {loc:>5} {code:>5} {comment:>5} {blank:>5}")
+print("-" * 80)
+print(f"{'合計':<55} {totals[0]:>5} {totals[1]:>5} {totals[2]:>5} {totals[3]:>5}")
+PYEOF
+```
+
+## 2026-05-21 13:12:26
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+export PATH="$PATH:/home/shona/.local/bin"
+
+echo "=== 循環的複雑度（Cyclomatic Complexity）関数別 Top20 ==="
+python3 - <<'PYEOF'
+from radon.complexity import cc_visit
+from radon.metrics import mi_visit
+from pathlib import Path
+
+results = []
+files = sorted(Path(".").rglob("*.py"))
+files = [f for f in files if not any(p in f.parts for p in ("archive", "__pycache__", ".venv"))]
+
+for f in files:
+    src = f.read_text(encoding="utf-8", errors="ignore")
+    try:
+        blocks = cc_visit(src)
+        for b in blocks:
+            results.append((b.complexity, str(f), b.name, b.lineno))
+    except:
+        pass
+
+results.sort(reverse=True)
+print(f"{'CC':>4} {'ファイル':<45} {'関数/クラス':<35} {'行'}")
+print("-" * 95)
+for cc, fname, name, lineno in results[:20]:
+    rank = "🔴" if cc >= 10 else ("🟡" if cc >= 5 else "🟢")
+    print(f"{cc:>4} {rank} {fname:<43} {name:<35} L{lineno}")
+PYEOF
+```
+
+## 2026-05-21 13:12:52
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+export PATH="$PATH:/home/shona/.local/bin"
+
+echo "=== ファイル別サマリー（CC合計・平均・メソッド数・保守性指数） ==="
+python3 - <<'PYEOF'
+from radon.complexity import cc_visit, cc_rank
+from radon.metrics import mi_visit
+from pathlib import Path
+
+files = sorted(Path(".").rglob("*.py"))
+files = [f for f in files if not any(p in f.parts for p in ("archive", "__pycache__", ".venv"))
+         and f.stat().st_size > 0]
+
+print(f"{'ファイル':<45} {'LOC':>5} {'CC合計':>7} {'CC最大':>7} {'CC平均':>7} {'関数数':>6} {'MI':>5}")
+print("-" * 95)
+
+for f in files:
+    src = f.read_text(encoding="utf-8", errors="ignore")
+    lines = src.splitlines()
+    loc = len(lines)
+    try:
+        blocks = cc_visit(src)
+        if blocks:
+            cc_total = sum(b.complexity for b in blocks)
+            cc_max   = max(b.complexity for b in blocks)
+            cc_avg   = cc_total / len(blocks)
+            n_funcs  = len(blocks)
+        else:
+            cc_total = cc_max = cc_avg = n_funcs = 0
+        mi = mi_visit(src, multi=True)
+    except:
+        cc_total = cc_max = cc_avg = n_funcs = mi = 0
+
+    flag = "🔴" if cc_max >= 10 else ("🟡" if cc_max >= 5 else "🟢")
+    print(f"{flag} {str(f):<43} {loc:>5} {cc_total:>7} {cc_max:>7} {cc_avg:>7.1f} {n_funcs:>6} {mi:>5.1f}")
+PYEOF
+```
+
+## 2026-05-21 13:16:05
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+python3 - <<'PYEOF'
+import ast
+from pathlib import Path
+
+files = sorted(Path(".").rglob("*.py"))
+files = [f for f in files if not any(p in f.parts for p in ("archive", "__pycache__", ".venv"))
+         and f.stat().st_size > 0]
+
+# プロジェクト内モジュールのセット（importで参照される名前）
+project_modules = {
+    "envs.hanoi_env": "envs/hanoi_env.py",
+    "envs": "envs/__init__.py",
+    "runners.run": "runners/run.py",
+    "runners.run_local": "runners/run_local.py",
+    "runners": "runners/__init__.py",
+    "analysis": "analysis/__init__.py",
+}
+
+for f in files:
+    src = f.read_text(encoding="utf-8", errors="ignore")
+    try:
+        tree = ast.parse(src)
+    except:
+        continue
+
+    imports_internal = []
+    imports_external = []
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                imports_external.append(alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            names = [a.name for a in node.names]
+            # プロジェクト内かどうか判定
+            is_internal = (
+                module.startswith("envs") or
+                module.startswith("runners") or
+                module.startswith("analysis") or
+                module.startswith("db") or
+                module.startswith("tests")
+            )
+            if is_internal:
+                imports_internal.append(f"from {module} import {', '.join(names)}")
+            else:
+                imports_external.append(f"{module}.{names[0]}" if names else module)
+
+    print(f"\n=== {f} ===")
+    if imports_internal:
+        print("  [内部依存]")
+        for i in imports_internal:
+            print(f"    {i}")
+    if imports_external:
+        # よく使うもだけ表示
+        ext_filtered = [e for e in imports_external if not e.startswith("_")]
+        print(f"  [外部ライブラリ] {', '.join(sorted(set(ext_filtered)))}")
+PYEOF
+```
+
+## 2026-05-21 13:16:17
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+# 各ファイルの主要クラス・関数・定数のエクスポート一覧を抽出
+python3 - <<'PYEOF'
+import ast
+from pathlib import Path
+
+targets = [
+    "envs/hanoi_env.py",
+    "runners/run.py",
+    "runners/run_local.py",
+    "runners/test_model_architecture.py",
+    "analysis/analyze_integrated.py",
+    "analysis/analyze_phase_diagram.py",
+    "analysis/analyze_pq.py",
+    "analysis/analyze_slowing.py",
+    "analysis/cosine_sim_phase.py",
+    "analysis/plot_scaling.py",
+    "db/sync_one.py",
+    "tests/test_early_stop.py",
+]
+
+for fpath in targets:
+    f = Path(fpath)
+    src = f.read_text(encoding="utf-8", errors="ignore")
+    try:
+        tree = ast.parse(src)
+    except:
+        continue
+    classes = [n.name for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]
+    funcs   = [n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and not n.name.startswith("_")]
+    priv    = [n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name.startswith("_") and n.name != "__init__"]
+    assigns = [n.targets[0].id for n in ast.walk(tree)
+               if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)
+               and n.targets[0].id.isupper()]
+    print(f"\n{fpath}")
+    if classes: print(f"  classes : {classes}")
+    if funcs:   print(f"  funcs   : {funcs}")
+    if priv:    print(f"  private : {priv}")
+    if assigns: print(f"  consts  : {assigns}")
+PYEOF
+```
+
+## 2026-05-21 13:24:20
+
+```bash
+find /home/shona/Modeling_of_LLMs_LPT -name "analyze_slowing.py" 2>/dev/null
+```
+
+## 2026-05-21 13:24:30
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/ 2>/dev/null | head -5
+```
+
+## 2026-05-21 13:24:32
+
+```bash
+ls /home/shona/Modeling_of_LLMs_LPT/results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b/ | head -8
+```
+
+## 2026-05-21 13:25:16
+
+```bash
+mkdir -p /home/shona/Modeling_of_LLMs_LPT/tools && ls /home/shona/Modeling_of_LLMs_LPT/tools/ 2>/dev/null || echo "(empty)"
+```
+
+## 2026-05-21 13:26:10
+
+```bash
+python3 -m radon --version 2>/dev/null || echo "radon not installed"
+```
+
+## 2026-05-21 13:29:32
+
+```bash
+python3 -m radon cc -s runners/run_local.py | grep -E "generate_with_hidden_states|_prepare_input_ids|_apply_repetition_penalty|_sample_next_token|_capture_new_move_hidden_states|_is_disk_loop_confirmed|_check_early_stop_with_disk_verify|_finalize_hidden_states"
+```
+
+## 2026-05-21 13:30:28
+
+```bash
+python3 -m radon cc -s runners/run_local.py | grep -E "generate_with_hidden_states|_prepare_input_ids|_apply_repetition_penalty|_sample_next_token|_capture_new_move|_is_disk_loop|_check_early_stop_with|_finalize_hidden_states|_handle_new_moves|_build_reasoning|_should_check"
+```
+
+## 2026-05-21 13:31:05
+
+```bash
+python3 -m radon cc -s runners/run_local.py | grep generate_with_hidden_states
+```
+
+## 2026-05-21 13:31:08
+
+```bash
+python3 -m pytest tests/test_early_stop.py -v --tb=short 2>&1 | tail -30
+```
+
+## 2026-05-21 13:31:15
+
+```bash
+python3 -m radon cc -s runners/run_local.py 2>&1 | grep -E "^ +F "
+```
+
+## 2026-05-21 13:31:21
+
+```bash
+python3 -m py_compile runners/run_local.py && echo "syntax OK"
+```
+
+## 2026-05-21 13:31:28
+
+```bash
+python3 -m radon cc -s runners/run_local.py | grep generate_with_hidden_states && python3 -m pytest tests/test_early_stop.py -v --tb=short 2>&1 | tail -20
+```
+
+## 2026-05-21 13:32:10
+
+```bash
+python3 -m radon cc -s runners/run_local.py | grep -E "(generate_with_hidden_states|CC|grade)" | head -20
+```
+
+## 2026-05-21 13:32:13
+
+```bash
+python3 -m pytest tests/test_early_stop.py -v --tb=short 2>&1 | tail -15
+```
+
+## 2026-05-21 13:34:29
+
+```bash
+grep -n "generate_with_hidden_states\|_resolve_profile\|_resolve_capture\|_estimate_reasoning_tokens\b" /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py | head -30
+```
+
+## 2026-05-21 13:34:32
+
+```bash
+grep -n "generate_with_hidden_states" /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py | head -10
+```
+
+## 2026-05-21 13:34:38
+
+```bash
+grep -n "profile=\|capture_layers=" /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py | head -20
+```
+
+## 2026-05-21 13:34:41
+
+```bash
+grep -n "profile " /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py | head -10
+```
+
+## 2026-05-21 13:34:45
+
+```bash
+grep -n "capture_layers " /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py | head -10
+```
+
+## 2026-05-21 13:35:22
+
+```bash
+python3 -m pytest tests/test_early_stop.py -q 2>&1 | tail -5 && python3 -m radon cc -s runners/run_local.py | grep -E "^\s+[A-F] " | head -5
+```
+
+## 2026-05-21 13:35:39
+
+```bash
+python3 tools/measure_quality.py 2>&1 | tail -25
+```
+
+## 2026-05-21 13:35:47
+
+```bash
+python3 tools/measure_quality.py --verbose 2>&1 | grep -A 10 "run_local"
+```
+
+## 2026-05-21 13:36:21
+
+```bash
+grep -n "^\(import os\|import sys\|from dataclasses import.*field\)\|[^_]os\.\|[^_]sys\.\|field(" /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py | head -20
+```
+
+## 2026-05-21 13:36:24
+
+```bash
+grep -n "\bos\.\|sys\.\|field(" /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py | head -20
+```
+
+## 2026-05-21 13:36:30
+
+```bash
+grep -cn "\bos\b\|\bsys\b\|\bfield\b" /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+```
+
+## 2026-05-21 13:36:34
+
+```bash
+grep -n "\bos\b\|\bsys\b\|\bfield\b" /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+```
+
+## 2026-05-21 13:36:44
+
+```bash
+python3 -m pytest tests/test_early_stop.py -q 2>&1 | tail -3
+```
+
+## 2026-05-21 13:37:16
+
+```bash
+python3 -m radon cc -s analysis/analyze_integrated.py
+```
+
+## 2026-05-21 13:39:09
+
+```bash
+python3 -m radon cc -s analysis/analyze_integrated.py | head -20
+```
+
+## 2026-05-21 13:39:14
+
+```bash
+python3 -m radon cc -s /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_integrated.py 2>/dev/null
+```
+
+## 2026-05-21 13:39:42
+
+```bash
+python3 -m radon cc -s /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_integrated.py 2>/dev/null
+```
+
+## 2026-05-21 13:39:46
+
+```bash
+python3 -m pytest tests/test_early_stop.py -q 2>&1 | tail -5
+```
+
+## 2026-05-21 13:39:49
+
+```bash
+python3 -c "from analysis.analyze_integrated import plot_phase_diagram, plot_summary, load_condition; print('import OK')"
+```
+
+## 2026-05-21 13:40:21
+
+```bash
+python3 -m radon cc -s analysis/analyze_integrated.py | grep -E "^\s+[ABCDEF] " | head -15 && python3 -m pytest tests/test_early_stop.py -q 2>&1 | tail -3
+```
+
+## 2026-05-21 13:40:28
+
+```bash
+python3 tools/measure_quality.py 2>&1 | grep -E "(ファイル|CC ≥|MI <|⚠ CC|✅|❌|スキャン)" | head -25
+```
+
+## 2026-05-21 13:40:31
+
+```bash
+python3 tools/measure_quality.py 2>&1 | grep -E "^\s+\S" | head -30
+```
+
+## 2026-05-21 13:41:21
+
+```bash
+python3 -m radon cc -s tools/measure_quality.py | grep -E "^\s+[A-F] " | head -10 && python3 tools/measure_quality.py 2>&1 | tail -5
+```
+
+## 2026-05-21 13:43:14
+
+```bash
+python3 -m radon cc -s analysis/analyze_phase_diagram.py | grep -E "^\s+[A-F] " | head -10 && python3 -m pytest tests/test_early_stop.py -q 2>&1 | tail -3
+```
+
+## 2026-05-21 13:43:19
+
+```bash
+python3 tools/measure_quality.py 2>&1 | grep -E "^\s+\S.*⚠|CC ≥|❌|✅|スキャン"
+```
+
+## 2026-05-21 13:43:31
+
+```bash
+python3 -m radon cc -s analysis/analyze_pq.py | grep -E "^\s+[A-F] " | grep -v "A (" | head -10
+```
+
+## 2026-05-21 13:43:53
+
+```bash
+python3 -m radon cc -s analysis/analyze_pq.py
+```
+
+## 2026-05-21 13:45:40
+
+```bash
+python3 -m radon cc -s analysis/analyze_pq.py
+```
+
+## 2026-05-21 13:45:47
+
+```bash
+python3 -m pytest tests/test_early_stop.py -q 2>&1 | tail -3
+```
+
+## 2026-05-21 13:45:54
+
+```bash
+python3 -c "import sys; sys.path.insert(0, '/home/shona/Modeling_of_LLMs_LPT'); import analysis.analyze_pq as m; print('import OK'); print('public API:', [f for f in dir(m) if not f.startswith('__')])"
+```
+
+## 2026-05-21 13:45:57
+
+```bash
+python3 -m radon cc -s analysis/analyze_pq.py | grep -E "^\s+[C-F] "
+```
+
+## 2026-05-21 13:46:01
+
+```bash
+python3 -m radon cc -s /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_pq.py | grep -E "^\s+[CDEF] "
+```
+
+## 2026-05-21 13:46:05
+
+```bash
+python3 -m radon cc -s /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_pq.py | grep " - C \| - D \| - E \| - F "
+```
+
+## 2026-05-21 13:46:41
+
+```bash
+python3 -m radon cc -s analysis/analyze_pq.py | grep -E "^\s+[C-F] " | head -5 && python3 -m pytest tests/test_early_stop.py -q 2>&1 | tail -3
+```
+
+## 2026-05-21 13:46:47
+
+```bash
+python3 tools/measure_quality.py 2>&1 | grep -E "(⚠|CC ≥|❌|✅|スキャン)" | head -15
+```
+
+## 2026-05-21 13:47:54
+
+```bash
+python3 -m radon cc -s analysis/cosine_sim_phase.py | grep -E "^\s+[A-F] " && python3 -m pytest tests/test_early_stop.py -q 2>&1 | tail -3
+```
+
+## 2026-05-21 13:47:58
+
+```bash
+python3 -m radon cc -s analysis/analyze_slowing.py | grep -E "^\s+[B-F] " | grep -v "A (" | head -8
+```
+
+## 2026-05-21 13:49:00
+
+```bash
+python3 -m radon cc -s analysis/analyze_slowing.py | grep -E "^\s+[B-F] " | head -10 && python3 -m pytest tests/test_early_stop.py -q 2>&1 | tail -3
+```
+
+## 2026-05-21 13:49:30
+
+```bash
+python3 -m radon cc -s analysis/analyze_slowing.py | grep -E "collect_all|_collect_from" && python3 -m pytest tests/test_early_stop.py -q 2>&1 | tail -3
+```
+
+## 2026-05-21 13:49:34
+
+```bash
+python3 tools/measure_quality.py 2>&1 | grep -E "(⚠|CC ≥|❌|✅|スキャン)"
+```
+
+## 2026-05-21 13:50:31
+
+```bash
+python3 -m radon cc -s runners/run.py | grep -E "check_early_stop|_check_" && python3 -m pytest tests/test_early_stop.py -v --tb=short 2>&1 | tail -15
+```
+
+## 2026-05-21 13:50:36
+
+```bash
+python3 tools/measure_quality.py --verbose 2>&1 | grep -E "(⚠|CC ≥|❌|✅|スキャン|\bCC=)" | head -20
+```
+
+## 2026-05-21 13:51:14
+
+```bash
+python3 -m radon cc -s analysis/analyze_integrated.py | grep -E "classify_phase|_is_" && python3 -m pytest tests/test_early_stop.py -q 2>&1 | tail -3
+```
+
+## 2026-05-21 13:51:44
+
+```bash
+python3 -m radon cc -s runners/test_model_architecture.py | grep -E "^\s+[B-F] " | grep -v "A (" | head -8
+```
+
+## 2026-05-21 13:52:01
+
+```bash
+python3 tools/measure_quality.py 2>&1 | grep -E "(⚠|CC ≥|❌|✅|スキャン|\bCC=)" | head -15
+```
+
+## 2026-05-21 13:52:58
+
+```bash
+python3 -m radon cc -s runners/run_local.py | grep -E "main|_build_early|_resolve_output|_write_meta" && python3 -m pytest tests/test_early_stop.py -q 2>&1 | tail -3
+```
+
+## 2026-05-21 13:53:40
+
+```bash
+grep -n "_capture_layers\|_profile\b" /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py | grep -v "def \|#" | head -20
+```
+
+## 2026-05-21 13:54:01
+
+```bash
+python3 -m radon cc -s runners/run_local.py | grep generate_with && python3 -m pytest tests/test_early_stop.py -q 2>&1 | tail -3
+```
+
+## 2026-05-21 13:54:05
+
+```bash
+python3 tools/measure_quality.py 2>&1 | grep -E "(⚠|CC ≥|❌|✅|スキャン)"
+```
+

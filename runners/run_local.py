@@ -1,25 +1,23 @@
 """
-run_hf.py — ハノイの塔 推論崩壊検知 (HuggingFace Transformers 版)
+run_local.py — ハノイの塔 推論崩壊検知 (HuggingFace Transformers 版)
 
 run.py (Ollama API 版) の HuggingFace 対応版。
 DeepSeek-R1-Distill-Qwen-7B を NF4 4-bit 量子化でローカル実行し、
 Move 出力位置で隠れ状態ベクトルを選択的に保存する。
 
 使用例:
-  python run_hf.py --N 3
-  python run_hf.py --N 5 --trials 10
-  python run_hf.py --N 5 --no-early-stop --device cuda:1
+  python runners/run_local.py --N 3
+  python runners/run_local.py --N 5 --trials 10
+  python runners/run_local.py --N 5 --no-early-stop --device cuda:1
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
-import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -30,8 +28,6 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from envs.hanoi_env import TowerOfHanoiEnv
 from runners.run import (
     EarlyStopConfig,
-    _MOVE_RE,
-    _estimate_reasoning_tokens,
     calc_default_trials,
     calc_num_predict,
     calc_think_budget_ratio,
@@ -215,6 +211,207 @@ def _estimate_reasoning_tokens_with_profile(
     return int(total_tokens * (think_len / total_len))
 
 
+def _prepare_input_ids(
+    tokenizer: AutoTokenizer,
+    prompt: str,
+    env: TowerOfHanoiEnv,
+    n_shot: int,
+    profile: ModelProfile,
+) -> torch.Tensor:
+    """messages を構築し、chat template を適用して input_ids を返す。
+
+    `.to(device)` は呼び出し側で行う。
+    """
+    if n_shot > 0:
+        messages = build_few_shot_messages(env, n_shot)
+    else:
+        messages = [
+            {"role": "system", "content": SYSTEM_HINT},
+            {"role": "user",   "content": prompt},
+        ]
+
+    if profile.think_mode == "chat_template":
+        # Qwen3 系: enable_thinking=True でトークナイザーが thinking モードを制御する
+        formatted = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True,
+            enable_thinking=True,
+        )
+    else:
+        formatted = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        if profile.think_mode == "prefill":
+            # DeepSeek-R1 系: <think> をプリフィルして推論モードを強制起動する
+            formatted += profile.think_open_tag + "\n"
+
+    return tokenizer(formatted, return_tensors="pt").input_ids
+
+
+def _apply_repetition_penalty(
+    logits: torch.Tensor,
+    generated_ids: list[int],
+    penalty: float,
+) -> None:
+    """生成済みトークンの logits を in-place で減衰させてループを抑制する。"""
+    if penalty == 1.0 or not generated_ids:
+        return
+    for token_id in set(generated_ids):
+        if logits[token_id] > 0:
+            logits[token_id] /= penalty
+        else:
+            logits[token_id] *= penalty
+
+
+def _sample_next_token(logits: torch.Tensor, temperature: float) -> int:
+    """温度サンプリングで次の token id を返す。"""
+    scaled = logits / temperature
+    probs = torch.softmax(scaled, dim=-1)
+    return int(torch.multinomial(probs, num_samples=1).item())
+
+
+def _capture_new_move_hidden_states(
+    outputs,
+    capture_layers: dict[str, int],
+    current_moves_full: list,
+    prev_move_count: int,
+    step: int,
+    hs_buffer: dict[str, list[np.ndarray]],
+    move_steps_list: list[int],
+    move_texts_list: list[str],
+) -> int:
+    """prev_move_count 以降の新しい Move について hidden state をキャプチャする。
+
+    Returns:
+        current_move_count（新しい prev_move_count として使う）。
+    """
+    current_move_count = len(current_moves_full)
+    for mv_idx in range(prev_move_count, current_move_count):
+        for layer_key, layer_idx in capture_layers.items():
+            hs_tensor = outputs.hidden_states[layer_idx][0, -1, :]
+            hs_buffer[layer_key].append(hs_tensor.float().cpu().numpy())
+        move_steps_list.append(step)
+        disk, src, dst = current_moves_full[mv_idx]
+        move_texts_list.append(f"Move {disk} from {src} to {dst}")
+    return current_move_count
+
+
+def _is_disk_loop_confirmed(
+    current_moves_full: list,
+    cfg: EarlyStopConfig,
+) -> bool:
+    """ディスク番号込みでループを再検証する。
+
+    loop_window と loop_min_count を使って disk_loop と reverse_loop の OR を返す。
+    """
+    if len(current_moves_full) < cfg.loop_window:
+        return False
+    recent = current_moves_full[-cfg.loop_window:]
+    disk_loop = any(
+        recent.count(mv) >= cfg.loop_min_count for mv in set(recent)
+    )
+    reverse_loop = any(
+        recent[i][1] == recent[i + 1][2]
+        and recent[i][2] == recent[i + 1][1]
+        and recent[i][0] == recent[i + 1][0]
+        for i in range(len(recent) - 1)
+    )
+    return disk_loop or reverse_loop
+
+
+def _check_early_stop_with_disk_verify(
+    accumulated_text: str,
+    num_predict: int,
+    min_moves: int,
+    early_stop_cfg: EarlyStopConfig,
+    current_moves_full: list,
+) -> Optional[str]:
+    """check_early_stop を呼び、move_loop 系は disk 番号込みで再検証する。
+
+    誤検知（disk 番号が違う）の場合は None を返す。
+    """
+    reason = check_early_stop(accumulated_text, num_predict, min_moves, early_stop_cfg)
+    if reason in ("move_loop_repeat", "move_loop_reverse"):
+        if not _is_disk_loop_confirmed(current_moves_full, early_stop_cfg):
+            return None  # 誤検知: ディスクが違うので無視
+    return reason
+
+
+def _finalize_hidden_states(
+    hs_buffer: dict[str, list[np.ndarray]],
+    capture_layers: dict[str, int],
+    move_steps_list: list[int],
+    move_texts_list: list[str],
+    step: int,
+    generated_ids: list[int],
+    last_outputs,
+    hidden_size: int,
+) -> dict[str, np.ndarray]:
+    """hidden state バッファを ndarray に変換して返す。
+
+    move が 1 本も取れなかった場合（fallback）は last_outputs の最終トークンを記録し、
+    move_steps_list / move_texts_list に "__fallback__" を in-place で追記する。
+    """
+    if not move_steps_list and generated_ids and last_outputs is not None:
+        for layer_key, layer_idx in capture_layers.items():
+            hs_tensor = last_outputs.hidden_states[layer_idx][0, -1, :]
+            hs_buffer[layer_key].append(hs_tensor.float().cpu().numpy())
+        move_steps_list.append(step)
+        move_texts_list.append("__fallback__")
+
+    hidden_states_np: dict[str, np.ndarray] = {}
+    for layer_key in capture_layers:
+        if hs_buffer[layer_key]:
+            hidden_states_np[layer_key] = np.stack(hs_buffer[layer_key], axis=0)
+        else:
+            hidden_states_np[layer_key] = np.empty((0, hidden_size), dtype=np.float32)
+    return hidden_states_np
+
+
+def _handle_new_moves(
+    outputs,
+    capture_layers: dict[str, int],
+    current_moves_full: list,
+    prev_move_count: int,
+    step: int,
+    hs_buffer: dict[str, list[np.ndarray]],
+    move_steps_list: list[int],
+    move_texts_list: list[str],
+    env: TowerOfHanoiEnv,
+    accumulated_text: str,
+    disable_goal_stop: bool,
+) -> tuple[int, Optional[str]]:
+    """新しい Move のキャプチャとゴール到達チェックをまとめて行う。
+
+    Returns:
+        (new_prev_move_count, stop_reason_or_None)
+    """
+    new_prev_move_count = _capture_new_move_hidden_states(
+        outputs, capture_layers, current_moves_full,
+        prev_move_count, step, hs_buffer, move_steps_list, move_texts_list,
+    )
+    if disable_goal_stop:
+        return new_prev_move_count, None
+    extracted = env.extract_moves_from_text(accumulated_text)
+    if env.goal_reached(extracted):
+        return new_prev_move_count, "goal_reached"
+    return new_prev_move_count, None
+
+
+def _build_reasoning_text(accumulated_text: str, profile: ModelProfile) -> str:
+    """prefill モード用に think_open_tag を先頭に補った reasoning_text を返す。"""
+    if profile.think_mode == "prefill":
+        return profile.think_open_tag + "\n" + accumulated_text
+    return accumulated_text
+
+
+def _should_check_early_stop(
+    early_stop_cfg: Optional[EarlyStopConfig],
+    accumulated_text: str,
+) -> bool:
+    """早期終了チェックを実行すべきかどうかを返す（50 文字おき）。"""
+    return early_stop_cfg is not None and len(accumulated_text) % 50 < 5
+
+
 def generate_with_hidden_states(
     model: AutoModelForCausalLM,
     tokenizer: AutoTokenizer,
@@ -226,8 +423,8 @@ def generate_with_hidden_states(
     temperature: float = 0.6,
     repetition_penalty: float = 1.1,
     n_shot: int = 0,
-    profile: Optional[ModelProfile] = None,
-    capture_layers: Optional[dict[str, int]] = None,
+    profile: ModelProfile = None,             # type: ignore[assignment]  実質必須
+    capture_layers: dict[str, int] = None,    # type: ignore[assignment]  実質必須
     disable_goal_stop: bool = False,
 ) -> GenerationResult:
     """
@@ -243,59 +440,33 @@ def generate_with_hidden_states(
         num_predict: 最大生成トークン数。
         min_moves: この N の最短手数（早期終了判定に使用）。
         early_stop_cfg: 早期終了設定。None なら無効。
+        profile: ModelProfile（必須）。resolve_model_profile() で生成すること。
+        capture_layers: キャプチャ層マップ（必須）。make_capture_layers() で生成すること。
 
     Returns:
         GenerationResult インスタンス。
     """
     device = next(model.parameters()).device
 
-    # system ヒント + few-shot（n_shot=0 でも system ヒントは常に適用）
-    if n_shot > 0:
-        messages = build_few_shot_messages(env, n_shot)
-    else:
-        messages = [
-            {"role": "system", "content": SYSTEM_HINT},
-            {"role": "user",   "content": prompt},
-        ]
-
-    # think_mode に応じてチャットテンプレートの適用方法を切り替える。
-    # profile が None の場合は後方互換として "prefill" と同じ挙動にする。
-    _profile = profile or ModelProfile(model_id="unknown", think_mode="prefill")
-    if _profile.think_mode == "chat_template":
-        # Qwen3 系: enable_thinking=True でトークナイザーが thinking モードを制御する
-        formatted = tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True,
-            enable_thinking=True,
-        )
-    else:
-        formatted = tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-        if _profile.think_mode == "prefill":
-            # DeepSeek-R1 系: <think> をプリフィルして推論モードを強制起動する
-            formatted += _profile.think_open_tag + "\n"
-    input_ids = tokenizer(formatted, return_tensors="pt").input_ids.to(device)
+    input_ids = _prepare_input_ids(tokenizer, prompt, env, n_shot, profile).to(device)
 
     # 生成トークンを蓄積するバッファ
     generated_ids: list[int] = []
     accumulated_text = ""
     past_key_values = None
     stop_reason: Optional[str] = None
+    last_outputs = None
 
-    # 隠れ状態バッファ: {layer_key: list of 1D numpy array}
-    _capture_layers = (
-        capture_layers if capture_layers is not None
-        else make_capture_layers(model.config.num_hidden_layers)
-    )
-    hs_buffer: dict[str, list[np.ndarray]] = {k: [] for k in _capture_layers}
+    hs_buffer: dict[str, list[np.ndarray]] = {k: [] for k in capture_layers}
     move_steps_list: list[int] = []
     move_texts_list: list[str] = []
 
     # 直前ステップまでに抽出済みの手数（重複キャプチャ防止）
     prev_move_count = 0
-
     current_input_ids = input_ids
 
+    # for が 0 回の場合の step 未定義を防ぐ
+    step = -1
     for step in range(num_predict):
         with torch.no_grad():
             outputs = model(
@@ -305,19 +476,9 @@ def generate_with_hidden_states(
                 output_hidden_states=True,
             )
 
-        # Repetition penalty: 生成済みトークンの logits を減衰させてループを抑制
         logits = outputs.logits[0, -1, :].float()
-        if repetition_penalty != 1.0 and generated_ids:
-            for token_id in set(generated_ids):
-                if logits[token_id] > 0:
-                    logits[token_id] /= repetition_penalty
-                else:
-                    logits[token_id] *= repetition_penalty
-
-        # Temperature sampling（greedy は決定論的で全試行が同一出力になるため使用しない）
-        logits = logits / temperature
-        probs = torch.softmax(logits, dim=-1)
-        next_token_id = int(torch.multinomial(probs, num_samples=1).item())
+        _apply_repetition_penalty(logits, generated_ids, repetition_penalty)
+        next_token_id = _sample_next_token(logits, temperature)
 
         # EOS チェック
         if next_token_id == tokenizer.eos_token_id:
@@ -331,25 +492,16 @@ def generate_with_hidden_states(
 
         # Move 検出: ディスク番号込みで抽出（hidden state キャプチャ & move_texts 用）
         current_moves_full = _MOVE_RE_WITH_DISK.findall(accumulated_text)  # (disk, src, dst)
-        current_move_count = len(current_moves_full)
 
-        if current_move_count > prev_move_count:
-            for mv_idx in range(prev_move_count, current_move_count):
-                for layer_key, layer_idx in _capture_layers.items():
-                    hs_tensor = outputs.hidden_states[layer_idx][0, -1, :]
-                    hs_buffer[layer_key].append(hs_tensor.float().cpu().numpy())
-                move_steps_list.append(step)
-                disk, src, dst = current_moves_full[mv_idx]
-                move_texts_list.append(f"Move {disk} from {src} to {dst}")
-
-            prev_move_count = current_move_count
-
-            # ゴール到達を検知したら即停止（以降の手が hidden state を汚染するのを防ぐ）
-            if not disable_goal_stop:
-                extracted = env.extract_moves_from_text(accumulated_text)
-                if env.goal_reached(extracted):
-                    stop_reason = "goal_reached"
-                    break
+        if len(current_moves_full) > prev_move_count:
+            prev_move_count, goal_stop = _handle_new_moves(
+                outputs, capture_layers, current_moves_full,
+                prev_move_count, step, hs_buffer, move_steps_list, move_texts_list,
+                env, accumulated_text, disable_goal_stop,
+            )
+            if goal_stop:
+                stop_reason = goal_stop
+                break
 
         # 次ステップの入力は今生成したトークンのみ（KV キャッシュを活用）
         current_input_ids = torch.tensor([[next_token_id]], device=device)
@@ -357,57 +509,23 @@ def generate_with_hidden_states(
 
         # 早期終了チェック（50 文字おきに評価してオーバーヘッドを抑える）
         # Algorithm C (move_loop) のみディスク番号込みの3-tuple で再判定し誤爆を防ぐ
-        if early_stop_cfg is not None and len(accumulated_text) % 50 < 5:
-            reason = check_early_stop(
-                accumulated_text, num_predict, min_moves, early_stop_cfg
+        if _should_check_early_stop(early_stop_cfg, accumulated_text):
+            reason = _check_early_stop_with_disk_verify(
+                accumulated_text, num_predict, min_moves, early_stop_cfg, current_moves_full,
             )
-            if reason in ("move_loop_repeat", "move_loop_reverse"):
-                # ディスク番号を含めて再チェック: 同じ (disk,src,dst) が繰り返すか確認
-                cfg = early_stop_cfg
-                if len(current_moves_full) >= cfg.loop_window:
-                    recent = current_moves_full[-cfg.loop_window:]
-                    disk_loop = any(
-                        recent.count(mv) >= cfg.loop_min_count for mv in set(recent)
-                    )
-                    reverse_loop = any(
-                        recent[i][1] == recent[i+1][2]
-                        and recent[i][2] == recent[i+1][1]
-                        and recent[i][0] == recent[i+1][0]
-                        for i in range(len(recent) - 1)
-                    )
-                    if not (disk_loop or reverse_loop):
-                        reason = None  # 誤検知: ディスクが違うので無視
             if reason:
                 stop_reason = reason
                 break
 
     total_tokens = len(generated_ids)
-    # prefill モードでは think_open_tag がプロンプト側にあるため先頭に補って渡す
-    reasoning_text = (
-        _profile.think_open_tag + "\n" + accumulated_text
-        if _profile.think_mode == "prefill"
-        else accumulated_text
+    reasoning_tokens = _estimate_reasoning_tokens_with_profile(
+        _build_reasoning_text(accumulated_text, profile), total_tokens, profile
     )
-    reasoning_tokens = _estimate_reasoning_tokens_with_profile(reasoning_text, total_tokens, _profile)
 
-    # moves が1本も取れなかった場合（常磁性相: no_move_catchall 等）、
-    # 最終トークンの hidden state をフォールバックとして記録する。
-    # これにより P(q) 解析で常磁性相とスピングラス相を比較できる。
-    if not move_steps_list and generated_ids and 'last_outputs' in dir():
-        for layer_key, layer_idx in _capture_layers.items():
-            hs_tensor = last_outputs.hidden_states[layer_idx][0, -1, :]
-            hs_buffer[layer_key].append(hs_tensor.float().cpu().numpy())
-        move_steps_list.append(step)
-        move_texts_list.append("__fallback__")
-
-    # list[np.ndarray] → np.ndarray of shape (num_moves, hidden_size)
-    hidden_states_np: dict[str, np.ndarray] = {}
-    num_captured = len(move_steps_list)
-    for layer_key in _capture_layers:
-        if hs_buffer[layer_key]:
-            hidden_states_np[layer_key] = np.stack(hs_buffer[layer_key], axis=0)
-        else:
-            hidden_states_np[layer_key] = np.empty((0, model.config.hidden_size), dtype=np.float32)
+    hidden_states_np = _finalize_hidden_states(
+        hs_buffer, capture_layers, move_steps_list, move_texts_list,
+        step, generated_ids, last_outputs, model.config.hidden_size,
+    )
 
     return GenerationResult(
         text=accumulated_text,
@@ -607,55 +725,71 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _build_early_stop_cfg(args) -> Optional[EarlyStopConfig]:
+    """CLI 引数から EarlyStopConfig を構築する。--no-early-stop 時は None を返す。"""
+    if args.no_early_stop:
+        return None
+    think_ratio = (
+        args.es_think_ratio if args.es_think_ratio is not None
+        else calc_think_budget_ratio(args.N)
+    )
+    return EarlyStopConfig(
+        think_budget_ratio=think_ratio,
+        max_move_multiplier=args.es_move_mult,
+        loop_window=args.es_loop_window,
+        loop_min_count=args.es_loop_count,
+    )
+
+
+def _resolve_output_paths(args) -> tuple[Optional[Path], Optional[Path]]:
+    """出力ディレクトリと summary.json パスを解決する。
+
+    Returns:
+        (output_dir, summary_path): いずれも保存不要なら None。
+    """
+    output_dir: Optional[Path] = None
+    if not args.no_save_hidden:
+        output_dir = (
+            Path(args.output_dir) if args.output_dir
+            else Path(f"results/hanoi/{model_id_to_slug(args.model_id)}/N{args.N}")
+        )
+    summary_path = (
+        Path(args.output) if args.output
+        else (output_dir / "summary.json" if output_dir else None)
+    )
+    return output_dir, summary_path
+
+
+def _write_meta_json(summary_path: Optional[Path], args) -> None:
+    """meta.json を summary.json より先に書き出す。
+
+    実験途中でクラッシュしても sync.sh が "waiting" として検知できる。
+    summary_path が None の場合は何もしない。
+    """
+    if summary_path is None:
+        return
+    meta_dir = summary_path.parent
+    meta_dir.mkdir(parents=True, exist_ok=True)
+    meta = {
+        "environment": "hanoi",
+        "model":       args.model_id,
+        "N":           args.N,
+        "temperature": args.temperature,
+        "sweep_type":  args.sweep_type,
+    }
+    meta_path = meta_dir / "meta.json"
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+    print(f"メタデータを保存しました: {meta_path}")
+
+
 def main() -> None:
     args = parse_args()
 
-    trials = args.trials if args.trials is not None else calc_default_trials(args.N)
-    think_ratio = (
-        args.es_think_ratio
-        if args.es_think_ratio is not None
-        else calc_think_budget_ratio(args.N)
-    )
-
-    early_stop_cfg: Optional[EarlyStopConfig] = None
-    if not args.no_early_stop:
-        early_stop_cfg = EarlyStopConfig(
-            think_budget_ratio=think_ratio,
-            max_move_multiplier=args.es_move_mult,
-            loop_window=args.es_loop_window,
-            loop_min_count=args.es_loop_count,
-        )
-
-    # 出力ディレクトリの解決
-    output_dir: Optional[Path] = None
-    if not args.no_save_hidden:
-        if args.output_dir:
-            output_dir = Path(args.output_dir)
-        else:
-            slug = model_id_to_slug(args.model_id)
-            output_dir = Path(f"results/hanoi/{slug}/N{args.N}")
-
-    # summary.json の保存先を確定（meta.json の書き出し先に使う）
-    summary_path = Path(args.output) if args.output else (
-        output_dir / "summary.json" if output_dir else None
-    )
-
-    # meta.json を summary.json より先に書き出す
-    # → 実験途中でクラッシュしても sync.sh が "waiting" として検知できる
-    if summary_path is not None:
-        meta_dir = summary_path.parent
-        meta_dir.mkdir(parents=True, exist_ok=True)
-        meta = {
-            "environment": "hanoi",
-            "model":       args.model_id,
-            "N":           args.N,
-            "temperature": args.temperature,
-            "sweep_type":  args.sweep_type,
-        }
-        meta_path = meta_dir / "meta.json"
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump(meta, f, ensure_ascii=False, indent=2)
-        print(f"メタデータを保存しました: {meta_path}")
+    trials         = args.trials if args.trials is not None else calc_default_trials(args.N)
+    early_stop_cfg = _build_early_stop_cfg(args)
+    output_dir, summary_path = _resolve_output_paths(args)
+    _write_meta_json(summary_path, args)
 
     # モデルプロファイル解決（think 起動方式の自動選択）
     profile = resolve_model_profile(args.model_id)

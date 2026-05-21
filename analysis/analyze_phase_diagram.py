@@ -126,6 +126,127 @@ def estimate_phase_boundary(
 # プロット
 # ===========================================================================
 
+def _plot_heatmap_panel(
+    ax,
+    acc_mat: np.ndarray,
+    ns: list[int],
+    ts: list[float],
+    boundary: dict[int, float | None],
+) -> None:
+    """パネル(1): accuracy ヒートマップ + 相境界線を描画する。"""
+    cmap = mcolors.LinearSegmentedColormap.from_list(
+        "order_disorder", ["#d62728", "#ffffff", "#1f77b4"]
+    )
+    im = ax.imshow(
+        acc_mat, aspect="auto", origin="lower",
+        vmin=0.0, vmax=1.0, cmap=cmap,
+        extent=[ts[0] - 0.1, ts[-1] + 0.1, ns[0] - 0.5, ns[-1] + 0.5],
+    )
+    plt.colorbar(im, ax=ax, label="Accuracy  m(N, T)")
+    bc_ns  = [N for N in ns if boundary.get(N) is not None]
+    bc_Tcs = [boundary[N] for N in bc_ns]
+    if bc_ns:
+        ax.plot(bc_Tcs, bc_ns, "k--o", linewidth=2, markersize=7, label=r"$T_c(N)$  boundary")
+        ax.legend(fontsize=9)
+    ax.set_xlabel("Temperature  T")
+    ax.set_ylabel("Disk count  N")
+    ax.set_title("Phase Diagram  (accuracy heatmap)")
+    ax.set_yticks(ns)
+    ax.set_xticks(ts)
+    ax.tick_params(axis="x", rotation=45)
+
+
+def _plot_accuracy_curve_panel(
+    ax,
+    acc_mat: np.ndarray,
+    acc_std: np.ndarray,
+    ns: list[int],
+    ts: list[float],
+    colors,
+) -> None:
+    """パネル(2): Accuracy vs T（各 N）を描画する。"""
+    for i, N in enumerate(ns):
+        row, row_s = acc_mat[i, :], acc_std[i, :]
+        valid = ~np.isnan(row)
+        ax.errorbar(np.array(ts)[valid], row[valid], yerr=row_s[valid],
+                    fmt="o-", capsize=4, color=colors[i],
+                    linewidth=1.8, markersize=6, label=f"N={N}")
+    ax.axhline(y=BOUNDARY_THRESHOLD, color="gray", linestyle="--",
+               alpha=0.6, label=f"threshold={BOUNDARY_THRESHOLD}")
+    ax.set_xlabel("Temperature  T")
+    ax.set_ylabel("Accuracy")
+    ax.set_title("Accuracy vs Temperature  (per N)")
+    ax.set_ylim(-0.05, 1.05)
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+
+def _plot_token_curve_panel(
+    ax,
+    tok_mat: np.ndarray,
+    tok_std: np.ndarray,
+    ns: list[int],
+    ts: list[float],
+    colors,
+) -> None:
+    """パネル(3): Total Tokens vs T（各 N）を描画する。"""
+    for i, N in enumerate(ns):
+        row, row_s = tok_mat[i, :], tok_std[i, :]
+        valid = ~np.isnan(row)
+        ax.errorbar(np.array(ts)[valid], row[valid], yerr=row_s[valid],
+                    fmt="s-", capsize=4, color=colors[i],
+                    linewidth=1.8, markersize=6, label=f"N={N}")
+    ax.set_xlabel("Temperature  T")
+    ax.set_ylabel("Total Tokens")
+    ax.set_title("Total Tokens vs Temperature  (per N)")
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+
+def _plot_boundary_fit_panel(
+    ax,
+    ns: list[int],
+    boundary: dict[int, float | None],
+) -> None:
+    """パネル(4): 相境界 T_c(N) と冪乗/指数フィットを描画する。"""
+    bc_ns  = [N for N in ns if boundary.get(N) is not None]
+    bc_Tcs = [boundary[N] for N in bc_ns]
+    if not bc_ns:
+        ax.set_xlabel("Disk count  N")
+        ax.set_ylabel(r"$T_c(N)$")
+        ax.set_title(r"Phase Boundary $T_c(N)$")
+        return
+
+    ax.plot(bc_ns, bc_Tcs, "ko-", linewidth=2,
+            markersize=9, zorder=5, label=r"$T_c(N)$  (interpolated)")
+
+    if len(bc_ns) >= 3:
+        ns_arr  = np.array(bc_ns, dtype=float)
+        Tcs_arr = np.array(bc_Tcs, dtype=float)
+        ns_fine = np.linspace(ns_arr[0], ns_arr[-1], 100)
+        try:
+            coeffs = np.polyfit(np.log(ns_arr), np.log(Tcs_arr), 1)
+            ax.plot(ns_fine, np.exp(coeffs[1]) * ns_fine ** (-coeffs[0]), "r--",
+                    linewidth=1.5,
+                    label=fr"Power law: $T_c \propto N^{{-{-coeffs[0]:.2f}}}$")
+        except Exception:
+            pass
+        try:
+            coeffs2 = np.polyfit(ns_arr, np.log(Tcs_arr), 1)
+            ax.plot(ns_fine, np.exp(coeffs2[1]) * np.exp(coeffs2[0] * ns_fine), "b-.",
+                    linewidth=1.5,
+                    label=fr"Exp law: $T_c \propto e^{{-{-coeffs2[0]:.2f}N}}$")
+        except Exception:
+            pass
+
+    ax.set_xlabel("Disk count  N")
+    ax.set_ylabel(r"$T_c(N)$")
+    ax.set_title(r"Phase Boundary $T_c(N)$")
+    ax.set_xticks(ns)
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+
 def plot_phase_diagram(
     stats: dict[tuple[int, float], dict],
     ns: list[int],
@@ -147,121 +268,12 @@ def plot_phase_diagram(
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     fig.suptitle("Inference Collapse Phase Diagram  (DeepSeek-R1-Distill-Qwen-7B)", fontsize=13)
-
     colors = plt.cm.tab10(np.linspace(0, 0.6, len(ns)))
 
-    # -----------------------------------------------------------------------
-    # (1) 相図ヒートマップ
-    # -----------------------------------------------------------------------
-    ax = axes[0, 0]
-    cmap = mcolors.LinearSegmentedColormap.from_list(
-        "order_disorder", ["#d62728", "#ffffff", "#1f77b4"]
-    )
-    im = ax.imshow(
-        acc_mat, aspect="auto", origin="lower",
-        vmin=0.0, vmax=1.0, cmap=cmap,
-        extent=[ts[0] - 0.1, ts[-1] + 0.1, ns[0] - 0.5, ns[-1] + 0.5],
-    )
-    plt.colorbar(im, ax=ax, label="Accuracy  m(N, T)")
-
-    # 相境界を重ねてプロット
-    bc_ns  = [N for N in ns if boundary.get(N) is not None]
-    bc_Tcs = [boundary[N] for N in bc_ns]
-    if bc_ns:
-        ax.plot(bc_Tcs, bc_ns, "k--o", linewidth=2, markersize=7, label=r"$T_c(N)$  boundary")
-        ax.legend(fontsize=9)
-
-    ax.set_xlabel("Temperature  T")
-    ax.set_ylabel("Disk count  N")
-    ax.set_title("Phase Diagram  (accuracy heatmap)")
-    ax.set_yticks(ns)
-    ax.set_xticks(ts)
-    ax.tick_params(axis="x", rotation=45)
-
-    # -----------------------------------------------------------------------
-    # (2) Accuracy vs T  (各 N)
-    # -----------------------------------------------------------------------
-    ax = axes[0, 1]
-    for i, N in enumerate(ns):
-        row    = acc_mat[i, :]
-        row_s  = acc_std[i, :]
-        valid  = ~np.isnan(row)
-        ts_v   = np.array(ts)[valid]
-        ax.errorbar(ts_v, row[valid], yerr=row_s[valid],
-                    fmt="o-", capsize=4, color=colors[i],
-                    linewidth=1.8, markersize=6, label=f"N={N}")
-    ax.axhline(y=BOUNDARY_THRESHOLD, color="gray", linestyle="--",
-               alpha=0.6, label=f"threshold={BOUNDARY_THRESHOLD}")
-    ax.set_xlabel("Temperature  T")
-    ax.set_ylabel("Accuracy")
-    ax.set_title("Accuracy vs Temperature  (per N)")
-    ax.set_ylim(-0.05, 1.05)
-    ax.legend(fontsize=9)
-    ax.grid(True, alpha=0.3)
-
-    # -----------------------------------------------------------------------
-    # (3) Total Tokens vs T  (各 N)
-    # -----------------------------------------------------------------------
-    ax = axes[1, 0]
-    for i, N in enumerate(ns):
-        row   = tok_mat[i, :]
-        row_s = tok_std[i, :]
-        valid = ~np.isnan(row)
-        ts_v  = np.array(ts)[valid]
-        ax.errorbar(ts_v, row[valid], yerr=row_s[valid],
-                    fmt="s-", capsize=4, color=colors[i],
-                    linewidth=1.8, markersize=6, label=f"N={N}")
-    ax.set_xlabel("Temperature  T")
-    ax.set_ylabel("Total Tokens")
-    ax.set_title("Total Tokens vs Temperature  (per N)")
-    ax.legend(fontsize=9)
-    ax.grid(True, alpha=0.3)
-
-    # -----------------------------------------------------------------------
-    # (4) 相境界 T_c(N)
-    # -----------------------------------------------------------------------
-    ax = axes[1, 1]
-    bc_ns_plot  = [N for N in ns if boundary.get(N) is not None]
-    bc_Tcs_plot = [boundary[N] for N in bc_ns_plot]
-
-    if bc_ns_plot:
-        ax.plot(bc_ns_plot, bc_Tcs_plot, "ko-", linewidth=2,
-                markersize=9, zorder=5, label=r"$T_c(N)$  (interpolated)")
-
-        # 指数・冪乗フィットを試みる（点が3つ以上あれば）
-        if len(bc_ns_plot) >= 3:
-            ns_arr  = np.array(bc_ns_plot, dtype=float)
-            Tcs_arr = np.array(bc_Tcs_plot, dtype=float)
-
-            # 冪乗則フィット: T_c = a * N^(-alpha)
-            try:
-                coeffs = np.polyfit(np.log(ns_arr), np.log(Tcs_arr), 1)
-                alpha  = -coeffs[0]
-                a      = np.exp(coeffs[1])
-                ns_fine = np.linspace(ns_arr[0], ns_arr[-1], 100)
-                ax.plot(ns_fine, a * ns_fine ** (-alpha), "r--",
-                        linewidth=1.5,
-                        label=fr"Power law: $T_c \propto N^{{-{alpha:.2f}}}$")
-            except Exception:
-                pass
-
-            # 指数則フィット: T_c = a * exp(-beta * N)
-            try:
-                coeffs2 = np.polyfit(ns_arr, np.log(Tcs_arr), 1)
-                beta    = -coeffs2[0]
-                a2      = np.exp(coeffs2[1])
-                ax.plot(ns_fine, a2 * np.exp(-beta * ns_fine), "b-.",
-                        linewidth=1.5,
-                        label=fr"Exp law: $T_c \propto e^{{-{beta:.2f}N}}$")
-            except Exception:
-                pass
-
-    ax.set_xlabel("Disk count  N")
-    ax.set_ylabel(r"$T_c(N)$")
-    ax.set_title(r"Phase Boundary $T_c(N)$")
-    ax.set_xticks(ns)
-    ax.legend(fontsize=9)
-    ax.grid(True, alpha=0.3)
+    _plot_heatmap_panel(axes[0, 0], acc_mat, ns, ts, boundary)
+    _plot_accuracy_curve_panel(axes[0, 1], acc_mat, acc_std, ns, ts, colors)
+    _plot_token_curve_panel(axes[1, 0], tok_mat, tok_std, ns, ts, colors)
+    _plot_boundary_fit_panel(axes[1, 1], ns, boundary)
 
     plt.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -271,35 +283,34 @@ def plot_phase_diagram(
 
 
 # ===========================================================================
-# コンソールレポート
+# コンソールレポート（private helpers）
 # ===========================================================================
 
-def print_report(
+def _print_accuracy_table(
     stats: dict[tuple[int, float], dict],
     ns: list[int],
     ts: list[float],
-    boundary: dict[int, float | None],
 ) -> None:
-    """相図のサマリーテーブルと相境界の考察をコンソールに出力する。"""
-    print(f"\n{'='*75}")
-    print(f"  Phase Diagram Report")
-    print(f"{'='*75}")
-
-    # 精度テーブル
+    """精度グリッドテーブルを出力する。"""
     header = f"{'N':>3} |" + "".join(f"  T={T:<4}" for T in ts)
     print(header)
     print("-" * len(header))
     for N in ns:
         row_str = f"{N:>3} |"
         for T in ts:
-            if (N, T) in stats:
-                acc = stats[(N, T)]["accuracy_mean"]
-                row_str += f"  {acc:.2f}  "
-            else:
-                row_str += "   --   "
+            row_str += (
+                f"  {stats[(N, T)]['accuracy_mean']:.2f}  "
+                if (N, T) in stats else "   --   "
+            )
         print(row_str)
 
-    # 相境界
+
+def _print_boundary_section(
+    boundary: dict[int, float | None],
+    ns: list[int],
+    ts: list[float],
+) -> None:
+    """推定相境界 T_c(N) を出力する。"""
     print(f"\n{'='*75}")
     print(f"  推定相境界 T_c(N)  (accuracy = {BOUNDARY_THRESHOLD} 交差点)")
     print(f"{'='*75}")
@@ -310,7 +321,13 @@ def print_report(
         else:
             print(f"  N={N}: T_c ≈ {Tc:.2f}")
 
-    # Early stop 崩壊モード分析
+
+def _print_early_stop_section(
+    stats: dict[tuple[int, float], dict],
+    ns: list[int],
+    ts: list[float],
+) -> None:
+    """Early Stop 崩壊モード内訳を出力する。"""
     print(f"\n{'='*75}")
     print(f"  Early Stop 崩壊モード内訳")
     print(f"{'='*75}")
@@ -319,12 +336,17 @@ def print_report(
         for T in ts:
             if (N, T) not in stats:
                 continue
-            es = stats[(N, T)]["early_stop"]
+            es    = stats[(N, T)]["early_stop"]
             total = sum(es.values())
             breakdown = "  ".join(f"{k}:{v}/{total}" for k, v in sorted(es.items()))
             print(f"    T={T:.1f}: {breakdown}")
 
-    # 案B・案C への示唆
+
+def _print_suggestions_section(
+    boundary: dict[int, float | None],
+    ns: list[int],
+) -> None:
+    """次ステップへの示唆（案B・案C）を出力する。"""
     print(f"\n{'='*75}")
     print(f"  次ステップへの示唆")
     print(f"{'='*75}")
@@ -339,6 +361,22 @@ def print_report(
             print(f"    N={N}: T={Tc:.1f} 付近（臨界点）で phi(t), norm(t) の揺動を確認")
     else:
         print(f"  データが不足しています。まず run_phase_diagram.sh を完走させてください。")
+
+
+def print_report(
+    stats: dict[tuple[int, float], dict],
+    ns: list[int],
+    ts: list[float],
+    boundary: dict[int, float | None],
+) -> None:
+    """相図のサマリーテーブルと相境界の考察をコンソールに出力する。"""
+    print(f"\n{'='*75}")
+    print(f"  Phase Diagram Report")
+    print(f"{'='*75}")
+    _print_accuracy_table(stats, ns, ts)
+    _print_boundary_section(boundary, ns, ts)
+    _print_early_stop_section(stats, ns, ts)
+    _print_suggestions_section(boundary, ns)
 
 
 # ===========================================================================

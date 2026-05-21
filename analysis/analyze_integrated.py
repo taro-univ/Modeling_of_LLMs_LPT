@@ -63,6 +63,29 @@ CMAP_PHASES  = ListedColormap([
 # データロード
 # ===========================================================================
 
+def _early_stop_rate(early_stop: list, keys: set) -> float:
+    """early_stop リスト中で keys に属する要素の割合を返す。空なら nan。"""
+    if not early_stop:
+        return float("nan")
+    return sum(1 for es in early_stop if es in keys) / len(early_stop)
+
+
+def _load_hidden_from_dir(cdir: Path, layer: str):
+    """cdir 内の npz ファイルから隠れ状態と fallback フラグを収集する。"""
+    hidden_list: list[np.ndarray] = []
+    is_fallback_list: list[bool]  = []
+    for npz_path in sorted(cdir.glob("trial_*_hidden.npz")):
+        d = np.load(npz_path, allow_pickle=True)
+        if layer not in d:
+            continue
+        H = d[layer].astype(np.float32)
+        texts = list(d["move_texts"])
+        is_fb = (len(texts) > 0 and texts[0] == "__fallback__")
+        hidden_list.append(H)
+        is_fallback_list.append(is_fb)
+    return hidden_list, is_fallback_list
+
+
 def load_condition(
     dirs: list[Path],
     N: int,
@@ -82,37 +105,21 @@ def load_condition(
             with open(sp) as f:
                 summary = json.load(f)
 
-        hidden_list: list[np.ndarray] = []
-        is_fallback_list: list[bool]  = []
-        for npz_path in sorted(cdir.glob("trial_*_hidden.npz")):
-            d = np.load(npz_path, allow_pickle=True)
-            if layer not in d:
-                continue
-            H = d[layer].astype(np.float32)
-            texts = list(d["move_texts"])
-            is_fb = (len(texts) > 0 and texts[0] == "__fallback__")
-            hidden_list.append(H)
-            is_fallback_list.append(is_fb)
-
+        hidden_list, is_fallback_list = _load_hidden_from_dir(cdir, layer)
         if not hidden_list:
             continue
 
-        accuracy   = [r["accuracy"]         for r in summary] if summary else []
-        early_stop = [r.get("early_stop")   for r in summary] if summary else []
-
-        def _rate(keys):
-            if not early_stop:
-                return float("nan")
-            return sum(1 for es in early_stop if es in keys) / len(early_stop)
+        accuracy   = [r["accuracy"]       for r in summary] if summary else []
+        early_stop = [r.get("early_stop") for r in summary] if summary else []
 
         return {
             "hidden":       hidden_list,
             "is_fallback":  is_fallback_list,
             "accuracy":     accuracy,
             "early_stop":   early_stop,
-            "pm_rate":      _rate({"no_move_catchall", "move_ceiling"}),
-            "sg_rate":      _rate({"move_loop_repeat", "move_loop_reverse"}),
-            "ordered_rate": _rate({"goal_reached"}),
+            "pm_rate":      _early_stop_rate(early_stop, {"no_move_catchall", "move_ceiling"}),
+            "sg_rate":      _early_stop_rate(early_stop, {"move_loop_repeat", "move_loop_reverse"}),
+            "ordered_rate": _early_stop_rate(early_stop, {"goal_reached"}),
             "n_trials":     len(hidden_list),
             "N": N, "T": T,
         }
@@ -163,17 +170,26 @@ def compute_autocorr(cond: dict, max_lag: int = 8) -> np.ndarray:
     return np.array(result)
 
 
+def _is_paramagnetic(pm_rate: float) -> bool:
+    """PM 相の判定: pm_rate が有限かつ 0.5 超。"""
+    return not np.isnan(pm_rate) and pm_rate > 0.5
+
+
+def _is_spin_glass(sg_rate: float, q_ea: Optional[float]) -> bool:
+    """SG 相の判定: sg_rate > 0.3 または q_EA > 0.70 のいずれかが成立。"""
+    by_rate = not np.isnan(sg_rate) and sg_rate > 0.3
+    by_qea  = q_ea is not None and not np.isnan(q_ea) and q_ea > 0.70
+    return by_rate or by_qea
+
+
 def classify_phase(cond: dict, q_ea: Optional[float] = None) -> str:
+    """早期終了ラベル率と q_EA から相を分類して文字列ラベルを返す。"""
     acc = float(np.mean(cond["accuracy"])) if cond["accuracy"] else 0.0
     if acc > 0.4:
         return "ordered"
-    pm = cond["pm_rate"]
-    sg = cond["sg_rate"]
-    if not np.isnan(pm) and pm > 0.5:
+    if _is_paramagnetic(cond["pm_rate"]):
         return "paramagnetic"
-    if not np.isnan(sg) and sg > 0.3:
-        return "spin_glass"
-    if q_ea is not None and not np.isnan(q_ea) and q_ea > 0.70:
+    if _is_spin_glass(cond["sg_rate"], q_ea):
         return "spin_glass"
     return "mixed"
 
@@ -201,8 +217,165 @@ def _build_phase_mat(all_conds, ns, ts, qea_cache=None) -> np.ndarray:
 
 
 # ===========================================================================
-# Figure 1: 統合相図（4パネル）
+# Figure 1: 統合相図（4パネル）— private helpers
 # ===========================================================================
+
+def _plot_accuracy_heatmap(
+    ax,
+    all_conds: dict,
+    ns: list[int],
+    ts: list[float],
+) -> None:
+    """パネル1: accuracy heatmap を描画する。"""
+    acc_mat = np.full((len(ns), len(ts)), np.nan)
+    for i, N in enumerate(ns):
+        for j, T in enumerate(ts):
+            cond = all_conds.get((N, T))
+            if cond and cond["accuracy"]:
+                acc_mat[i, j] = float(np.mean(cond["accuracy"]))
+
+    im = ax.imshow(acc_mat, aspect="auto", origin="lower",
+                   vmin=0, vmax=1, cmap="RdYlBu")
+    plt.colorbar(im, ax=ax, label="accuracy $m$")
+    ax.set_title("Accuracy heatmap")
+    ax.set_ylabel("Disk count  N")
+    ax.set_yticks(range(len(ns)))
+    ax.set_yticklabels(ns)
+    _set_T_ticks(ax, ts)
+    sep = TS_FULL.index(TS_FULL[-1])  # = 9 (T=1.0 の列インデックス)
+    ax.axvline(sep + 0.5, color="k", ls=":", lw=1.5, alpha=0.7, label="sweep boundary (T=1.0)")
+    ax.legend(fontsize=8, loc="upper right")
+
+
+def _plot_accuracy_vs_T(
+    ax,
+    all_conds: dict,
+    ns: list[int],
+    ts: list[float],
+    colors_n,
+) -> None:
+    """パネル2: Accuracy vs Temperature 折れ線を描画する。"""
+    ax.set_title("Accuracy vs Temperature  (per N)")
+    for idx, N in enumerate(ns):
+        ts_v, acc_v, err_v = [], [], []
+        for T in ts:
+            cond = all_conds.get((N, T))
+            if cond and cond["accuracy"]:
+                a = cond["accuracy"]
+                ts_v.append(T)
+                acc_v.append(float(np.mean(a)))
+                err_v.append(float(np.std(a) / np.sqrt(len(a))))
+        ax.errorbar(ts_v, acc_v, yerr=err_v, fmt="o-",
+                    color=colors_n[idx], lw=1.5, ms=4, label=f"N={N}")
+    ax.axhline(0.5, color="gray", ls="--", alpha=0.6, label="threshold=0.5")
+    ax.axvline(1.0, color="k", ls=":", lw=1, alpha=0.5)
+    ax.set_xlabel("Temperature  T")
+    ax.set_ylabel("Accuracy")
+    ax.set_ylim(-0.05, 1.05)
+    ax.legend(fontsize=8)
+    ax.grid(True, alpha=0.3)
+
+
+def _plot_phase_heatmap(
+    ax,
+    all_conds: dict,
+    ns: list[int],
+    ts: list[float],
+    qea_cache: dict,
+) -> None:
+    """パネル3: Phase classification heatmap を描画する。"""
+    phase_mat = _build_phase_mat(all_conds, ns, ts, qea_cache)
+    im2 = ax.imshow(phase_mat, aspect="auto", origin="lower",
+                    vmin=-0.5, vmax=3.5, cmap=CMAP_PHASES)
+    cbar2 = plt.colorbar(im2, ax=ax, ticks=[0, 1, 2, 3])
+    cbar2.ax.set_yticklabels([INT_TO_LABEL[i] for i in [0, 1, 2, 3]], fontsize=8)
+    ax.set_title("Phase classification  (early_stop + q_EA)")
+    ax.set_xlabel("Temperature  T")
+    ax.set_ylabel("Disk count  N")
+    ax.set_yticks(range(len(ns)))
+    ax.set_yticklabels(ns)
+    _set_T_ticks(ax, ts)
+    sep = TS_FULL.index(TS_FULL[-1])
+    ax.axvline(sep + 0.5, color="k", ls=":", lw=1.5, alpha=0.7)
+
+
+def _find_tc(ts_v: list[float], acc_v: list[float], threshold: float = 0.15) -> Optional[float]:
+    """高温側から走査して Tc を線形補間で求める。見つからなければ None。"""
+    for j in range(len(ts_v) - 1, 0, -1):
+        if acc_v[j - 1] >= threshold > acc_v[j]:
+            slope = (acc_v[j] - acc_v[j - 1]) / (ts_v[j] - ts_v[j - 1])
+            return ts_v[j - 1] + (threshold - acc_v[j - 1]) / slope
+    return None
+
+
+def _fit_power_law(ax, bc_ns: list[int], bc_Tc: list[float]) -> None:
+    """冪乗則フィットを試みて ax に描画する。失敗は無視。"""
+    try:
+        ns_arr = np.array(bc_ns, dtype=float)
+        Tc_arr = np.array(bc_Tc, dtype=float)
+        coeffs = np.polyfit(np.log(ns_arr), np.log(Tc_arr), 1)
+        alpha  = -coeffs[0]
+        A      = np.exp(coeffs[1])
+        ns_fit = np.linspace(min(bc_ns) * 0.8, max(bc_ns) * 1.2, 50)
+        ax.plot(ns_fit, A * ns_fit**(-alpha), "r--",
+                label=fr"$T_c \propto N^{{-{alpha:.2f}}}$")
+    except Exception:
+        pass
+
+
+def _compute_boundary(all_conds: dict, ns: list[int], ts: list[float]) -> dict[int, Optional[float]]:
+    """各 N について Tc を求め {N: Tc or None} を返す。"""
+    boundary: dict[int, Optional[float]] = {}
+    for N in ns:
+        ts_v, acc_v = [], []
+        for T in ts:
+            cond = all_conds.get((N, T))
+            if cond and cond["accuracy"]:
+                ts_v.append(T)
+                acc_v.append(float(np.mean(cond["accuracy"])))
+        boundary[N] = _find_tc(ts_v, acc_v)
+    return boundary
+
+
+def _annotate_missing_tc(ax, all_conds: dict, ns: list[int], ts: list[float],
+                          boundary: dict) -> None:
+    """Tc が見つからない N について、最大 accuracy が低い場合に注釈を付ける。"""
+    for N in ns:
+        if boundary.get(N) is not None:
+            continue
+        max_acc = max(
+            (float(np.mean(all_conds[(N, T)]["accuracy"]))
+             for T in ts if (N, T) in all_conds and all_conds[(N, T)]["accuracy"]),
+            default=None,
+        )
+        if max_acc is not None and max_acc < 0.5:
+            ax.annotate(f"N={N}\n(acc<0.5)", xy=(N, 0.05), fontsize=7,
+                        ha="center", color="gray")
+
+
+def _plot_Tc_boundary(
+    ax,
+    all_conds: dict,
+    ns: list[int],
+    ts: list[float],
+) -> None:
+    """パネル4: Tc(N) 境界と冪乗フィットを描画する。"""
+    ax.set_title(r"Phase Boundary  $T_c(N)$")
+    boundary = _compute_boundary(all_conds, ns, ts)
+
+    bc_ns = [N for N in ns if boundary.get(N) is not None]
+    bc_Tc = [boundary[N] for N in bc_ns]
+    if bc_ns:
+        ax.plot(bc_ns, bc_Tc, "ko-", linewidth=2, markersize=9, label=r"$T_c(N)$")
+        if len(bc_ns) >= 2:
+            _fit_power_law(ax, bc_ns, bc_Tc)
+
+    _annotate_missing_tc(ax, all_conds, ns, ts, boundary)
+    ax.set_xlabel("Disk count  N")
+    ax.set_ylabel(r"$T_c(N)$")
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+
 
 def plot_phase_diagram(
     all_conds: dict,
@@ -221,114 +394,10 @@ def plot_phase_diagram(
 
     colors_n = plt.cm.tab10(np.linspace(0, 0.6, len(ns)))
 
-    # ---- (1) Accuracy heatmap ----
-    acc_mat = np.full((len(ns), len(ts)), np.nan)
-    for i, N in enumerate(ns):
-        for j, T in enumerate(ts):
-            cond = all_conds.get((N, T))
-            if cond and cond["accuracy"]:
-                acc_mat[i, j] = float(np.mean(cond["accuracy"]))
-
-    im = ax_hm.imshow(acc_mat, aspect="auto", origin="lower",
-                      vmin=0, vmax=1, cmap="RdYlBu")
-    plt.colorbar(im, ax=ax_hm, label="accuracy $m$")
-    ax_hm.set_title("Accuracy heatmap")
-    ax_hm.set_ylabel("Disk count  N")
-    ax_hm.set_yticks(range(len(ns)))
-    ax_hm.set_yticklabels(ns)
-    _set_T_ticks(ax_hm, ts)
-    # sweep境界線
-    sep = TS_FULL.index(TS_FULL[-1])  # = 9 (T=1.0 の列インデックス)
-    ax_hm.axvline(sep + 0.5, color="k", ls=":", lw=1.5, alpha=0.7, label="sweep boundary (T=1.0)")
-    ax_hm.legend(fontsize=8, loc="upper right")
-
-    # ---- (2) Accuracy vs T ----
-    ax_acc.set_title("Accuracy vs Temperature  (per N)")
-    for idx, N in enumerate(ns):
-        ts_v, acc_v, err_v = [], [], []
-        for T in ts:
-            cond = all_conds.get((N, T))
-            if cond and cond["accuracy"]:
-                a = cond["accuracy"]
-                ts_v.append(T)
-                acc_v.append(float(np.mean(a)))
-                err_v.append(float(np.std(a) / np.sqrt(len(a))))
-        ax_acc.errorbar(ts_v, acc_v, yerr=err_v, fmt="o-",
-                        color=colors_n[idx], lw=1.5, ms=4, label=f"N={N}")
-    ax_acc.axhline(0.5, color="gray", ls="--", alpha=0.6, label="threshold=0.5")
-    ax_acc.axvline(1.0, color="k", ls=":", lw=1, alpha=0.5)
-    ax_acc.set_xlabel("Temperature  T")
-    ax_acc.set_ylabel("Accuracy")
-    ax_acc.set_ylim(-0.05, 1.05)
-    ax_acc.legend(fontsize=8)
-    ax_acc.grid(True, alpha=0.3)
-
-    # ---- (3) Phase classification heatmap ----
-    phase_mat = _build_phase_mat(all_conds, ns, ts, qea_cache)
-    im2 = ax_ph.imshow(phase_mat, aspect="auto", origin="lower",
-                       vmin=-0.5, vmax=3.5, cmap=CMAP_PHASES)
-    cbar2 = plt.colorbar(im2, ax=ax_ph, ticks=[0, 1, 2, 3])
-    cbar2.ax.set_yticklabels([INT_TO_LABEL[i] for i in [0, 1, 2, 3]], fontsize=8)
-    ax_ph.set_title("Phase classification  (early_stop + q_EA)")
-    ax_ph.set_xlabel("Temperature  T")
-    ax_ph.set_ylabel("Disk count  N")
-    ax_ph.set_yticks(range(len(ns)))
-    ax_ph.set_yticklabels(ns)
-    _set_T_ticks(ax_ph, ts)
-    ax_ph.axvline(sep + 0.5, color="k", ls=":", lw=1.5, alpha=0.7)
-
-    # ---- (4) Tc(N) boundary ----
-    ax_tc.set_title(r"Phase Boundary  $T_c(N)$")
-    boundary: dict[int, Optional[float]] = {}
-    for N in ns:
-        ts_v, acc_v = [], []
-        for T in ts:
-            cond = all_conds.get((N, T))
-            if cond and cond["accuracy"]:
-                ts_v.append(T)
-                acc_v.append(float(np.mean(cond["accuracy"])))
-        TC_THRESHOLD = 0.15
-        Tc = None
-        # 高温側から走査して「最後に閾値を下回る点」を T_c とする
-        # （ノイズによる一時的な閾値割れを誤検出しないため）
-        for j in range(len(ts_v) - 1, 0, -1):
-            if acc_v[j - 1] >= TC_THRESHOLD > acc_v[j]:
-                slope = (acc_v[j] - acc_v[j - 1]) / (ts_v[j] - ts_v[j - 1])
-                Tc = ts_v[j - 1] + (TC_THRESHOLD - acc_v[j - 1]) / slope
-                break
-        boundary[N] = Tc
-
-    bc_ns = [N for N in ns if boundary.get(N) is not None]
-    bc_Tc = [boundary[N] for N in bc_ns]
-    if bc_ns:
-        ax_tc.plot(bc_ns, bc_Tc, "ko-", linewidth=2, markersize=9, label=r"$T_c(N)$")
-        if len(bc_ns) >= 2:
-            try:
-                ns_arr = np.array(bc_ns, dtype=float)
-                Tc_arr = np.array(bc_Tc, dtype=float)
-                coeffs = np.polyfit(np.log(ns_arr), np.log(Tc_arr), 1)
-                alpha  = -coeffs[0]
-                A      = np.exp(coeffs[1])
-                ns_fit = np.linspace(min(bc_ns) * 0.8, max(bc_ns) * 1.2, 50)
-                ax_tc.plot(ns_fit, A * ns_fit**(-alpha), "r--",
-                           label=fr"$T_c \propto N^{{-{alpha:.2f}}}$")
-            except Exception:
-                pass
-    for N in ns:
-        if boundary.get(N) is None:
-            # Tc が範囲外の場合は上限矢印で表示
-            max_acc = max(
-                (float(np.mean(all_conds[(N, T)]["accuracy"]))
-                 for T in ts if (N, T) in all_conds and all_conds[(N, T)]["accuracy"]),
-                default=None,
-            )
-            if max_acc is not None and max_acc < 0.5:
-                ax_tc.annotate(f"N={N}\n(acc<0.5)", xy=(N, 0.05), fontsize=7,
-                               ha="center", color="gray")
-    ax_tc.set_xlabel("Disk count  N")
-    ax_tc.set_ylabel(r"$T_c(N)$")
-    ax_tc.legend(fontsize=9)
-    ax_tc.grid(True, alpha=0.3)
+    _plot_accuracy_heatmap(ax_hm, all_conds, ns, ts)
+    _plot_accuracy_vs_T(ax_acc, all_conds, ns, ts, colors_n)
+    _plot_phase_heatmap(ax_ph, all_conds, ns, ts, qea_cache)
+    _plot_Tc_boundary(ax_tc, all_conds, ns, ts)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
@@ -401,8 +470,118 @@ def plot_pq_dist(
 
 
 # ===========================================================================
-# Figure 3: 統合サマリー（4パネル）
+# Figure 3: 統合サマリー（4パネル）— private helpers
 # ===========================================================================
+
+def _plot_qea_vs_T(
+    ax,
+    qea_cache: dict,
+    ns: list[int],
+    ts: list[float],
+    colors_n,
+) -> None:
+    """パネル1: q_EA vs Temperature を描画する。"""
+    ax.set_title(r"$q_{EA}$  vs  Temperature")
+    for idx, N in enumerate(ns):
+        ts_v, qea_v = [], []
+        for T in ts:
+            q_ea = qea_cache.get((N, T))
+            if q_ea is not None and not np.isnan(q_ea):
+                ts_v.append(T)
+                qea_v.append(q_ea)
+        if ts_v:
+            ax.plot(ts_v, qea_v, "o-", color=colors_n[idx],
+                    lw=1.8, ms=5, label=f"N={N}")
+    ax.axvline(1.0, color="k", ls=":", lw=1, alpha=0.5)
+    ax.set_xlabel("Temperature  T")
+    ax.set_ylabel(r"$q_{EA}$")
+    ax.set_ylim(0.4, 1.02)
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+
+def _plot_pm_rate_vs_T(
+    ax,
+    all_conds: dict,
+    ns: list[int],
+    ts: list[float],
+    colors_n,
+) -> None:
+    """パネル2: PM rate vs Temperature を描画する。"""
+    ax.set_title("PM rate  vs  Temperature\n(paramagnetic phase indicator)")
+    for idx, N in enumerate(ns):
+        ts_v, pm_v = [], []
+        for T in ts:
+            cond = all_conds.get((N, T))
+            if cond is not None and not np.isnan(cond["pm_rate"]):
+                ts_v.append(T)
+                pm_v.append(cond["pm_rate"])
+        if ts_v:
+            ax.plot(ts_v, pm_v, "s-", color=colors_n[idx],
+                    lw=1.8, ms=5, label=f"N={N}")
+    ax.axhline(0.5, color="gray", ls="--", alpha=0.6, label="50%")
+    ax.axvline(1.0, color="k", ls=":", lw=1, alpha=0.5)
+    ax.set_xlabel("Temperature  T")
+    ax.set_ylabel("PM rate  (no_move_catchall + move_ceiling)")
+    ax.set_ylim(-0.05, 1.05)
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+
+def _plot_autocorr(
+    ax,
+    all_conds: dict,
+    ns: list[int],
+    layer: str,  # noqa: ARG001  (layer は将来の拡張のために引数として保持)
+) -> None:
+    """パネル3: 代表条件の時間自己相関 C(Δt) を描画する。"""
+    ax.set_title(r"Time autocorrelation  $C(\Delta t)$")
+    palette = ["#1f77b4", "#ff7f0e", "#d62728", "#9467bd", "#2ca02c", "#8c564b"]
+    rep_conds = [
+        (ns[0],  0.2,  f"N={ns[0]}  T=0.2"),
+        (ns[-1], 0.2,  f"N={ns[-1]}  T=0.2"),
+        (ns[0],  1.5,  f"N={ns[0]}  T=1.5"),
+        (ns[-1], 1.5,  f"N={ns[-1]}  T=1.5"),
+    ]
+    for k, (N, T, label) in enumerate(rep_conds):
+        cond = all_conds.get((N, T))
+        if cond is None:
+            continue
+        C     = compute_autocorr(cond, max_lag=8)
+        lags  = np.arange(1, 9)
+        valid = ~np.isnan(C)
+        if valid.any():
+            ax.plot(lags[valid], C[valid], "o-", color=palette[k],
+                    lw=1.8, ms=6, label=label)
+    ax.set_xlabel(r"$\Delta t$  (move steps)")
+    ax.set_ylabel(r"$C(\Delta t)$")
+    ax.set_ylim(0.4, 1.02)
+    ax.legend(fontsize=8)
+    ax.grid(True, alpha=0.3)
+
+
+def _plot_sg_rate_vs_T(
+    ax,
+    all_conds: dict,
+    ns: list[int],
+    ts: list[float],
+    qea_cache: dict,
+) -> None:
+    """パネル4: Phase classification heatmap を描画する（summary パネル用）。"""
+    ax.set_title("Phase classification")
+    phase_mat = _build_phase_mat(all_conds, ns, ts, qea_cache)
+    im = ax.imshow(phase_mat, aspect="auto", origin="lower",
+                   vmin=-0.5, vmax=3.5, cmap=CMAP_PHASES)
+    cbar = plt.colorbar(im, ax=ax, ticks=[0, 1, 2, 3])
+    cbar.ax.set_yticklabels([INT_TO_LABEL[i] for i in [0, 1, 2, 3]], fontsize=8)
+    ax.set_ylabel("Disk count  N")
+    ax.set_xlabel("Temperature  T")
+    ax.set_yticks(range(len(ns)))
+    ax.set_yticklabels(ns)
+    _set_T_ticks(ax, ts, step=3)
+    sep = len(TS_FULL) - 1
+    ax.axvline(sep + 0.5, color="k", ls=":", lw=1.5, alpha=0.7)
+
 
 def plot_summary(
     all_conds: dict,
@@ -422,84 +601,10 @@ def plot_summary(
 
     colors_n = plt.cm.tab10(np.linspace(0, 0.6, len(ns)))
 
-    # ---- (1) q_EA vs T ----
-    ax1.set_title(r"$q_{EA}$  vs  Temperature")
-    for idx, N in enumerate(ns):
-        ts_v, qea_v = [], []
-        for T in ts:
-            q_ea = qea_cache.get((N, T))
-            if q_ea is not None and not np.isnan(q_ea):
-                ts_v.append(T)
-                qea_v.append(q_ea)
-        if ts_v:
-            ax1.plot(ts_v, qea_v, "o-", color=colors_n[idx],
-                     lw=1.8, ms=5, label=f"N={N}")
-    ax1.axvline(1.0, color="k", ls=":", lw=1, alpha=0.5)
-    ax1.set_xlabel("Temperature  T")
-    ax1.set_ylabel(r"$q_{EA}$")
-    ax1.set_ylim(0.4, 1.02)
-    ax1.legend(fontsize=9)
-    ax1.grid(True, alpha=0.3)
-
-    # ---- (2) PM rate vs T ----
-    ax2.set_title("PM rate  vs  Temperature\n(paramagnetic phase indicator)")
-    for idx, N in enumerate(ns):
-        ts_v, pm_v = [], []
-        for T in ts:
-            cond = all_conds.get((N, T))
-            if cond is not None and not np.isnan(cond["pm_rate"]):
-                ts_v.append(T)
-                pm_v.append(cond["pm_rate"])
-        if ts_v:
-            ax2.plot(ts_v, pm_v, "s-", color=colors_n[idx],
-                     lw=1.8, ms=5, label=f"N={N}")
-    ax2.axhline(0.5, color="gray", ls="--", alpha=0.6, label="50%")
-    ax2.axvline(1.0, color="k", ls=":", lw=1, alpha=0.5)
-    ax2.set_xlabel("Temperature  T")
-    ax2.set_ylabel("PM rate  (no_move_catchall + move_ceiling)")
-    ax2.set_ylim(-0.05, 1.05)
-    ax2.legend(fontsize=9)
-    ax2.grid(True, alpha=0.3)
-
-    # ---- (3) C(Δt) — 代表条件 ----
-    ax3.set_title(r"Time autocorrelation  $C(\Delta t)$")
-    palette = ["#1f77b4", "#ff7f0e", "#d62728", "#9467bd", "#2ca02c", "#8c564b"]
-    rep_conds = [
-        (ns[0],  0.2,  f"N={ns[0]}  T=0.2"),
-        (ns[-1], 0.2,  f"N={ns[-1]}  T=0.2"),
-        (ns[0],  1.5,  f"N={ns[0]}  T=1.5"),
-        (ns[-1], 1.5,  f"N={ns[-1]}  T=1.5"),
-    ]
-    for k, (N, T, label) in enumerate(rep_conds):
-        cond = all_conds.get((N, T))
-        if cond is None:
-            continue
-        C     = compute_autocorr(cond, max_lag=8)
-        lags  = np.arange(1, 9)
-        valid = ~np.isnan(C)
-        if valid.any():
-            ax3.plot(lags[valid], C[valid], "o-", color=palette[k],
-                     lw=1.8, ms=6, label=label)
-    ax3.set_xlabel(r"$\Delta t$  (move steps)")
-    ax3.set_ylabel(r"$C(\Delta t)$")
-    ax3.set_ylim(0.4, 1.02)
-    ax3.legend(fontsize=8)
-    ax3.grid(True, alpha=0.3)
-
-    # ---- (4) Phase classification heatmap ----
-    ax4.set_title("Phase classification")
-    phase_mat = _build_phase_mat(all_conds, ns, ts, qea_cache)
-    im = ax4.imshow(phase_mat, aspect="auto", origin="lower",
-                    vmin=-0.5, vmax=3.5, cmap=CMAP_PHASES)
-    cbar = plt.colorbar(im, ax=ax4, ticks=[0, 1, 2, 3])
-    cbar.ax.set_yticklabels([INT_TO_LABEL[i] for i in [0, 1, 2, 3]], fontsize=8)
-    ax4.set_ylabel("Disk count  N")
-    ax4.set_xlabel("Temperature  T")
-    ax4.set_yticks(range(len(ns)))
-    ax4.set_yticklabels(ns)
-    _set_T_ticks(ax4, ts, step=3)
-    sep = len(TS_FULL) - 1
-    ax4.axvline(sep + 0.5, color="k", ls=":", lw=1.5, alpha=0.7)
+    _plot_qea_vs_T(ax1, qea_cache, ns, ts, colors_n)
+    _plot_pm_rate_vs_T(ax2, all_conds, ns, ts, colors_n)
+    _plot_autocorr(ax3, all_conds, ns, layer)
+    _plot_sg_rate_vs_T(ax4, all_conds, ns, ts, qea_cache)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=150, bbox_inches="tight")

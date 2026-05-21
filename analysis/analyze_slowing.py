@@ -44,8 +44,18 @@ from scipy.optimize import curve_fit
 # 定数
 # ---------------------------------------------------------------------------
 
-PHASE_DIAGRAM_DIR = "results/hanoi/phase_diagram"
-PQ_SWEEP_DIR      = "results/hanoi/pq_sweep"
+# full_sweep/<slug>/ 以下の N*_T* ディレクトリを使用する
+# （旧 results/hanoi/phase_diagram, pq_sweep は archive/results_legacy/ へ移行済み）
+FULL_SWEEP_BASE = "results/hanoi/full_sweep"
+
+
+def _discover_sweep_dirs(base: str = FULL_SWEEP_BASE) -> list[str]:
+    """full_sweep/ 配下の全スラグディレクトリを返す。存在しなければ空リスト。"""
+    base_path = Path(base)
+    if not base_path.is_dir():
+        return []
+    return sorted(str(p) for p in base_path.iterdir() if p.is_dir())
+
 
 COLORS = {
     2: "#1f77b4",
@@ -129,6 +139,28 @@ def load_condition(dirpath: str, num_predict_fallback: int = 4096) -> Dict:
     }
 
 
+def _collect_from_dir(base: str, num_predict_fallback: int) -> List[Dict]:
+    """1 つのベースディレクトリから全条件を読み込んで返す。"""
+    conds = []
+    for subdir in sorted(glob.glob(os.path.join(base, "N*_T*"))):
+        if not os.path.isdir(subdir):
+            continue
+        cond = load_condition(subdir, num_predict_fallback)
+        if cond:
+            conds.append(cond)
+    return conds
+
+
+def _merge_into(existing: Dict, new_cond: Dict) -> None:
+    """同一 (N, T) の条件を existing に in-place でマージする。"""
+    existing["valid_taus"]    += new_cond["valid_taus"]
+    existing["imputed_taus"]  += new_cond["imputed_taus"]
+    existing["fallback_count"] += new_cond["fallback_count"]
+    existing["n_trials"]       += new_cond["n_trials"]
+    n = existing["n_trials"]
+    existing["fallback_rate"] = existing["fallback_count"] / n if n > 0 else float("nan")
+
+
 def collect_all(data_dirs: List[str], num_predict_fallback: int = 4096) -> Dict[int, List[Dict]]:
     """
     複数ディレクトリ下の全条件を読み込み、N ごとに整理する。
@@ -136,35 +168,15 @@ def collect_all(data_dirs: List[str], num_predict_fallback: int = 4096) -> Dict[
     Returns:
         {N: sorted list of condition dicts by T}
     """
-    all_conditions: Dict[int, List[Dict]] = {}
-
-    for base in data_dirs:
-        for subdir in sorted(glob.glob(os.path.join(base, "N*_T*"))):
-            if not os.path.isdir(subdir):
-                continue
-            cond = load_condition(subdir, num_predict_fallback)
-            if not cond:
-                continue
-            N = cond["N"]
-            all_conditions.setdefault(N, []).append(cond)
-
-    # T でソート、重複 (N, T) は valid_taus を統合
     merged: Dict[int, Dict[float, Dict]] = {}
-    for N, conds in all_conditions.items():
-        merged[N] = {}
-        for c in conds:
-            T = c["T"]
+    for base in data_dirs:
+        for cond in _collect_from_dir(base, num_predict_fallback):
+            N, T = cond["N"], cond["T"]
+            merged.setdefault(N, {})
             if T not in merged[N]:
-                merged[N][T] = c
+                merged[N][T] = cond
             else:
-                # 同一 (N, T) が複数ディレクトリに存在する場合はマージ
-                ex = merged[N][T]
-                ex["valid_taus"]    += c["valid_taus"]
-                ex["imputed_taus"]  += c["imputed_taus"]
-                ex["fallback_count"] += c["fallback_count"]
-                ex["n_trials"]       += c["n_trials"]
-                ex["fallback_rate"]  = (ex["fallback_count"] / ex["n_trials"]
-                                        if ex["n_trials"] > 0 else float("nan"))
+                _merge_into(merged[N][T], cond)
 
     result: Dict[int, List[Dict]] = {}
     for N, T_map in merged.items():
@@ -519,54 +531,57 @@ def plot_combined(
 # コンソールレポート
 # ---------------------------------------------------------------------------
 
+def _print_N_section(N: int, tbl: Dict, fr: Optional[Dict]) -> None:
+    """1 つの N に関するテーブル行とフィット結果を出力する。"""
+    print(f"\n  N = {N}")
+    print(f"  {'T':>6}  {'n_valid':>8}  {'mean_tau':>10}  {'SEM':>8}  {'fallback%':>10}")
+    print("  " + "-" * 50)
+    for i, T in enumerate(tbl["T"]):
+        nv    = int(tbl["n_valid"][i])
+        mu    = tbl["mean_tau_valid"][i]
+        sem   = tbl["sem_tau_valid"][i]
+        fb    = tbl["fallback_rate"][i] * 100
+        mu_s  = f"{mu:10.1f}" if np.isfinite(mu)  else f"{'—':>10}"
+        sem_s = f"{sem:8.1f}" if np.isfinite(sem) else f"{'—':>8}"
+        print(f"  {T:>6.2f}  {nv:>8}  {mu_s}  {sem_s}  {fb:>9.1f}%")
+
+    if fr:
+        print(f"\n  Power-law fit: τ ~ |T - T_c|^{{-zν}}")
+        print(f"    T_c  = {fr['Tc']:.3f}")
+        print(f"    z*nu = {fr['znu']:.3f}")
+        print(f"    tau0 = {fr['tau0']:.1f}")
+        print(f"    R²   = {fr['r2']:.3f}")
+    else:
+        print(f"\n  Power-law fit: not available (insufficient data)")
+
+
+def _print_sgpm_transitions(tables: Dict[int, Dict]) -> None:
+    """SG→PM 転移温度（fallback rate 50% 交差点）を出力する。"""
+    print()
+    print("  T_{SG->PM} (fallback rate = 50% crossing):")
+    for N in sorted(tables.keys()):
+        tbl  = tables[N]
+        T, fb = tbl["T"], tbl["fallback_rate"]
+        Tc_cross = None
+        for i in range(len(T) - 1):
+            if np.isfinite(fb[i]) and np.isfinite(fb[i + 1]) and fb[i] < 0.5 <= fb[i + 1]:
+                Tc_cross = T[i] + (T[i + 1] - T[i]) * (0.5 - fb[i]) / (fb[i + 1] - fb[i])
+                break
+        if Tc_cross:
+            print(f"    N={N}: T_{{SG->PM}} ≈ {Tc_cross:.2f}")
+        else:
+            print(f"    N={N}: T_{{SG->PM}} not detected in T range")
+
+
 def print_report(tables: Dict[int, Dict], fit_results: Dict[int, Optional[Dict]]) -> None:
     """集計結果とフィットパラメータを表形式で出力する。"""
     print()
     print("=" * 70)
     print("  Critical Slowing Down — Summary Report")
     print("=" * 70)
-
     for N in sorted(tables.keys()):
-        tbl = tables[N]
-        fr  = fit_results.get(N)
-        print(f"\n  N = {N}")
-        print(f"  {'T':>6}  {'n_valid':>8}  {'mean_tau':>10}  {'SEM':>8}  {'fallback%':>10}")
-        print("  " + "-" * 50)
-        for i, T in enumerate(tbl["T"]):
-            nv   = int(tbl["n_valid"][i])
-            mu   = tbl["mean_tau_valid"][i]
-            sem  = tbl["sem_tau_valid"][i]
-            fb   = tbl["fallback_rate"][i] * 100
-            mu_s = f"{mu:10.1f}" if np.isfinite(mu) else f"{'—':>10}"
-            sem_s= f"{sem:8.1f}"  if np.isfinite(sem) else f"{'—':>8}"
-            print(f"  {T:>6.2f}  {nv:>8}  {mu_s}  {sem_s}  {fb:>9.1f}%")
-
-        if fr:
-            print(f"\n  Power-law fit: τ ~ |T - T_c|^{{-zν}}")
-            print(f"    T_c  = {fr['Tc']:.3f}")
-            print(f"    z*nu = {fr['znu']:.3f}")
-            print(f"    tau0 = {fr['tau0']:.1f}")
-            print(f"    R²   = {fr['r2']:.3f}")
-        else:
-            print(f"\n  Power-law fit: not available (insufficient data)")
-
-    # SG→PM 転移温度の一覧
-    print()
-    print("  T_{SG->PM} (fallback rate = 50% crossing):")
-    for N in sorted(tables.keys()):
-        tbl = tables[N]
-        T, fb = tbl["T"], tbl["fallback_rate"]
-        Tc_cross = None
-        for i in range(len(T) - 1):
-            if np.isfinite(fb[i]) and np.isfinite(fb[i + 1]):
-                if fb[i] < 0.5 <= fb[i + 1]:
-                    Tc_cross = T[i] + (T[i + 1] - T[i]) * (0.5 - fb[i]) / (fb[i + 1] - fb[i])
-                    break
-        if Tc_cross:
-            print(f"    N={N}: T_{{SG->PM}} ≈ {Tc_cross:.2f}")
-        else:
-            print(f"    N={N}: T_{{SG->PM}} not detected in T range")
-
+        _print_N_section(N, tables[N], fit_results.get(N))
+    _print_sgpm_transitions(tables)
     print()
     print("=" * 70)
 
@@ -581,8 +596,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--data-dirs", nargs="+",
-        default=[PHASE_DIAGRAM_DIR, PQ_SWEEP_DIR],
-        help="npz が格納されたディレクトリ群"
+        default=None,  # None → _discover_sweep_dirs() で自動検出
+        help=(
+            "npz が格納されたスラグディレクトリ群 "
+            "(例: results/hanoi/full_sweep/deepseek-r1-distill-qwen-7b). "
+            "省略時は results/hanoi/full_sweep/ 配下を自動検出。"
+        ),
     )
     parser.add_argument(
         "--ns", nargs="+", type=int, default=[2, 3, 4, 5],
@@ -617,8 +636,63 @@ def _estimate_tc_init(tbl: Dict) -> float:
     return float(T[mask][np.argmax(mu[mask])])
 
 
+def _run_fits(
+    tables: Dict[int, Dict],
+    ns_available: list,
+    args,
+) -> Dict[int, Optional[Dict]]:
+    """冪乗則フィットを実行して {N: fit_result_or_None} を返す。"""
+    fit_results: Dict[int, Optional[Dict]] = {}
+    if args.no_fit:
+        print("[2/4] Skipping power-law fit (--no-fit)")
+        for N in ns_available:
+            fit_results[N] = None
+        return fit_results
+
+    print("[2/4] Fitting power law τ ~ |T - T_c|^{-znu} ...")
+    tc_init_map: Dict[int, float] = {}
+    if args.tc_init and len(args.tc_init) == len(args.ns):
+        tc_init_map = dict(zip(args.ns, args.tc_init))
+    for N in ns_available:
+        tbl = tables[N]
+        Tc0 = tc_init_map.get(N, _estimate_tc_init(tbl))
+        fr  = fit_critical_slowing(tbl["T"], tbl["mean_tau_valid"], Tc_init=Tc0, side="both")
+        fit_results[N] = fr
+        if fr:
+            print(f"  N={N}: T_c={fr['Tc']:.3f}, z*nu={fr['znu']:.3f}, R²={fr['r2']:.3f}")
+        else:
+            print(f"  N={N}: fit failed (not enough data near T_c)")
+    return fit_results
+
+
+def _save_plots(
+    tables: Dict[int, Dict],
+    ns_available: list,
+    fit_results: Dict[int, Optional[Dict]],
+    out_dir: str,
+) -> None:
+    """4 種類の図を out_dir に保存する。"""
+    print("[3/4] Generating plots ...")
+    plot_tau_vs_T(tables, ns_available, fit_results,
+                  out_path=os.path.join(out_dir, "slowing_tau_valid.png"))
+    plot_fallback_rate(tables, ns_available,
+                       out_path=os.path.join(out_dir, "slowing_fallback_rate.png"))
+    plot_tau_imputed(tables, ns_available,
+                     out_path=os.path.join(out_dir, "slowing_tau_imputed.png"))
+    plot_combined(tables, ns_available, fit_results,
+                  out_path=os.path.join(out_dir, "slowing_combined.png"))
+
+
 def main() -> None:
     args = parse_args()
+
+    # --data-dirs 省略時は full_sweep/ を自動検出
+    if args.data_dirs is None:
+        args.data_dirs = _discover_sweep_dirs()
+        if not args.data_dirs:
+            print(f"[ERROR] No slug directories found under '{FULL_SWEEP_BASE}'.")
+            print("        --data-dirs で明示的にディレクトリを指定してください。")
+            return
 
     print("=" * 70)
     print("  analyze_slowing.py — Critical Slowing Down Analysis")
@@ -637,51 +711,11 @@ def main() -> None:
     print(f"  Available N: {ns_available}")
 
     # 冪乗則フィット
-    fit_results: Dict[int, Optional[Dict]] = {}
-    if not args.no_fit:
-        print("[2/4] Fitting power law τ ~ |T - T_c|^{-znu} ...")
-        tc_init_map: Dict[int, float] = {}
-        if args.tc_init and len(args.tc_init) == len(args.ns):
-            tc_init_map = dict(zip(args.ns, args.tc_init))
-        for N in ns_available:
-            tbl = tables[N]
-            Tc0 = tc_init_map.get(N, _estimate_tc_init(tbl))
-            fr  = fit_critical_slowing(
-                tbl["T"], tbl["mean_tau_valid"], Tc_init=Tc0, side="both"
-            )
-            fit_results[N] = fr
-            if fr:
-                print(f"  N={N}: T_c={fr['Tc']:.3f}, z*nu={fr['znu']:.3f}, R²={fr['r2']:.3f}")
-            else:
-                print(f"  N={N}: fit failed (not enough data near T_c)")
-    else:
-        print("[2/4] Skipping power-law fit (--no-fit)")
-        for N in ns_available:
-            fit_results[N] = None
+    fit_results = _run_fits(tables, ns_available, args)
 
-    # 出力ディレクトリ
+    # プロット & レポート
     os.makedirs(args.out_dir, exist_ok=True)
-
-    # プロット
-    print("[3/4] Generating plots ...")
-    plot_tau_vs_T(
-        tables, ns_available, fit_results,
-        out_path=os.path.join(args.out_dir, "slowing_tau_valid.png"),
-    )
-    plot_fallback_rate(
-        tables, ns_available,
-        out_path=os.path.join(args.out_dir, "slowing_fallback_rate.png"),
-    )
-    plot_tau_imputed(
-        tables, ns_available,
-        out_path=os.path.join(args.out_dir, "slowing_tau_imputed.png"),
-    )
-    plot_combined(
-        tables, ns_available, fit_results,
-        out_path=os.path.join(args.out_dir, "slowing_combined.png"),
-    )
-
-    # レポート
+    _save_plots(tables, ns_available, fit_results, args.out_dir)
     print("[4/4] Printing report ...")
     print_report(tables, fit_results)
 
