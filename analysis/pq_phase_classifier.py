@@ -460,6 +460,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--random-seed", type=int, default=0)
     parser.add_argument("--thresholds", type=Path, default=None)
     parser.add_argument("--sensitivity-topks", type=int, nargs="+", default=[0, 1, 3, 5, 10])
+    parser.add_argument("--output-dir", type=Path, default=None,
+                        help="Override output directory for metrics CSV/JSON (default: results-dir/model/layer)")
     return parser.parse_args()
 
 
@@ -490,7 +492,7 @@ def main() -> None:
         args.random_seed,
     )
 
-    result_dir = Path(args.results_dir) / args.model / args.layer
+    result_dir = args.output_dir if args.output_dir else Path(args.results_dir) / args.model / args.layer
     figure_dir = Path(args.figures_dir) / args.model / args.layer
     write_metrics(rows, result_dir)
     topk_sensitivity = None
