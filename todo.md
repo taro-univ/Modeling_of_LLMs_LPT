@@ -27,15 +27,15 @@
 - [ ] **q_tail_mass の再決定**：多モデルデータ取得後に感度解析で再キャリブレーション
 - [ ] **$T_c(N)$ スケーリング則の定量化**：Ordered→SG 境界を N の関数として fitting
 
-### ⏳ SPEC-2026-05-21-001（stagnation 診断）— 実装済み・解析待ち
+### ✅ SPEC-2026-05-21-001（stagnation 診断）— 完了
 
 - [x] `stagnation_diagnostic.py` 実装（commit d9d6fc5）
 - [x] Algorithm E を `run_local.py` に移植（commit 083e173）
 - [x] stagnation sweep 実行（deepseek-r1-distill-qwen-7b 分）
-- [ ] stagnation sweep 結果の解析・レポートまとめ
-  - `results/hanoi/stagnation_sweep/deepseek-r1-distill-qwen-7b/` を読む
-  - SG 寄り / PM 寄りの統計的傾向を SPEC-2026-05-21-001 に記録
-  - SPEC-2026-05-22-001 の補助シグナルとして活用
+- [x] stagnation sweep 結果の解析・Q3 確定（2026-05-22, commit c11a682）
+  - 出現率 2.2%（450試行中 10件）→ 主要終了機構ではない
+  - PM 優勢ゾーンで多発 → **PM 寄りの補助シグナルに確定**（user 決定）
+  - SPEC-2026-05-22-001 の `stagnation_after_move_rate` 扱いと整合確認済み
 
 ### 🔧 Codex CLI 統合 — 設定済み・未検証
 
