@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import asdict, dataclass
 from itertools import combinations
 from typing import Iterable
@@ -12,6 +13,17 @@ from scipy import stats
 # TODO(SPEC-2026-05-22-001): promote _cosine to a public analysis metrics module
 # when analyze_integrated.py is refactored into reusable IO/metrics helpers.
 from analysis.analyze_integrated import _cosine
+
+LOGGER = logging.getLogger(__name__)
+
+try:
+    from diptest import diptest as _diptest  # type: ignore
+except Exception:
+    _diptest = None
+    LOGGER.warning(
+        "diptest not installed; q_bimodality_dip and q_bimodality_dip_pval will be NaN. "
+        "Install with: pip install diptest"
+    )
 
 
 @dataclass(frozen=True)
@@ -27,7 +39,7 @@ class PQMoments:
     q_mean_ci_95: tuple[float, float]
     q_var: float
     q_var_ci_95: tuple[float, float]
-    q_abs_mean: float
+    q_abs_mean_exploratory: float
     q_tail_mass: float
     q_bimodality_bc: float
     q_bimodality_dip: float
@@ -100,47 +112,20 @@ def sarle_bimodality_coefficient(vals: np.ndarray) -> float:
 
 
 def hartigan_dip_statistic(vals: np.ndarray) -> float:
-    """Return Hartigan's dip statistic when diptest is installed, else a stable proxy.
-
-    The fallback is a conservative shape diagnostic: the maximum CDF gap between the
-    empirical distribution and a moment-matched normal distribution. It preserves the
-    output contract without adding an unpinned dependency.
-    """
+    """Return Hartigan's dip statistic, or NaN when diptest is unavailable."""
     clean = np.sort(vals[np.isfinite(vals)])
-    if clean.size < 3:
+    if clean.size < 3 or _diptest is None:
         return float("nan")
-    try:
-        from diptest import diptest  # type: ignore
-
-        dip, _ = diptest(clean)
-        return float(dip)
-    except Exception:
-        std = float(np.std(clean))
-        if std < 1e-12:
-            return 0.0
-        empirical = np.arange(1, clean.size + 1, dtype=np.float64) / clean.size
-        fitted = stats.norm.cdf(clean, loc=float(np.mean(clean)), scale=std)
-        return float(np.max(np.abs(empirical - fitted)))
+    dip, _ = _diptest(clean)
+    return float(dip)
 
 
 def dip_pvalue(vals: np.ndarray, observed: float, n_bootstrap: int, rng: np.random.Generator) -> float:
     clean = vals[np.isfinite(vals)]
-    if clean.size < 3 or not np.isfinite(observed):
+    if clean.size < 3 or not np.isfinite(observed) or _diptest is None:
         return float("nan")
-    try:
-        from diptest import diptest  # type: ignore
-
-        _, pval = diptest(clean, boot_pval=True, n_boot=n_bootstrap)
-        return float(pval)
-    except Exception:
-        lo, hi = float(np.min(clean)), float(np.max(clean))
-        if hi <= lo:
-            return 1.0
-        stats_boot = np.empty(n_bootstrap, dtype=np.float64)
-        for i in range(n_bootstrap):
-            sample = rng.uniform(lo, hi, size=clean.size)
-            stats_boot[i] = hartigan_dip_statistic(sample)
-        return float(np.mean(stats_boot >= observed))
+    _, pval = _diptest(clean, boot_pval=True, n_boot=n_bootstrap)
+    return float(pval)
 
 
 def compute_pq_moments(
@@ -160,7 +145,7 @@ def compute_pq_moments(
             q_mean_ci_95=nan_ci,
             q_var=float("nan"),
             q_var_ci_95=nan_ci,
-            q_abs_mean=float("nan"),
+            q_abs_mean_exploratory=float("nan"),
             q_tail_mass=float("nan"),
             q_bimodality_bc=float("nan"),
             q_bimodality_dip=float("nan"),
@@ -177,7 +162,7 @@ def compute_pq_moments(
         q_mean_ci_95=_bootstrap_ci(clean, np.mean, n_bootstrap, rng),
         q_var=float(np.var(clean)),
         q_var_ci_95=_bootstrap_ci(clean, np.var, n_bootstrap, rng),
-        q_abs_mean=float(np.mean(np.abs(clean))),
+        q_abs_mean_exploratory=float(np.mean(np.abs(clean))),
         q_tail_mass=float(np.mean(clean >= tail_threshold)),
         q_bimodality_bc=sarle_bimodality_coefficient(clean),
         q_bimodality_dip=dip,

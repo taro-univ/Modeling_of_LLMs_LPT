@@ -7,6 +7,7 @@
   "sg_tail_min": null,
   "pm_mean_max": null,
   "pm_var_max": null,
+  "pm_bimodality_max": null,
   "pm_abs_q_max": null,
   "pm_rate_min": null,
   "min_trials": 5

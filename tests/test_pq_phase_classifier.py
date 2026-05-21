@@ -2,7 +2,7 @@ import numpy as np
 
 from analysis.isotropy import IsotropyFitter
 from analysis.pq_metrics import compute_pq_moments, pairwise_overlaps, trial_mean_vectors
-from analysis.pq_phase_classifier import Thresholds, classify_from_moments
+from analysis.pq_phase_classifier import Thresholds, classify_from_moments, compute_metrics_rows
 
 
 def test_pairwise_overlaps_excludes_self_overlap():
@@ -55,6 +55,7 @@ def test_moments_are_finite_for_valid_q_values():
 
     assert moments.q_count == 5
     assert moments.q_tail_mass == 0.4
+    assert moments.q_abs_mean_exploratory == np.mean(np.abs(q_vals))
     assert np.isfinite(moments.q_mean)
     assert np.isfinite(moments.q_var)
     assert len(moments.q_mean_ci_95) == 2
@@ -62,8 +63,13 @@ def test_moments_are_finite_for_valid_q_values():
 
 def test_unset_thresholds_make_phase_undetermined():
     moments = {"q_var": 0.01, "q_tail_mass": 1.0, "q_bimodality_bc": 0.8, "q_mean": 0.7}
+    thresholds = Thresholds(
+        acc_ordered_min=0.5,
+        ordered_var_max=0.005,
+        ordered_tail_min=0.9,
+    )
 
-    phase = classify_from_moments(accuracy=1.0, moments=moments, n_effective=25, thresholds=Thresholds())
+    phase = classify_from_moments(accuracy=0.0, moments=moments, n_effective=25, thresholds=thresholds)
 
     assert phase == "undetermined"
 
@@ -95,3 +101,87 @@ def test_classify_paramagnetic_uses_pq_not_pm_rate():
     phase = classify_from_moments(accuracy=0.0, moments=moments, n_effective=25, thresholds=thresholds)
 
     assert phase == "paramagnetic"
+
+
+def test_classify_spin_glass_via_bimodality():
+    moments = {"q_var": 0.2, "q_tail_mass": 0.8, "q_bimodality_bc": 0.7, "q_mean": 0.3}
+    thresholds = Thresholds(
+        acc_ordered_min=0.5,
+        sg_bimodality_min=0.5,
+        min_trials=5,
+    )
+
+    phase = classify_from_moments(accuracy=0.0, moments=moments, n_effective=25, thresholds=thresholds)
+
+    assert phase == "spin_glass"
+
+
+def test_classify_transitional_when_sg_and_pm_both_match():
+    moments = {"q_var": 0.01, "q_tail_mass": 0.8, "q_bimodality_bc": 0.2, "q_mean": 0.0}
+    thresholds = Thresholds(
+        acc_ordered_min=0.5,
+        sg_tail_min=0.5,
+        pm_mean_max=0.05,
+        pm_var_max=0.02,
+        pm_bimodality_max=0.5,
+        min_trials=5,
+    )
+
+    phase = classify_from_moments(accuracy=0.0, moments=moments, n_effective=25, thresholds=thresholds)
+
+    assert phase == "transitional"
+
+
+def test_undetermined_when_insufficient_trials():
+    moments = {"q_var": 0.2, "q_tail_mass": 0.8, "q_bimodality_bc": 0.7, "q_mean": 0.3}
+    thresholds = Thresholds(
+        acc_ordered_min=0.5,
+        sg_bimodality_min=0.5,
+        min_trials=5,
+    )
+
+    phase = classify_from_moments(accuracy=0.0, moments=moments, n_effective=3, thresholds=thresholds)
+
+    assert phase == "undetermined"
+
+
+def test_think_budget_excluded_from_rate_denominator():
+    class IdentityTransformer:
+        def transform(self, H):
+            return H
+
+    cond = {
+        "hidden": [
+            np.array([[1.0, 0.0]]),
+            np.array([[0.0, 1.0]]),
+            np.array([[1.0, 1.0]]),
+            np.array([[1.0, -1.0]]),
+        ],
+        "early_stop": [
+            "stagnation_after_move",
+            "think_budget",
+            "move_ceiling",
+            "goal_reached",
+        ],
+        "accuracy": [0, 0, 0, 1],
+    }
+
+    rows, _ = compute_metrics_rows(
+        model_slug="test-model",
+        layer="layer_mid",
+        conditions={(3, 1.0): cond},
+        transformer=IdentityTransformer(),
+        thresholds=Thresholds(),
+        min_steps=1,
+        tail_threshold=0.5,
+        n_bootstrap=0,
+        random_seed=0,
+    )
+
+    row = rows[0]
+    assert row["n_effective"] == 3
+    assert row["n_censored"] == 1
+    assert row["stagnation_after_move_rate"] == 1 / 3
+    assert row["pm_rate"] == 1 / 3
+    assert row["ordered_rate"] == 1 / 3
+    assert row["sg_label_rate"] == 0.0

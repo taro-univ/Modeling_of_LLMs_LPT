@@ -44,7 +44,7 @@ RESULT_COLUMNS = [
     "q_mean_ci_95",
     "q_var",
     "q_var_ci_95",
-    "q_abs_mean",
+    "q_abs_mean_exploratory",
     "q_tail_mass",
     "q_bimodality_bc",
     "q_bimodality_dip",
@@ -76,6 +76,7 @@ class Thresholds:
     sg_tail_min: float | None = None
     pm_mean_max: float | None = None
     pm_var_max: float | None = None
+    pm_bimodality_max: float | None = None
     pm_abs_q_max: float | None = None
     pm_rate_min: float | None = None
     min_trials: int = 5
@@ -132,6 +133,18 @@ def classify_from_moments(
         and moments["q_var"] <= thresholds.ordered_var_max
         and moments["q_tail_mass"] >= thresholds.ordered_tail_min
     )
+    if ordered:
+        return "ordered"
+
+    if (
+        thresholds.sg_var_min is None
+        and thresholds.sg_tail_min is None
+        and thresholds.sg_bimodality_min is None
+        and thresholds.pm_mean_max is None
+        and thresholds.pm_var_max is None
+        and thresholds.pm_bimodality_max is None
+    ):
+        return "undetermined"
 
     below_ordered = accuracy < acc_min
     sg_checks = []
@@ -149,13 +162,15 @@ def classify_from_moments(
         and thresholds.pm_var_max is not None
         and abs(moments["q_mean"]) <= thresholds.pm_mean_max
         and moments["q_var"] <= thresholds.pm_var_max
+        and (
+            thresholds.pm_bimodality_max is None
+            or moments["q_bimodality_bc"] < thresholds.pm_bimodality_max
+        )
     )
 
     matched = [ordered, spin_glass, paramagnetic]
     if sum(bool(x) for x in matched) > 1:
         return "transitional"
-    if ordered:
-        return "ordered"
     if spin_glass:
         return "spin_glass"
     if paramagnetic:
@@ -257,7 +272,7 @@ def compute_metrics_rows(
             "q_mean_ci_95": m["q_mean_ci_95"],
             "q_var": m["q_var"],
             "q_var_ci_95": m["q_var_ci_95"],
-            "q_abs_mean": m["q_abs_mean"],
+            "q_abs_mean_exploratory": m["q_abs_mean_exploratory"],
             "q_tail_mass": m["q_tail_mass"],
             "q_bimodality_bc": m["q_bimodality_bc"],
             "q_bimodality_dip": m["q_bimodality_dip"],
