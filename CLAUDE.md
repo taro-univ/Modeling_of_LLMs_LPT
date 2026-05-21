@@ -328,3 +328,41 @@ archiveフォルダーについては、実験済みのものを保存してあ�
 - `research_state/results_summary.md` — 観測事実と既存データの要約
 - `todo.md` — 優先度付きタスク
 - `open_questions.md` — 未解決の論点（未定項目は未定として明示）
+
+---
+
+## 研究フロー（アイデア → 実装 → 実行）
+
+**詳細は [`docs/research_flow.md`](docs/research_flow.md) を参照。**
+
+アイデアを実験・モデリング実装に落とし込む標準ワークフロー：
+
+```
+User（アイデア）→ ドラフト仕様書作成（各エージェント並行）
+  → 壁打ち（保存則・アルゴリズム詳細を詰める）
+  → 仕様書清書・確定（specs/final/）
+  → 実装（再現性情報を記録）
+  → 検証（quality-check + physics 事後確認）
+  → pytest PASS → 実行
+```
+
+### 仕様書の置き場
+
+```
+specs/
+  _template.md   ← テンプレート（コピーして使う）
+  draft/         ← 壁打ち中（status: draft / review）
+  final/         ← 確定済み（status: final / implemented）
+  log/           ← 壁打ち議事録（<spec_id>/round*.md）
+```
+
+spec_id 命名: `SPEC-YYYY-MM-DD-NNN`（例: `SPEC-2026-05-21-001`）
+
+### 各エージェントの仕様書における役割
+
+| エージェント | 担当 Section | タイミング |
+|---|---|---|
+| physics-agent | Section 2（物理的要件） | Stage 1（ドラフト作成時） |
+| research-agent | Section 3（関連文献） | Stage 1（ドラフト作成時） |
+| implementation-agent | Section 4（アルゴリズム仕様） | Stage 1（設計案）、Stage 4（実装） |
+| quality-check-agent | 仕様書との照合審査 | Stage 5（実装後レビュー） |
