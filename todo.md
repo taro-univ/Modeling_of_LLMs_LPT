@@ -8,33 +8,57 @@
 
 ---
 
-## P0：データ収集アーキテクチャ（即着手）
+## P0：進行中・即着手
 
-- [ ] **5 モデル横断のスイープ実行アーキテクチャ整備**
+### 🔄 SPEC-2026-05-22-001（P(q) moments ベース相分類器）— 壁打ち中
+
+- [ ] physics-agent レビュー（Section 2）の完了・判定取得
+- [ ] research-agent レビュー（Section 3）の完了
+- [ ] implementation-agent 設計案（Section 4）の完了
+- [ ] **GATE A**：壁打ち終了をユーザーが宣言 → specs/final/ へ移動
+- [ ] **GATE B**：final 仕様書をユーザーが目視確認 → Codex 起動
+- [ ] Codex 実装 → quality-check → physics 事後確認（自律ゾーン）
+- [ ] **GATE C**：検証レポートをユーザーに提示 → 実験GO
+
+### ⏳ SPEC-2026-05-21-001（stagnation 診断）— 実装済み・解析待ち
+
+- [x] `stagnation_diagnostic.py` 実装（commit d9d6fc5）
+- [x] Algorithm E を `run_local.py` に移植（commit 083e173）
+- [x] stagnation sweep 実行（deepseek-r1-distill-qwen-7b 分）
+- [ ] stagnation sweep 結果の解析・レポートまとめ
+  - `results/hanoi/stagnation_sweep/deepseek-r1-distill-qwen-7b/` を読む
+  - SG 寄り / PM 寄りの統計的傾向を SPEC-2026-05-21-001 に記録
+  - SPEC-2026-05-22-001 の補助シグナルとして活用
+
+### 🔧 Codex CLI 統合 — 設定済み・未検証
+
+- [x] `AGENTS.md` を実装エージェント専用に書き直し
+- [x] `.codex/config.yaml` 作成（model: gpt-5.5, approval_policy: auto-edit）
+- [x] `CLAUDE.md`・`docs/research_flow.md` に GATE A/B/C を明文化
+- [ ] **Codex CLI の動作確認**（実際に `codex --task-file ...` が動くかテスト）
+  - 小さな仕様書でドライランし、実行ログ・git diff を確認
+  - エラーが出る場合は `.codex/config.yaml` を調整
+
+---
+
+## P0：データ収集アーキテクチャ
+
+- [ ] **5 モデル横断スイープアーキテクチャの整備**
   - 対象：deepseek-r1-distill-qwen-14B / llama 8B / Qwen3 7B / Qwen3 14B
   - 各モデルに対し `runners/test_model_architecture.py` で事前検証
-  - 14B 級は NF4 で 12GB VRAM に乗るかの実機確認（`open_questions.md` U7）
   - 既存の `run_full_sweep.sh` / `run_collapse_phase_sweep.sh` を多モデル化
-- [ ] **多様なパズルの実装**
+- [ ] **多様なパズルの実装**（パズル候補の選定は user 確認事項）
   - 必須制約：**解が一意**
   - その他の軸（branching factor, 状態空間の連続性, ポテンシャル地形）は多様に
-  - パズル候補の選定そのものは user 確認事項
 - [ ] **`envs/` への新パズル追加用の抽象基底の整備**（`BaseEnv` の拡張耐性チェック）
-
-## P0：エージェントチーム構築
-
-- [ ] **フィジックスエージェント**：理論整合性を厳しく審査
-- [ ] **実装エージェント** + **品質チェックエージェント**（OOP 等で機能別分離・拡張耐性のある設計を強制）
-- [ ] **リサーチエージェント**：文献収集の単一窓口、user/実装/フィジックスへの**潤滑油役**
-- [ ] **オーケストレーションエージェント**：上記の連携と進行管理
 
 ---
 
 ## P1：解析
 
-- [ ] **SG 相判定基準の確立**
-  - `analyze_pq.py` の $P(q)$ 分布と早期終了ラベル `move_loop_*` の関係を**定量的に定式化**
-  - 既存 npz（deepseek-r1-distill-qwen-7B）で先行検証
+- [ ] **SG 相判定基準の確立**（SPEC-2026-05-22-001 の実装待ち）
+  - $P(q)$ moments と早期終了ラベル `move_loop_*` の関係を定量的に定式化
+  - stagnation 診断結果を補助シグナルとして統合
 - [ ] **モデリング案 1（3 状態ボルツマン）のフィッティング**
   - $T_{c1}, T_{c2}$ の定量化
   - `docs/Modeling_idea.md` の (E_O, E_SG, g_O, g_SG) を最小二乗で推定
@@ -61,3 +85,16 @@
 - 「Hopfield is All You Need」精読
 - Apple 推論崩壊論文の精読
 - 「LLM × 統計力学」既存研究のリサーチエージェント主導サーベイ
+
+---
+
+## ✅ 完了済み
+
+- [x] エージェントチーム構築（Hybrid Architecture: Claude Opus/Sonnet + Codex CLI）
+  - CLAUDE.md・AGENTS.md・.codex/config.yaml・docs/research_flow.md 整備
+  - GATE A / B / C による承認フロー確定（2026-05-22）
+- [x] `stagnation_diagnostic.py` 実装・Algorithm E 移植（SPEC-2026-05-21-001, 2026-05-21）
+- [x] 相図分類レビュー（`docs/phase_classification_review.md`）
+- [x] 旧形式 results のアーカイブ化（`archive/results_legacy/`）
+- [x] コード品質整備（Cyclomatic Complexity 9→2 削減）
+- [x] deepseek-r1-distill-qwen-7B の 14B 実験

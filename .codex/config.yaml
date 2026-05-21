@@ -1,0 +1,22 @@
+# .codex/config.yaml — Codex CLI project-level configuration
+# https://github.com/openai/codex
+
+# --- モデル ---
+model: gpt-5.5
+
+# --- 承認ポリシー ---
+# auto-edit : ファイル編集は自動、シェルコマンド実行は確認
+# full-auto : 編集・コマンド実行ともに自動（--auto-approve 相当）
+# suggest   : すべての変更を提案のみ
+approval_policy: auto-edit   # CLI 起動時に --auto-approve を付ければ full-auto になる
+
+# --- プロバイダ ---
+provider: openai
+
+# --- 作業ディレクトリ ---
+# Codex はプロジェクトルート（AGENTS.md と同階層）から起動する前提
+# Docker コンテナ内実験は Claude Code 側が行う
+
+# --- Gitコミット ---
+# 実装完了後に自動コミットしない（AGENTS.md の手順通り手動で行う）
+auto_commit: false

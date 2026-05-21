@@ -297,15 +297,29 @@ archiveフォルダーについては、実験済みのものを保存してあ�
 
 ## エージェントチームの設計思想と運用ルール
 
-### 役割分担
+### 役割分担 (Hybrid Architecture)
 
-| エージェント | 責務 | 定義ファイル |
+| エージェント | 責務 | 担当ツール/モデル |
 |---|---|---|
-| **オーケストレーション** | メイン実行管理。全体の進行と他エージェントへのタスク分配。**メイン Claude Code セッションが担う**（専用ファイルは作らない） | (this CLAUDE.md) |
-| **フィジックスエージェント** | 理論的整合性を**厳しく**審査。ハミルトニアン・ポテンシャル・外力の物理的妥当性を検証 | `.claude/agents/physics-agent.md` |
-| **実装エージェント** | コーディング担当。**拡張耐性のある設計**（OOP 等で機能別に綺麗に分かれる） | `.claude/agents/implementation-agent.md` |
-| **品質チェックエージェント** | コード品質審査。実装エージェントとは独立 | `.claude/agents/quality-check-agent.md` |
-| **リサーチエージェント** | 文献を拾って **user に提案**／**実装チームへ理論ヒント**／**フィジックスへ参考文献**を供給する**潤滑油役** | `.claude/agents/research-agent.md` |
+| **オーケストレーション** | プロジェクトの指揮、仕様書の作成・更新、結果の評価。**直接コードの編集（Edit/Write）は原則行わない。** | Claude Code（Opus/Sonnet をタスクにより選択） |
+| **フィジックスエージェント** | 理論的整合性を**厳しく**審査。ハミルトニアン・ポテンシャル・外力の物理的妥当性を検証（役割定義は `.claude/agents/physics-agent.md`） | Claude Code（Sonnet） |
+| **実装エージェント** | コーディング担当。仕様書（`specs/final/`）を読み込みコードを書き換える。**OOP で機能別に綺麗に分離した設計を徹底。** | **Codex CLI（GPT-5.5）** |
+| **品質チェックエージェント** | コード品質審査。実装後に差分をチェックする。実装エージェントとは独立（`.claude/agents/quality-check-agent.md`） | Claude Code（Sonnet） |
+| **リサーチエージェント** | 文献調査の単一窓口。user・フィジックス・実装チームへ参考文献を供給する潤滑油役（`.claude/agents/research-agent.md`） | Claude Code（Sonnet） |
+
+### Codex（実装エージェント）の呼び出しルール
+
+オーケストレーション（Claude Code）は、仕様書が `specs/final/` に移動して「Stage 4: 実装」フェーズに入った際、**自分でファイル編集を行わず、必ず以下の Bash コマンドを実行して Codex に実装を委譲すること。**
+
+```bash
+# Codex への実装委譲コマンド（spec_id を実際の ID に置き換える）
+codex --task-file specs/final/SPEC-YYYY-MM-DD-NNN.md \
+      --agent-profile .claude/agents/implementation-agent.md \
+      --auto-approve
+```
+
+> **完了後の必須手順**：Codex の実行ログと `git diff` を確認し、Stage 5（品質チェック → physics 事後確認）へ進むこと。
+> Codex が途中で詰まった場合（exit non-zero / diff が空）は、エラーログを user に報告して指示を仰ぐ。
 
 ### 判断権の所在
 
@@ -339,13 +353,42 @@ archiveフォルダーについては、実験済みのものを保存してあ�
 アイデアを実験・モデリング実装に落とし込む標準ワークフロー：
 
 ```
-User（アイデア）→ ドラフト仕様書作成（各エージェント並行）
-  → 壁打ち（保存則・アルゴリズム詳細を詰める）
-  → 仕様書清書・確定（specs/final/）
-  → 実装（再現性情報を記録）
-  → 検証（quality-check + physics 事後確認）
-  → pytest PASS → 実行
+Stage 1: User（アイデア）→ ドラフト仕様書作成（各エージェント並行）
+         │
+Stage 2: 壁打ち（保存則・アルゴリズム詳細を詰める）
+         │
+         ⛔ GATE A ─ ユーザーが「壁打ち終了」を宣言するまで specs/final/ に移動しない
+         │           Claude は壁打ち中に自律的に final に昇格させない
+         │
+Stage 3: 仕様書清書・確定（specs/final/ へ移動）
+         │
+         ⛔ GATE B ─ final 仕様書をユーザーに提示し、目視確認の承認を得る
+         │           「この仕様書で Codex を起動してよいですか？」を必ず聞く
+         │           承認なしに codex コマンドを実行しない
+         │
+Stage 4: 実装（Codex CLI に委譲）
+         │
+Stage 5: 検証（quality-check-agent → physics-agent 事後確認）
+         │  ↑ Stage 4〜5 は一気通貫で自律実行。Claude/Codex が自由に進める
+         │
+         ⛔ GATE C ─ 実験実行前に必ずユーザーの GO サインを待つ
+         │           pytest PASS + 検証レポートをまとめてユーザーに提示してから止まる
+         │           承認なしに run_local.py / sweep スクリプトを実行しない
+         │
+Stage 6: 実験実行（run_local.py / sweep）
 ```
+
+### ゲートの運用ルール
+
+| ゲート | 停止条件 | Claude が提示するもの | 次に進む条件 |
+|---|---|---|---|
+| **GATE A** | Stage 2 終了後 | 壁打ちの論点まとめ・未解決事項 | ユーザーが「final に移してOK」と明示 |
+| **GATE B** | final 仕様書作成後 | `specs/final/<spec_id>.md` の全文 | ユーザーが「Codex 起動OK」と明示 |
+| **GATE C** | Stage 5 完了後 | pytest 結果・quality-check 報告・physics 審査結果 | ユーザーが「実験実行GO」と明示 |
+
+> **Stage 4 の鉄則**：仕様書が `specs/final/` にあるときは、オーケストレーションは Edit/Write を使わず
+> 必ず `codex --task-file ... --auto-approve` で Codex に委譲する。
+> 完了後は `git diff` と Codex ログを確認してから Stage 5 へ進む。
 
 ### 仕様書の置き場
 
@@ -361,9 +404,9 @@ spec_id 命名: `SPEC-YYYY-MM-DD-NNN`（例: `SPEC-2026-05-21-001`）
 
 ### 各エージェントの仕様書における役割
 
-| エージェント | 担当 Section | タイミング |
-|---|---|---|
-| physics-agent | Section 2（物理的要件） | Stage 1（ドラフト作成時） |
-| research-agent | Section 3（関連文献） | Stage 1（ドラフト作成時） |
-| implementation-agent | Section 4（アルゴリズム仕様） | Stage 1（設計案）、Stage 4（実装） |
-| quality-check-agent | 仕様書との照合審査 | Stage 5（実装後レビュー） |
+| エージェント | モデル | 担当 Section | タイミング |
+|---|---|---|---|
+| physics-agent | Claude Code（Sonnet） | Section 2（物理的要件） | Stage 1（ドラフト作成時） |
+| research-agent | Claude Code（Sonnet） | Section 3（関連文献） | Stage 1（ドラフト作成時） |
+| implementation-agent | **Codex CLI（GPT-5.5）** | Section 4（アルゴリズム仕様） | Stage 1（設計案）、**Stage 4（実装委譲）** |
+| quality-check-agent | Claude Code（Sonnet） | 仕様書との照合審査 | Stage 5（実装後レビュー） |
