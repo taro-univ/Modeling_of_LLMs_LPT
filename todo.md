@@ -10,15 +10,22 @@
 
 ## P0：進行中・即着手
 
-### 🔄 SPEC-2026-05-22-001（P(q) moments ベース相分類器）— 壁打ち中
+### ✅ SPEC-2026-05-22-001（P(q) moments ベース相分類器）— 実験完了
 
-- [ ] physics-agent レビュー（Section 2）の完了・判定取得
-- [ ] research-agent レビュー（Section 3）の完了
-- [ ] implementation-agent 設計案（Section 4）の完了
-- [ ] **GATE A**：壁打ち終了をユーザーが宣言 → specs/final/ へ移動
-- [ ] **GATE B**：final 仕様書をユーザーが目視確認 → Codex 起動
-- [ ] Codex 実装 → quality-check → physics 事後確認（自律ゾーン）
-- [ ] **GATE C**：検証レポートをユーザーに提示 → 実験GO
+- [x] physics-agent レビュー（Section 2）条件付き合格・全条件解消
+- [x] research-agent レビュー（Section 3）R1〜R4 完了
+- [x] implementation-agent 設計案（Section 4）完了
+- [x] **GATE A**：壁打ち終了宣言 → specs/final/ へ移動（2026-05-22）
+- [x] **GATE B**：final 仕様書目視確認 → Codex 起動（2026-05-22）
+- [x] Codex 実装（commit c876e42）→ quality-check → physics 事後確認
+- [x] **GATE C**：pytest 22 passed + 検証レポート提示 → 実験GO（2026-05-22）
+- [x] 初回実験：deepseek-r1-distill-qwen-7b 86 条件を分類（commit 1ba0cf2）
+  - ORD=18 / SG=32 / PM=27 / TRN=9
+  - Ordered→SG 境界：N=3 T≈0.8〜0.9、N≥4 は T_c < 0.1
+  - SG→PM 境界：N=3〜6 で T≈1.3〜1.4（N 依存性が弱い）
+- [ ] **多モデル展開**：14B / llama-8B / Qwen3-7B / Qwen3-14B で同スイープ実施
+- [ ] **q_tail_mass の再決定**：多モデルデータ取得後に感度解析で再キャリブレーション
+- [ ] **$T_c(N)$ スケーリング則の定量化**：Ordered→SG 境界を N の関数として fitting
 
 ### ⏳ SPEC-2026-05-21-001（stagnation 診断）— 実装済み・解析待ち
 
