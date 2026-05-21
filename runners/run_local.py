@@ -61,6 +61,9 @@ def resolve_model_profile(model_id: str) -> ModelProfile:
     if lm.startswith("qwen/qwen3"):
         # Qwen3 は apply_chat_template の enable_thinking=True で thinking を起動する
         return ModelProfile(model_id=model_id, think_mode="chat_template")
+    if lm.startswith("meta-llama"):
+        # Meta-Llama 系は推論タグを持たない標準 instruct モデル
+        return ModelProfile(model_id=model_id, think_mode="none")
     # DeepSeek-R1-Distill 系（Qwen/Llama ベース）は <think> プリフィルで起動する
     return ModelProfile(model_id=model_id, think_mode="prefill")
 
