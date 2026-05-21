@@ -465,6 +465,9 @@ def generate_with_hidden_states(
     prev_move_count = 0
     current_input_ids = input_ids
 
+    # Algorithm E: 最後に move を検出したステップ（token index）
+    last_move_step: Optional[int] = None
+
     # for が 0 回の場合の step 未定義を防ぐ
     step = -1
     for step in range(num_predict):
@@ -494,6 +497,7 @@ def generate_with_hidden_states(
         current_moves_full = _MOVE_RE_WITH_DISK.findall(accumulated_text)  # (disk, src, dst)
 
         if len(current_moves_full) > prev_move_count:
+            last_move_step = step  # Algorithm E: 最後の move 検出ステップを更新
             prev_move_count, goal_stop = _handle_new_moves(
                 outputs, capture_layers, current_moves_full,
                 prev_move_count, step, hs_buffer, move_steps_list, move_texts_list,
@@ -506,6 +510,15 @@ def generate_with_hidden_states(
         # 次ステップの入力は今生成したトークンのみ（KV キャッシュを活用）
         current_input_ids = torch.tensor([[next_token_id]], device=device)
         last_outputs = outputs  # フォールバック用に最終ステップの出力を保持
+
+        # Algorithm E: Stagnation After Move（毎トークン・軽量チェック）
+        # move を ≥1 本出した後、stagnation_ratio × num_predict トークン手が止まれば打ち切る
+        if (early_stop_cfg is not None
+                and early_stop_cfg.enable_stagnation
+                and last_move_step is not None
+                and step - last_move_step > num_predict * early_stop_cfg.stagnation_ratio):
+            stop_reason = "stagnation_after_move"
+            break
 
         # 早期終了チェック（50 文字おきに評価してオーバーヘッドを抑える）
         # Algorithm C (move_loop) のみディスク番号込みの3-tuple で再判定し誤爆を防ぐ

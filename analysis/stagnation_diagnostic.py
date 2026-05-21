@@ -65,6 +65,11 @@ _COL_W = {"group": 14, "n_trials": 10, "n_pairs": 9,
           "mean_q": 9, "std_q": 9, "median_q": 10}
 
 
+# move を出さない（または出せない）グループ：fallback hidden state が唯一の状態表現
+# → is_fallback=True でも除外せず、end-of-generation hidden state を使う
+_ALLOW_FALLBACK_GROUPS: frozenset[str] = frozenset({"no_move", "think_budget"})
+
+
 # ===========================================================================
 # データ計算
 # ===========================================================================
@@ -84,16 +89,23 @@ def _compute_group_indices(
     Returns
     -------
     各グループ名 → 有効な試行インデックスのリスト。
-    is_fallback=True の試行はどのグループにも含めない。
+
+    Notes
+    -----
+    move を出したグループ（ordered / move_loop / stagnation）は
+    is_fallback=True の試行を除外する（本来は move ステップで hidden state を取得済みのはず）。
+
+    move を出さないグループ（no_move / think_budget）は is_fallback=True も含める。
+    no_move_catchall 試行は必ず fallback capture になるため、除外すると PM ベースラインが消える。
     """
     n = min(len(early_stops), len(is_fallback))
     result: dict[str, list[int]] = {g: [] for g in GROUPS}
     for i in range(n):
-        if is_fallback[i]:
-            continue
         es = early_stops[i]
         for group_name, pred in GROUPS.items():
             if pred(es):
+                if is_fallback[i] and group_name not in _ALLOW_FALLBACK_GROUPS:
+                    break  # move ベースグループの fallback は除外
                 result[group_name].append(i)
                 break
     return result
@@ -109,16 +121,22 @@ def _compute_h_bars(
     Parameters
     ----------
     hidden      : 各試行の hidden state 行列 (n_steps, hidden_dim) のリスト。
-    is_fallback : fallback フラグリスト（True の試行はスキップ）。
+    is_fallback : fallback フラグリスト。
 
     Returns
     -------
     試行インデックス → 時間平均 hidden state ベクトルのマッピング。
+
+    Notes
+    -----
+    fallback 試行（no_move 等）は n_steps=1 の行列を持つ。
+    mean(axis=0) は 1 行でも有効なので全試行を対象にする。
+    グループ別の除外制御は _compute_group_indices 側で行う。
     """
     h_bars: dict[int, np.ndarray] = {}
-    for i, (H, is_fb) in enumerate(zip(hidden, is_fallback)):
-        if is_fb:
-            continue
+    for i, H in enumerate(hidden):
+        if H.shape[0] == 0:
+            continue  # 空行列（npz に hidden state がないケース）はスキップ
         h_bars[i] = H.mean(axis=0)
     return h_bars
 
