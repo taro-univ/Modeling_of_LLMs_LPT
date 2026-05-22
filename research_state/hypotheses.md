@@ -26,9 +26,9 @@ LLM 推論中に観測される **move loop**（手の繰り返し）は、構�
 
 **位置づけ**：これは「実推論中に粒子が穴に閉じ込められている」という現象論的主張ではなく、**モデリング上そう記述する**という構成的仮説。Hopfield エネルギー、SG 理論ともに局所安定状態の概念があり、両者と整合する。
 
-- **status**: active（検証進行中）
-- **evidence**: （EXP-001 完了後に記入。P(q)双峰の有無が根拠になる）
-- **changed**: 2026-05-22 初記録 → EXP-001 完了後に更新予定
+- **status**: supported（EXP-001 で支持）
+- **evidence**: qwen-7b full_sweep + collapse_phase（86セル）のP(q)解析で、N=4-6の SG セルにP(q)双峰性が確認。N=2では全域 Ordered、N=3は低T Ordered・高T SG の遷移。AGS相図の recall/SG/PM 構造と整合。
+- **changed**: 2026-05-22 active → supported（EXP-001 完了）
 - **exp_refs**: EXP-001（SPEC-2026-05-22-001）
 
 ### H4：制御可能性（段階的）

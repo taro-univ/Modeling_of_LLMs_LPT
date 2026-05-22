@@ -11,7 +11,7 @@
 
 | exp_id | date | spec_id | hypothesis_ids | model | sweep_type | 結果サマリ | 仮説への影響 | status |
 |--------|------|---------|----------------|-------|------------|-----------|------------|--------|
-| EXP-001 | 2026-05-22 | SPEC-2026-05-22-001 | U2, H3 | qwen-7b（初回）/ qwen-14b（比較） | full_sweep + collapse_phase + stagnation_sweep | （実行待ち） | P(q)双峰の有無でH3支持/棄却が決まる | pending |
+| EXP-001 | 2026-05-22 | SPEC-2026-05-22-001 | U2, H3 | deepseek-r1-distill-qwen-7b | full_sweep + collapse_phase | N=2: 全域 Ordered / N=3: 低T Ordered・高T SG / N=4-6: SG 支配（PM は高T側に確認）/ 総86セル | H3 supported — SG 相でのmove loop固着がP(q)双峰として観測。詳細は figures/pq_phase_classifier/ 参照 | done |
 
 ---
 
