@@ -175,7 +175,9 @@ def classify_from_moments(
         return "spin_glass"
     if paramagnetic:
         return "paramagnetic"
-    return "transitional"
+    if ordered:
+        return "ordered"
+    return "undetermined"
 
 
 def _serializable_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -259,7 +261,8 @@ def compute_metrics_rows(
         )
         m = moments.to_dict()
         n_effective = int(means.vectors.shape[0])
-        phase = classify_from_moments(_accuracy(cond["accuracy"], cond["early_stop"], len(cond["hidden"])), m, n_effective, thresholds)
+        acc_val = _accuracy(cond["accuracy"], cond["early_stop"], len(cond["hidden"]))
+        phase = classify_from_moments(acc_val, m, n_effective, thresholds)
         row = {
             "model_slug": model_slug,
             "N": N,
@@ -267,7 +270,7 @@ def compute_metrics_rows(
             "layer": layer,
             "n_effective": n_effective,
             "n_censored": n_censored,
-            "accuracy": _accuracy(cond["accuracy"], cond["early_stop"], len(cond["hidden"])),
+            "accuracy": acc_val,
             "q_mean": m["q_mean"],
             "q_mean_ci_95": m["q_mean_ci_95"],
             "q_var": m["q_var"],
