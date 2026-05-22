@@ -13,9 +13,10 @@ ArrayLike2D = np.ndarray
 
 def stack_hidden_samples(hidden_trials: Iterable[np.ndarray]) -> np.ndarray:
     """Stack all move-step hidden states from all trials into one 2D matrix."""
-    arrays = [np.asarray(H, dtype=np.float64) for H in hidden_trials if np.asarray(H).ndim == 2 and H.shape[0] > 0]
+    # float32 のまま保持してメモリ効率を確保（float64 への昇格は不要）
+    arrays = [np.asarray(H, dtype=np.float32) for H in hidden_trials if np.asarray(H).ndim == 2 and H.shape[0] > 0]
     if not arrays:
-        return np.empty((0, 0), dtype=np.float64)
+        return np.empty((0, 0), dtype=np.float32)
     return np.vstack(arrays)
 
 
@@ -29,7 +30,7 @@ class IsotropyTransformer:
     zca_matrix_: np.ndarray | None = None
 
     def transform(self, X: ArrayLike2D) -> np.ndarray:
-        X_arr = np.asarray(X, dtype=np.float64)
+        X_arr = np.asarray(X, dtype=np.float32)
         if X_arr.ndim == 1:
             X_arr = X_arr.reshape(1, -1)
         centered = X_arr - self.mean_
@@ -65,7 +66,8 @@ class IsotropyFitter:
         self.zca_reg = zca_reg
 
     def fit(self, X: ArrayLike2D) -> IsotropyTransformer:
-        X_arr = np.asarray(X, dtype=np.float64)
+        # float32 のまま処理。hidden state の精度には十分で、SVD も float32 で動作する
+        X_arr = np.asarray(X, dtype=np.float32)
         if X_arr.ndim != 2 or X_arr.shape[0] == 0:
             raise ValueError("X must be a non-empty 2D array")
         mean = X_arr.mean(axis=0)
@@ -77,10 +79,15 @@ class IsotropyFitter:
         if self.method == "remove_topk":
             k = min(self.topk, centered.shape[0], centered.shape[1])
             if k == 0:
-                components = np.empty((0, centered.shape[1]), dtype=np.float64)
+                components = np.empty((0, centered.shape[1]), dtype=np.float32)
             else:
-                _, _, vt = np.linalg.svd(centered, full_matrices=False)
-                components = vt[:k]
+                # X^T X (d×d) の固有値分解で top-k 右特異ベクトルを取得。
+                # full SVD (LAPACK SGESDD) はワーク領域が O(m×n²) になり大規模データで OOM になる。
+                # eigh は対称行列専用 (SSYEVD) でワーク領域が O(d²) に留まる（今回は d=3584）。
+                cov = centered.T @ centered          # shape (d, d), float32
+                eigvals, eigvecs = np.linalg.eigh(cov)  # ascending order
+                # eigh は昇順なので末尾 k 列が top-k 固有ベクトル（= 主成分方向）
+                components = eigvecs[:, -k:].T.astype(np.float32)  # shape (k, d)
             return IsotropyTransformer(method=self.method, mean_=mean, components_=components)
 
         cov = np.cov(centered, rowvar=False)
