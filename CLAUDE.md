@@ -419,14 +419,39 @@ Stage 6: 実験実行（run_local.py / sweep）
 > 必ず `codex --task-file ... --auto-approve` で Codex に委譲する。
 > 完了後は `git diff` と Codex ログを確認してから Stage 5 へ進む。
 
+### 解析タスクの軽量トラック（Track B）
+
+実装を伴わない純粋な解析・探索は **`specs/_template_analysis.md`** を使い、
+**physics-agent 確認のみ** で GATE B/C なしに実行可能とする。
+Codex への委譲・quality-check-agent レビューは不要。
+
+```
+Track A（実装あり）: アイデア → Spec(_template.md) → GATE A → GATE B → Codex → quality-check → GATE C → 実行
+Track B（解析のみ）: アイデア → Brief(_template_analysis.md) → physics-agent確認 → 実行
+                                                                  ↓
+                                                      experiment_register.md に記入
+                                                      hypotheses.md の status を更新
+```
+
+**Track B を使う判断基準**：
+- 新規コードファイルを作成しない（既存スクリプトのみ）
+- 実験（LLM 推論）を伴わない（解析・可視化のみ）
+- pytest 対象のロジック変更がない
+
+完了後は **必ず** `research_state/experiment_register.md` に記入し、
+対応する仮説の `status` / `evidence` を `research_state/hypotheses.md` に更新すること。
+
+---
+
 ### 仕様書の置き場
 
 ```
 specs/
-  _template.md   ← テンプレート（コピーして使う）
-  draft/         ← 壁打ち中（status: draft / review）
-  final/         ← 確定済み（status: final / implemented）
-  log/           ← 壁打ち議事録（<spec_id>/round*.md）
+  _template.md          ← Track A（実装）テンプレート
+  _template_analysis.md ← Track B（解析）テンプレート
+  draft/                ← 壁打ち中（status: draft / review）
+  final/                ← 確定済み（status: final / implemented）
+  log/                  ← 壁打ち議事録（<spec_id>/round*.md）
 ```
 
 spec_id 命名: `SPEC-YYYY-MM-DD-NNN`（例: `SPEC-2026-05-21-001`）
