@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import gaussian_kde
 
-from analysis.analyze_integrated import _cosine, load_condition
+from analysis.io_utils import _cosine, load_condition
 
 # ===========================================================================
 # グループ定義（SPEC Section 4.1 / 仕様書 Section 2.2）

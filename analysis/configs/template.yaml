@@ -1,0 +1,10 @@
+data_dir: results/hanoi/full_sweep/<model_slug>
+out_dir: figures/full_sweep/<model_slug>
+title: "<Model Name>"
+ns: [2, 3, 4, 5, 6]
+ts: [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0]
+layer: layer_m8
+analyzers:
+  - phase_transition
+  - spin_glass
+  - critical_dynamics

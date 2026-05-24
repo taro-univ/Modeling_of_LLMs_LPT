@@ -1,0 +1,5 @@
+[
+  {"trial": 1, "accuracy": 1, "N": 2, "temperature": 0.5, "early_stop": "goal_reached", "num_moves": 3},
+  {"trial": 2, "accuracy": 0, "N": 2, "temperature": 0.5, "early_stop": "no_move_catchall", "num_moves": 0},
+  {"trial": 3, "accuracy": 1, "N": 2, "temperature": 0.5, "early_stop": "goal_reached", "num_moves": 3}
+]

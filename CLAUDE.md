@@ -86,14 +86,15 @@ bash runners/scripts/run_full_sweep.sh \
 ### 5. 解析
 
 ```bash
-# 相図（accuracy + early_stop 内訳の 2相/3相）
-python3 analysis/analyze_phase_diagram.py --dir results/hanoi/full_sweep/<slug>/
+# 統合解析パイプライン（相図 + P(q) + 臨界減速）
+python3 analysis/run_pipeline.py \
+    --data-dir results/hanoi/full_sweep/<slug>/ \
+    --out-dir figures/full_sweep/<slug>/ \
+    --title "<model name>" \
+    --analyzers phase_transition spin_glass critical_dynamics
 
-# P(q) 分布・q_EA・自己相関（SG 判別）
-python3 analysis/analyze_pq.py --dir results/hanoi/full_sweep/<slug>/
-
-# full_sweep + collapse_phase の統合相図
-python3 analysis/analyze_integrated.py --model <slug>
+# YAML config から実行
+python3 analysis/run_pipeline.py --config analysis/configs/template.yaml
 ```
 
 ### 6. DB 同期

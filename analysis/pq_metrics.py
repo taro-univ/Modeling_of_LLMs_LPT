@@ -10,9 +10,7 @@ from typing import Iterable
 import numpy as np
 from scipy import stats
 
-# TODO(SPEC-2026-05-22-001): promote _cosine to a public analysis metrics module
-# when analyze_integrated.py is refactored into reusable IO/metrics helpers.
-from analysis.analyze_integrated import _cosine
+from analysis.io_utils import _cosine
 
 LOGGER = logging.getLogger(__name__)
 
