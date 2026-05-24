@@ -56,7 +56,8 @@
 - **一意解**：⚠️ **最短解が一意でない**場合が多い → 設計で制御する必要あり
 - **physics-agent 評価**：⭕ AGS/REM/p-spin の判別に最も有用（新しい universality class）。ただし一意解問題がクリティカル
 - **research-agent 評価**：（明示的評価なし）
-- **status**：🟡 保留（一意解の設計方法を検討後）
+- **status**：❌ **除外確定**（2026-05-24 user 決定）
+  - 除外理由：最短反転数は NP-hard。`_min_moves_from` の契約（厳密最短手数を返す）を満たせないため、`BaseEnv` 継承パズルとして設計上成立しない。
 
 ### Tower of London
 - **状態空間**：3本ペグ + 玉の移動。ToH より短い最適手数（1〜5手）
@@ -74,6 +75,7 @@
 |---|---|
 | **Cryptarithmetic** | 逐次的 dynamics がなく、SG / PM の動的遷移が観測しにくい |
 | **Rush Hour** | 最小手数 K(N) が解析的に書けない → スケーリング則の検証不可 |
+| **Pancake Sorting** | 最短反転数が NP-hard。`_min_moves_from` の厳密最短契約を満たせない（2026-05-24 user 確定） |
 
 ---
 

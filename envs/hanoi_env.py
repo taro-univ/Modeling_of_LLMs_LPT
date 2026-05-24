@@ -1,77 +1,8 @@
-"""
-hanoi_env.py — スタンドアロン版ハノイの塔環境
-
-BaseEnv + TowerOfHanoiEnv を単一ファイルにマージした最小構成版。
-外部モジュール依存なし（標準ライブラリ + numpy のみ）。
-"""
+"""hanoi_env.py - Tower of Hanoi environment."""
 
 import re
-from abc import ABC, abstractmethod
-from typing import List
 
-
-# ===========================================================================
-# BaseEnv（推論ポテンシャル V(x) の共通ロジック）
-# ===========================================================================
-
-class BaseEnv(ABC):
-    """
-    全環境共通の抽象基底クラス。
-
-    推論ポテンシャル V(x) の定義:
-        V(x) = LAMBDA_DIST * D_hat(s) + LAMBDA_PENALTY * illegal_count
-
-        D_hat(s) = D(s, goal) / min_moves  ← Filter Normalization
-                                              (Li et al. 2018 の思想)
-    V の意味:
-        V = 0.0  … 目標状態（谷底）
-        V = 1.0  … 初期状態（高原）
-        V > 1.0  … ルール違反によるエネルギー障壁
-    """
-
-    LAMBDA_DIST    = 1.0   # 距離項の重み
-    LAMBDA_PENALTY = 0.5   # ルール違反 1 回あたりのペナルティ
-
-    def __init__(self, N: int) -> None:
-        self.N = N
-        self.min_moves: int = 0
-        self.initial_state = None
-        self.goal_state    = None
-
-    @abstractmethod
-    def get_prompt(self) -> str: ...
-
-    @abstractmethod
-    def evaluate_state(self, current_moves: list) -> float: ...
-
-    @abstractmethod
-    def goal_reached(self, current_moves: list) -> bool: ...
-
-    @abstractmethod
-    def solve(self) -> list: ...
-
-    @abstractmethod
-    def get_bad_move(self) -> str: ...
-
-    @abstractmethod
-    def _get_state_coord(self, state) -> 'np.ndarray': ...
-
-    @abstractmethod
-    def _min_moves_from(self, state) -> int: ...
-
-    def extract_moves_from_text(self, text: str) -> list:
-        return []
-
-    def _compute_V(self, state, illegal_count: int = 0) -> float:
-        """推論ポテンシャル V(x) を計算して返す。"""
-        d_hat   = self._min_moves_from(state) / self.min_moves
-        penalty = self.LAMBDA_PENALTY * illegal_count
-        return round(self.LAMBDA_DIST * d_hat + penalty, 6)
-
-    @staticmethod
-    def _state_to_key(state: dict) -> tuple:
-        """状態を hashable なタプルへ変換する。"""
-        return (tuple(state['A']), tuple(state['B']), tuple(state['C']))
+from envs.base_env import BaseEnv
 
 
 # ===========================================================================
@@ -86,23 +17,46 @@ class TowerOfHanoiEnv(BaseEnv):
     ゴール状態（C に全円盤）を管理する。
     """
 
+    LAMBDA_DIST = 1.0
+    LAMBDA_PENALTY = 0.5
+
     def __init__(self, N: int) -> None:
+        if N < 1:
+            raise ValueError("N must be >= 1")
         super().__init__(N)
-        self.initial_state: dict = {
+        self._initial_state: dict = {
             'A': list(range(N, 0, -1)),  # [N, N-1, ..., 1]（底が大きい）
             'B': [],
             'C': [],
         }
-        self.goal_state: dict = {
+        self._goal_state: dict = {
             'A': [],
             'B': [],
             'C': list(range(N, 0, -1)),
         }
-        self.min_moves: int = (2 ** N) - 1
 
     # ------------------------------------------------------------------
     # 公開 API
     # ------------------------------------------------------------------
+
+    @property
+    def min_moves(self) -> int:
+        return (2 ** self.N) - 1
+
+    @property
+    def initial_state(self) -> dict:
+        return self._initial_state
+
+    @property
+    def goal_state(self) -> dict:
+        return self._goal_state
+
+    def make_sub_env(self, N: int) -> 'TowerOfHanoiEnv':
+        return TowerOfHanoiEnv(N)
+
+    def state_to_key(self, state: dict) -> tuple:
+        """状態を hashable なタプルへ変換する。"""
+        return (tuple(state['A']), tuple(state['B']), tuple(state['C']))
 
     def get_prompt(self) -> str:
         """LLM に与える初期プロンプトを生成して返す。"""
@@ -236,6 +190,12 @@ class TowerOfHanoiEnv(BaseEnv):
         """任意の盤面状態からゴールまでの最短手数を O(N) 再帰で返す。"""
         return self._min_moves_to_peg(state, self.N, 'C')
 
+    def _compute_V(self, state: dict, illegal_count: int = 0) -> float:
+        """ハノイ固有の推論ポテンシャル V(x) を計算する。"""
+        d_hat = self._min_moves_from(state) / self.min_moves
+        penalty = self.LAMBDA_PENALTY * illegal_count
+        return round(self.LAMBDA_DIST * d_hat + penalty, 6)
+
     # ------------------------------------------------------------------
     # 内部ユーティリティ
     # ------------------------------------------------------------------
@@ -306,13 +266,13 @@ class TowerOfHanoiEnv(BaseEnv):
     def _simulate_states(self, start_state: dict, moves: list) -> list:
         """手のリストを適用し、各ステップ後の状態キー列を返す。"""
         state = {k: list(v) for k, v in start_state.items()}
-        keys  = [self._state_to_key(state)]
+        keys  = [self.state_to_key(state)]
         for move_str in moves:
             parsed = self._parse_move(move_str)
             if parsed is not None:
                 disk, src, dst = parsed
                 self._apply_move(state, disk, src, dst)
-            keys.append(self._state_to_key(state))
+            keys.append(self.state_to_key(state))
         return keys
 
     def _solve_recursive(self, n: int, src: str, dst: str, aux: str) -> list:

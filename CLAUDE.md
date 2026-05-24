@@ -362,6 +362,43 @@ prompt: ".claude/agents/pipeline-orchestrator.md の指示に従い、以下の�
 - デバッグ目的のドライラン（`--dry-run`）
 - GPU メモリチェック（`runners/scripts/check_gpu_memory.sh`）
 
+### サブエージェントへの Bash コマンド生成ルール
+
+**全サブエージェント（特に implementation-agent）へのプロンプトに必ず以下の一文を含めること：**
+
+> 「Bash コマンドの中で複数行の `python3 -c "..."` にコメント（`#`）を含めないこと。
+> 代わりに Write ツールで `/tmp/script_<用途>.py` に書き出してから `python3 /tmp/script_<用途>.py` で実行すること。」
+
+**背景**：Claude Code のセキュリティ機構「Newline followed by # inside a quoted argument」は、
+引数内の改行＋`#` のパターンをコマンドインジェクションの可能性として検出し、
+allowlist に登録済みのコマンドであっても**強制的にブロック**する（security override）。
+この制約はプロジェクト設定では回避できないため、コード生成側で対処する必要がある。
+
+**OK な書き方**（ファイル経由）：
+```bash
+# Write ツールで /tmp/check_env.py を作成してから：
+python3 /tmp/check_env.py
+```
+
+**NG な書き方**（インライン複数行 + コメント）：
+```bash
+# これはセキュリティ override でブロックされる
+python3 -c "
+import sys  # check version
+print(sys.version)
+"
+```
+
+**Agent prompt 内の `#` 見出しも同様にブロックされる（追記 2026-05-24）**：
+
+Agent ツールの `prompt` パラメータに改行 + `#`（Markdown 見出し `##` `###` 等）が含まれると、
+同じ security override が発動して Agent ツール呼び出し自体がブロックされる。
+
+Agent への prompt では `#` 見出しを使わず、以下の代替表記を使うこと：
+- `===` や `---` の ASCII アンダーライン区切り
+- `**太字**` でのセクション名
+- 番号付きリスト
+
 ---
 
 ## 研究状態ファイル
