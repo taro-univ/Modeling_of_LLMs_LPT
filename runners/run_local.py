@@ -25,7 +25,9 @@ import numpy as np
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
+from envs.base_env import BaseEnv
 from envs.hanoi_env import TowerOfHanoiEnv
+from envs.lights_out_env import LightsOutEnv
 from runners.run import (
     EarlyStopConfig,
     calc_default_trials,
@@ -92,7 +94,7 @@ SYSTEM_HINT = (
 )
 
 
-def build_few_shot_messages(env: TowerOfHanoiEnv, n_shot: int) -> list[dict]:
+def build_few_shot_messages(env: BaseEnv, n_shot: int) -> list[dict]:
     """
     システムヒント + マルチターン few-shot メッセージリストを構築する。
 
@@ -104,7 +106,7 @@ def build_few_shot_messages(env: TowerOfHanoiEnv, n_shot: int) -> list[dict]:
     N=4+: N-2, N-1 の例 2 つ → 直近パターンの転移
 
     Args:
-        env: 本番の TowerOfHanoiEnv（N を参照するために使用）。
+        env: 本番の BaseEnv（N を参照するために使用）。
         n_shot: 提示する例の数（1 or 2）。
 
     Returns:
@@ -114,7 +116,9 @@ def build_few_shot_messages(env: TowerOfHanoiEnv, n_shot: int) -> list[dict]:
 
     example_ns = list(range(max(1, env.N - n_shot), env.N))
     for ex_n in example_ns:
-        ex_env = TowerOfHanoiEnv(N=ex_n)
+        # TODO(SPEC-FUTURE): build_few_shot_messages はハノイ専用プロンプトを使用。
+        # LightsOutEnv 対応は別 SPEC で BaseEnv.get_few_shot_examples() 等を追加して対応予定。
+        ex_env = env.make_sub_env(ex_n)
         solution_lines = "\n".join(ex_env.solve())
         messages.append({"role": "user",      "content": ex_env.get_prompt()})
         messages.append({"role": "assistant", "content": solution_lines})
@@ -217,7 +221,7 @@ def _estimate_reasoning_tokens_with_profile(
 def _prepare_input_ids(
     tokenizer: AutoTokenizer,
     prompt: str,
-    env: TowerOfHanoiEnv,
+    env: BaseEnv,
     n_shot: int,
     profile: ModelProfile,
 ) -> torch.Tensor:
@@ -379,7 +383,7 @@ def _handle_new_moves(
     hs_buffer: dict[str, list[np.ndarray]],
     move_steps_list: list[int],
     move_texts_list: list[str],
-    env: TowerOfHanoiEnv,
+    env: BaseEnv,
     accumulated_text: str,
     disable_goal_stop: bool,
 ) -> tuple[int, Optional[str]]:
@@ -421,7 +425,7 @@ def generate_with_hidden_states(
     prompt: str,
     num_predict: int,
     min_moves: int,
-    env: TowerOfHanoiEnv,
+    env: BaseEnv,
     early_stop_cfg: Optional[EarlyStopConfig] = None,
     temperature: float = 0.6,
     repetition_penalty: float = 1.1,
@@ -442,6 +446,7 @@ def generate_with_hidden_states(
         prompt: 入力プロンプト文字列。
         num_predict: 最大生成トークン数。
         min_moves: この N の最短手数（早期終了判定に使用）。
+        env: パズル環境。BaseEnv の共通 API でプロンプト評価を行う。
         early_stop_cfg: 早期終了設定。None なら無効。
         profile: ModelProfile（必須）。resolve_model_profile() で生成すること。
         capture_layers: キャプチャ層マップ（必須）。make_capture_layers() で生成すること。
@@ -559,6 +564,7 @@ def generate_with_hidden_states(
 # ===========================================================================
 
 def run_experiment_hf(
+    env: BaseEnv,
     N: int,
     trials: int,
     model_id: str,
@@ -574,10 +580,11 @@ def run_experiment_hf(
     capture_layers: Optional[dict[str, int]] = None,
 ) -> list[dict]:
     """
-    N 枚ハノイの塔で trials 回の推論を実行し、結果リストを返す。
+    指定されたパズル環境で trials 回の推論を実行し、結果リストを返す。
 
     Args:
-        N: 円盤の枚数。
+        env: パズル環境。
+        N: 問題サイズ。
         trials: 試行回数。
         model: ロード済みモデル。
         tokenizer: トークナイザー。
@@ -588,7 +595,6 @@ def run_experiment_hf(
     Returns:
         各試行の結果辞書のリスト。
     """
-    env = TowerOfHanoiEnv(N=N)
     results: list[dict] = []
     num_predict_ = num_predict if num_predict is not None else calc_num_predict(N)
 
@@ -597,8 +603,8 @@ def run_experiment_hf(
 
     es_label = "有効" if early_stop_cfg is not None else "無効"
     print(f"\n{'='*60}")
-    print(f"  Tower of Hanoi (HF)  N={N}  trials={trials}  model={model_id}")
-    print(f"  最短手数 (2^N-1): {env.min_moves}")
+    print(f"  {env.__class__.__name__} (HF)  N={N}  trials={trials}  model={model_id}")
+    print(f"  最短手数: {env.min_moves}")
     print(f"  num_predict: {num_predict_}")
     print(f"  早期終了:    {es_label}")
     print(f"  出力先:      {output_dir}")
@@ -738,6 +744,13 @@ def parse_args() -> argparse.Namespace:
                         help="few-shot 例の数 (default: 1, 0 で無効)")
     parser.add_argument("--sweep-type",          type=str,   default="hf",
                         help="実験種別ラベル（DB の sweep_type カラムに対応）")
+    parser.add_argument(
+        "--puzzle",
+        type=str,
+        default="hanoi",
+        choices=["hanoi", "lights_out"],
+        help="パズル種を選択（デフォルト: hanoi）",
+    )
     return parser.parse_args()
 
 
@@ -767,7 +780,7 @@ def _resolve_output_paths(args) -> tuple[Optional[Path], Optional[Path]]:
     if not args.no_save_hidden:
         output_dir = (
             Path(args.output_dir) if args.output_dir
-            else Path(f"results/hanoi/{model_id_to_slug(args.model_id)}/N{args.N}")
+            else Path(f"results/{args.puzzle}/{model_id_to_slug(args.model_id)}/N{args.N}")
         )
     summary_path = (
         Path(args.output) if args.output
@@ -787,7 +800,7 @@ def _write_meta_json(summary_path: Optional[Path], args) -> None:
     meta_dir = summary_path.parent
     meta_dir.mkdir(parents=True, exist_ok=True)
     meta = {
-        "environment": "hanoi",
+        "environment": args.puzzle,
         "model":       args.model_id,
         "N":           args.N,
         "temperature": args.temperature,
@@ -801,6 +814,13 @@ def _write_meta_json(summary_path: Optional[Path], args) -> None:
 
 def main() -> None:
     args = parse_args()
+
+    puzzle_factories = {
+        "hanoi": TowerOfHanoiEnv,
+        "lights_out": LightsOutEnv,
+    }
+    env_factory = puzzle_factories[args.puzzle]
+    env = env_factory(args.N)
 
     trials         = args.trials if args.trials is not None else calc_default_trials(args.N)
     early_stop_cfg = _build_early_stop_cfg(args)
@@ -819,6 +839,7 @@ def main() -> None:
     print(f"[INFO] capture_layers: {capture_layers}")
 
     results = run_experiment_hf(
+        env=env,
         N=args.N,
         trials=trials,
         model_id=args.model_id,

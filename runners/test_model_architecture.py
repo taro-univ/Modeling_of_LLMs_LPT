@@ -565,6 +565,7 @@ def run_t5(
 
     try:
         trial_results = run_experiment_hf(
+            env=TowerOfHanoiEnv(N=2),
             N=2,
             trials=3,
             model_id=model_id,
