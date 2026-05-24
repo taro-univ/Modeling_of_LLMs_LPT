@@ -85,11 +85,44 @@
 
 ---
 
+---
+
+## P1：Phase 2 移行準備（Hanoi 完了後）
+
+方針詳細は `research_state/phase2_strategy.md`、パズル候補評価は `research_state/puzzle_roadmap.md` を参照。
+
+### Phase 2 移行チェックリスト
+
+- [ ] Tower of Hanoi × 5 モデル full_sweep 完了（llama-8B / qwen-14B / Qwen3-7B / Qwen3-14B）
+- [ ] 5 モデル全ての P(q) 相図生成・比較（モデル間での AGS 構造の一致・差異）
+- [ ] AGS 1987 読了
+- [ ] arxiv:2503.23084 読了（"Reasoning-Memorization Interplay mediated by a single direction"）
+
+### 新パズル実装（確定分）
+
+- [ ] **Frog Jump（蛙跳び）** 実装（`envs/frog_jump_env.py`、一意解設計・`BaseEnv` 継承）
+  - K(N) = N(N+2) の検証テスト含む
+- [ ] **River Crossing（川渡り問題）** 実装（`envs/river_crossing_env.py`）
+  - キャラクター数・ルール設計で一意解を保証
+
+### 新パズル実装（候補・未確定）
+
+パズル追加は `research_state/puzzle_roadmap.md` を参照して user が選定。
+
+- [ ] Lights Out（両エージェント推薦、GF(2) 構造）
+- [ ] 8-puzzle（physics-agent 推薦、universality class 確認）
+- [ ] Pancake Sorting（一意解の設計方法を詰めてから）
+- [ ] Tower of London（先行 LLM 研究との比較が必要な場合）
+
+---
+
 ## 学習（並行）
 
 - 西森「スピングラス理論と情報統計力学」読了
 - 散逸構造の専門書（読み進め中）
 - 「Hopfield is All You Need」精読
+- **AGS 1987（Almeida, Thouless, Sommers）**：⭐ 最優先
+- **arxiv:2503.23084**（Reasoning-Memorization Interplay）：⭐ 優先（H3 直結）
 - Apple 推論崩壊論文の精読
 - 「LLM × 統計力学」既存研究のリサーチエージェント主導サーベイ
 

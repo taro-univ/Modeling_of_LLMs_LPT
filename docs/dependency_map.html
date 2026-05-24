@@ -17,6 +17,7 @@
   --analysis:  #f0883e;
   --db:        #bc8cff;
   --tests:     #8b949e;
+  --tools:     #ffa657;
   --external:  #21262d;
   --ext-text:  #6e7681;
   --cc-ok:     #3fb950;
@@ -49,14 +50,14 @@ body {
   padding: 2px 8px;
   border-radius: 20px;
   font-size: 11px;
-  font-weight: 600;
-  border: 1px solid;
+  font-weight: 500;
+  background: var(--badge-bg);
+  border: 1px solid var(--border);
 }
-.badge-envs     { color: var(--envs);    border-color: var(--envs);    background: #3fb95015; }
-.badge-runners  { color: var(--runners); border-color: var(--runners); background: #58a6ff15; }
-.badge-analysis { color: var(--analysis);border-color: var(--analysis);background: #f0883e15; }
-.badge-db       { color: var(--db);      border-color: var(--db);      background: #bc8cff15; }
-.badge-tests    { color: var(--tests);   border-color: var(--tests);   background: #8b949e15; }
+.badge.green  { color: var(--cc-ok);   border-color: #238636; }
+.badge.yellow { color: var(--cc-warn); border-color: #9e6a03; }
+.badge.red    { color: var(--cc-bad);  border-color: #6e1814; }
+.badge.blue   { color: #58a6ff;        border-color: #1f6feb; }
 
 /* ─── Tabs ─── */
 .tabs {
@@ -64,767 +65,768 @@ body {
   gap: 0;
   border-bottom: 1px solid var(--border);
   padding: 0 28px;
+  background: var(--surface);
 }
-.tab {
-  padding: 10px 16px;
-  cursor: pointer;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
+.tab-btn {
+  padding: 10px 18px;
+  background: none;
+  border: none;
   border-bottom: 2px solid transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
   transition: color .15s, border-color .15s;
-  user-select: none;
 }
-.tab.active { color: var(--text); border-color: var(--runners); }
-.tab:hover { color: var(--text); }
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--text); border-bottom-color: #58a6ff; }
 
-/* ─── Tab panels ─── */
-.panel { display: none; }
-.panel.active { display: block; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
 
-/* ─── Graph panel ─── */
-#graph-wrap {
+/* ─── Tab 1: Dependency Graph ─── */
+#graph-container {
   display: flex;
-  gap: 0;
-  height: calc(100vh - 120px);
-  min-height: 560px;
+  height: calc(100vh - 140px);
 }
 #graph-svg {
   flex: 1;
-  background: var(--bg);
+  cursor: grab;
 }
+#graph-svg:active { cursor: grabbing; }
 
-/* ─── Side panel ─── */
-#side-panel {
-  width: 300px;
+#info-panel {
+  width: 280px;
   border-left: 1px solid var(--border);
-  background: var(--surface);
+  padding: 20px;
   overflow-y: auto;
-  padding: 18px 16px;
-  flex-shrink: 0;
+  background: var(--surface);
+  transition: width .2s;
 }
-#side-panel .sp-hint {
-  color: var(--muted);
-  font-size: 12px;
-  text-align: center;
-  padding: 60px 0;
-  line-height: 1.8;
-}
-.sp-filename {
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  font-size: 12px;
-  color: var(--muted);
-  margin-bottom: 4px;
-}
-.sp-title {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 10px;
-  word-break: break-all;
-}
-.sp-desc {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.6;
-  margin-bottom: 14px;
-}
-.sp-metrics {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-bottom: 14px;
-}
-.sp-metric {
-  background: var(--badge-bg);
-  border-radius: 6px;
-  padding: 8px 10px;
-}
-.sp-metric .label { color: var(--muted); font-size: 10px; margin-bottom: 2px; }
-.sp-metric .value { font-size: 16px; font-weight: 700; font-family: monospace; }
-.sp-metric.bad .value  { color: var(--cc-bad); }
-.sp-metric.warn .value { color: var(--cc-warn); }
-.sp-metric.ok .value   { color: var(--cc-ok); }
-
-.sp-section { font-size: 11px; font-weight: 600; text-transform: uppercase;
-              letter-spacing: .8px; color: var(--muted); margin: 12px 0 6px; }
-.sp-chip {
+#info-panel h3 { font-size: 14px; margin-bottom: 8px; }
+#info-panel .info-path { color: var(--muted); font-size: 11px; margin-bottom: 12px; font-family: monospace; }
+.info-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.info-label { color: var(--muted); }
+.info-val { font-weight: 600; }
+.info-section { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px; }
+.info-section h4 { font-size: 12px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+.dep-pill {
   display: inline-block;
   padding: 2px 7px;
   border-radius: 4px;
-  background: var(--badge-bg);
-  font-family: monospace;
   font-size: 11px;
-  margin: 2px 2px;
+  margin: 2px;
+  background: var(--badge-bg);
   border: 1px solid var(--border);
 }
-.sp-import-row {
-  display: flex; align-items: flex-start; gap: 6px;
-  margin-bottom: 6px; font-size: 12px;
-}
-.sp-import-arrow { color: var(--runners); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
-.sp-import-sym { font-family: monospace; font-size: 11px; color: var(--muted); line-height: 1.5; }
 
-.sp-warning {
-  background: #f8514920;
-  border: 1px solid #f8514960;
-  border-radius: 6px;
-  padding: 8px 10px;
-  margin-top: 10px;
-  font-size: 11px;
-  color: #f85149;
-  line-height: 1.5;
-}
-
-/* ─── Legend ─── */
-#legend {
+/* Legend */
+.legend {
   position: absolute;
-  top: 142px;
-  left: 16px;
+  bottom: 20px;
+  left: 20px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 12px 16px;
   font-size: 11px;
-  z-index: 10;
-  pointer-events: none;
 }
-#legend .lg-title { color: var(--muted); font-weight: 600; margin-bottom: 8px; font-size: 10px;
-                    text-transform: uppercase; letter-spacing: .8px; }
-.lg-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
-.lg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.lg-ext { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; border: 1px solid #444; background: var(--external); }
-.lg-divider { border: none; border-top: 1px solid var(--border); margin: 7px 0; }
-.lg-ring { display: flex; align-items: center; gap: 4px; }
-.ring-sample {
-  width: 14px; height: 14px; border-radius: 50%;
-  background: #30363d;
-  border: 2.5px solid;
-  flex-shrink: 0;
-}
+.legend-title { color: var(--muted); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+.legend-ring { width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid; background: transparent; }
+.legend-line { width: 18px; height: 2px; }
 
-/* ─── Data Flow ─── */
-#dataflow-wrap { padding: 28px; overflow-x: auto; }
-.df-title { font-size: 15px; font-weight: 600; margin-bottom: 20px; }
-.df-diagram {
-  min-width: 860px;
-  position: relative;
+/* ─── Tab 2: Data Flow ─── */
+#flow-container {
+  padding: 24px 32px;
+  overflow-y: auto;
+  height: calc(100vh - 140px);
 }
-.df-row {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  margin-bottom: 0;
-}
-.df-node {
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  text-align: center;
-  min-width: 120px;
-  flex-shrink: 0;
-}
-.df-node.runners  { background: #58a6ff20; border: 1.5px solid var(--runners); color: var(--runners); }
-.df-node.analysis { background: #f0883e20; border: 1.5px solid var(--analysis); color: var(--analysis); }
-.df-node.db       { background: #bc8cff20; border: 1.5px solid var(--db);       color: var(--db); }
-.df-node.fs       { background: #21262d; border: 1.5px solid var(--border); color: var(--muted); font-family: monospace; font-size: 11px; }
-.df-node.pg       { background: #bc8cff10; border: 1.5px dashed var(--db); color: var(--db); }
-.df-node.fig      { background: #f0883e10; border: 1.5px dashed var(--analysis); color: var(--analysis); }
+.flow-section { margin-bottom: 40px; }
+.flow-section h2 { font-size: 15px; margin-bottom: 16px; color: var(--text); }
+.flow-section p  { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+.flow-svg { width: 100%; max-width: 900px; }
 
-.df-arrow {
-  display: flex; align-items: center; padding: 0 4px; flex-shrink: 0;
+/* ─── Tab 3: Quality Metrics ─── */
+#metrics-container {
+  padding: 24px 32px;
+  overflow-y: auto;
+  height: calc(100vh - 140px);
 }
-.df-arrow-line {
-  display: flex; flex-direction: column; align-items: center;
-}
-.df-arrow svg { display: block; }
-.df-arrow .label {
-  font-size: 10px; color: var(--muted); white-space: nowrap;
-  font-family: monospace; text-align: center;
-}
-
-.df-section {
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
   margin-bottom: 28px;
 }
-.df-section-label {
-  font-size: 11px; font-weight: 600; text-transform: uppercase;
-  letter-spacing: .8px; color: var(--muted);
-  margin-bottom: 12px;
-  display: flex; align-items: center; gap: 8px;
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 18px;
 }
-.df-section-label::after {
-  content: ''; flex: 1; height: 1px; background: var(--border);
-}
+.metric-card .val { font-size: 28px; font-weight: 700; margin-bottom: 2px; }
+.metric-card .lbl { color: var(--muted); font-size: 11px; }
+.metric-card.green .val { color: var(--cc-ok); }
+.metric-card.yellow .val { color: var(--cc-warn); }
+.metric-card.blue .val { color: #58a6ff; }
 
-/* ─── Metrics Table ─── */
-#metrics-wrap { padding: 28px; overflow-x: auto; }
-.mt-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
-table {
+table.quality-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
 }
-th {
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .6px;
-  padding: 8px 12px;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-  cursor: pointer;
-  user-select: none;
-}
-th:hover { color: var(--text); }
-th .sort-arrow { opacity: .3; margin-left: 4px; }
-th.sorted .sort-arrow { opacity: 1; }
-td {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  font-family: monospace;
-  white-space: nowrap;
-}
-tr:hover td { background: #161b2260; }
-.td-file { font-size: 11px; }
-.td-layer { }
-.cc-cell { font-weight: 700; }
-.cc-ok   { color: var(--cc-ok); }
-.cc-warn { color: var(--cc-warn); }
-.cc-bad  { color: var(--cc-bad); }
-.mi-cell { }
-.mi-ok   { color: var(--cc-ok); }
-.mi-warn { color: var(--cc-warn); }
-.mi-bad  { color: var(--cc-bad); }
-
-/* ─── Tooltip ─── */
-#tooltip {
-  position: fixed;
+table.quality-table th {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 10px;
+  padding: 8px 12px;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  color: var(--muted);
+  font-weight: 600;
   font-size: 11px;
-  pointer-events: none;
-  z-index: 100;
-  display: none;
-  max-width: 260px;
-  line-height: 1.6;
-  box-shadow: 0 4px 16px #00000060;
+  text-transform: uppercase;
+  letter-spacing: .4px;
 }
-#tooltip .tt-name { font-weight: 700; font-family: monospace; margin-bottom: 4px; }
-#tooltip .tt-metric { color: var(--muted); }
+table.quality-table th:hover { color: var(--text); }
+table.quality-table td {
+  border: 1px solid var(--border);
+  padding: 7px 12px;
+  font-family: monospace;
+}
+table.quality-table tr:hover td { background: #1c2128; }
+.cc-chip {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.cc-ok   { background: #0f3d1f; color: var(--cc-ok);   border: 1px solid #238636; }
+.cc-warn { background: #3a2a00; color: var(--cc-warn); border: 1px solid #9e6a03; }
+.cc-bad  { background: #3b0000; color: var(--cc-bad);  border: 1px solid #6e1814; }
 
-/* ─── SVG styles ─── */
-.node circle { cursor: pointer; transition: opacity .15s; }
-.node text   { pointer-events: none; }
-.node:hover circle { opacity: .85; }
-.link { fill: none; stroke-opacity: .55; transition: stroke-opacity .15s; }
-.link:hover { stroke-opacity: 1; }
-.link-ext { stroke-dasharray: 3 3; }
-.node-label { font-size: 10px; fill: var(--text); font-family: monospace; text-anchor: middle; }
-.node-label-ext { font-size: 9px; fill: var(--ext-text); text-anchor: middle; }
-.node-ring { fill: none; stroke-width: 2.5; }
+/* ─── Tab 4: Refactor History ─── */
+#history-container {
+  padding: 24px 32px;
+  overflow-y: auto;
+  height: calc(100vh - 140px);
+}
+.history-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.summary-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+.summary-card .arrow { font-size: 22px; font-weight: 700; }
+.summary-card .arrow .before { color: var(--cc-bad); }
+.summary-card .arrow .after  { color: var(--cc-ok);  }
+.summary-card .clabel { color: var(--muted); font-size: 11px; margin-top: 4px; }
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 24px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+table.refactor-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 32px;
+}
+table.refactor-table th {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+table.refactor-table td {
+  border: 1px solid var(--border);
+  padding: 7px 12px;
+  font-family: monospace;
+}
+table.refactor-table tr:hover td { background: #1c2128; }
+.delta { font-weight: 700; }
+.delta.positive { color: var(--cc-ok); }
+.strike { color: var(--cc-bad); text-decoration: line-through; opacity: .7; }
+
+.remaining-card {
+  background: #1c1400;
+  border: 1px solid #9e6a03;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+}
+.remaining-card .rfile { color: #d29922; font-family: monospace; font-size: 12px; }
+.remaining-card .rfunc { color: var(--muted); font-size: 11px; margin-top: 4px; }
+.remaining-card .rreason { color: var(--muted); font-size: 11px; margin-top: 6px; font-style: italic; }
 </style>
 </head>
 <body>
 
-<!-- ─── Header ─── -->
 <div class="header">
   <div>
-    <h1>📦 依存関係マップ — Modeling_of_LLMs_LPT</h1>
-    <div class="sub">2026-05-21 生成 ・ 12 モジュール ・ 5,153 LOC</div>
+    <h1>📦 Modeling_of_LLMs_LPT — コード依存マップ</h1>
+    <div class="sub">updated: 2026-05-21 | radon CC threshold: 10 | MI threshold: 20</div>
   </div>
   <div class="badges">
-    <span class="badge badge-envs">envs</span>
-    <span class="badge badge-runners">runners</span>
-    <span class="badge badge-analysis">analysis</span>
-    <span class="badge badge-db">db</span>
-    <span class="badge badge-tests">tests</span>
+    <span class="badge blue">13 internal modules</span>
+    <span class="badge blue">8 external libs</span>
+    <span class="badge green">CC violations: 2 (deferred)</span>
+    <span class="badge green">MI violations: 0</span>
   </div>
 </div>
 
-<!-- ─── Tabs ─── -->
 <div class="tabs">
-  <div class="tab active" onclick="switchTab('graph')">🔗 コード依存グラフ</div>
-  <div class="tab" onclick="switchTab('dataflow')">🔄 データフロー</div>
-  <div class="tab" onclick="switchTab('metrics')">📊 品質メトリクス</div>
+  <button class="tab-btn active" onclick="switchTab(0)">🕸 コード依存グラフ</button>
+  <button class="tab-btn" onclick="switchTab(1)">🔄 データフロー</button>
+  <button class="tab-btn" onclick="switchTab(2)">📊 品質メトリクス</button>
+  <button class="tab-btn" onclick="switchTab(3)">🔧 リファクタ履歴</button>
 </div>
 
-<!-- ─── Panel: Graph ─── -->
-<div class="panel active" id="panel-graph">
-  <div id="graph-wrap">
-    <div style="position:relative;flex:1;overflow:hidden;">
-      <svg id="graph-svg"></svg>
-      <div id="legend">
-        <div class="lg-title">レイヤー</div>
-        <div class="lg-row"><div class="lg-dot" style="background:var(--envs)"></div> envs（環境）</div>
-        <div class="lg-row"><div class="lg-dot" style="background:var(--runners)"></div> runners（実験）</div>
-        <div class="lg-row"><div class="lg-dot" style="background:var(--analysis)"></div> analysis（解析）</div>
-        <div class="lg-row"><div class="lg-dot" style="background:var(--db)"></div> db（永続化）</div>
-        <div class="lg-row"><div class="lg-dot" style="background:var(--tests)"></div> tests（テスト）</div>
-        <div class="lg-row"><div class="lg-ext"></div> 外部ライブラリ</div>
-        <hr class="lg-divider">
-        <div class="lg-title">循環的複雑度 最大値</div>
-        <div class="lg-row lg-ring"><div class="ring-sample" style="border-color:var(--cc-ok)"></div> &lt; 5（良好）</div>
-        <div class="lg-row lg-ring"><div class="ring-sample" style="border-color:var(--cc-warn)"></div> 5–9（注意）</div>
-        <div class="lg-row lg-ring"><div class="ring-sample" style="border-color:var(--cc-bad)"></div> ≥ 10（要改善）</div>
-        <hr class="lg-divider">
-        <div class="lg-title">ノードサイズ</div>
-        <div style="color:var(--muted);font-size:10px;">● が大きいほど LOC が多い</div>
-      </div>
-    </div>
-    <div id="side-panel">
-      <div class="sp-hint">ノードをクリックすると<br>詳細が表示されます</div>
+<!-- ════════ Tab 1: Dependency Graph ════════ -->
+<div class="tab-pane active" id="tab-0">
+<div id="graph-container">
+  <svg id="graph-svg"></svg>
+  <div id="info-panel">
+    <div style="color:var(--muted);font-size:12px;margin-top:40px;text-align:center;">
+      ← ノードをクリックすると<br>詳細が表示されます
     </div>
   </div>
 </div>
+</div>
 
-<!-- ─── Panel: Data Flow ─── -->
-<div class="panel" id="panel-dataflow">
-<div id="dataflow-wrap">
-<div class="df-title">データフロー図</div>
-<div class="df-section">
-  <div class="df-section-label">① 実験実行パイプライン</div>
-  <div style="overflow-x:auto;">
-  <svg width="860" height="80" style="display:block;">
-    <defs>
-      <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-        <polygon points="0 0, 8 3, 0 6" fill="#58a6ff80"/>
-      </marker>
-      <marker id="arr2" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-        <polygon points="0 0, 8 3, 0 6" fill="#f0883e80"/>
-      </marker>
-      <marker id="arr3" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-        <polygon points="0 0, 8 3, 0 6" fill="#bc8cff80"/>
-      </marker>
-    </defs>
+<!-- ════════ Tab 2: Data Flow ════════ -->
+<div class="tab-pane" id="tab-1">
+<div id="flow-container">
 
-    <!-- run_local.py -->
-    <rect x="10" y="18" width="130" height="44" rx="7" fill="#58a6ff15" stroke="#58a6ff" stroke-width="1.5"/>
-    <text x="75" y="37" text-anchor="middle" fill="#58a6ff" font-size="11" font-weight="600">run_local.py</text>
-    <text x="75" y="52" text-anchor="middle" fill="#58a6ff90" font-size="9">エントリポイント</text>
+  <div class="flow-section">
+    <h2>1. 実験実行パイプライン</h2>
+    <p>run_local.py がモデルをロードし、Hanoi 問題を解かせる。Move ごとに hidden state を npz へ書き出す。</p>
+    <svg class="flow-svg" height="120" viewBox="0 0 860 120">
+      <defs>
+        <marker id="arrow1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#58a6ff"/>
+        </marker>
+      </defs>
+      <!-- boxes -->
+      <g>
+        <rect x="10"  y="40" width="120" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+        <text x="70"  y="65" text-anchor="middle" font-size="11" fill="#e6edf3">run_local.py</text>
+      </g>
+      <g>
+        <rect x="180" y="40" width="120" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+        <text x="240" y="65" text-anchor="middle" font-size="11" fill="#e6edf3">HF Transformers</text>
+      </g>
+      <g>
+        <rect x="350" y="40" width="120" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+        <text x="410" y="60" text-anchor="middle" font-size="11" fill="#e6edf3">hanoi_env.py</text>
+        <text x="410" y="73" text-anchor="middle" font-size="10" fill="#7d8590">evaluate_state()</text>
+      </g>
+      <g>
+        <rect x="520" y="40" width="120" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+        <text x="580" y="60" text-anchor="middle" font-size="11" fill="#e6edf3">run.py</text>
+        <text x="580" y="73" text-anchor="middle" font-size="10" fill="#7d8590">check_early_stop()</text>
+      </g>
+      <g>
+        <rect x="690" y="40" width="140" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+        <text x="760" y="60" text-anchor="middle" font-size="11" fill="#e6edf3">summary.json</text>
+        <text x="760" y="73" text-anchor="middle" font-size="10" fill="#7d8590">trial_NNN_hidden.npz</text>
+      </g>
+      <!-- arrows -->
+      <line x1="130" y1="60" x2="178" y2="60" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
+      <line x1="300" y1="60" x2="348" y2="60" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
+      <line x1="470" y1="60" x2="518" y2="60" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
+      <line x1="640" y1="60" x2="688" y2="60" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
+      <!-- labels -->
+      <text x="154" y="53" text-anchor="middle" font-size="9" fill="#7d8590">generate</text>
+      <text x="324" y="53" text-anchor="middle" font-size="9" fill="#7d8590">moves</text>
+      <text x="494" y="53" text-anchor="middle" font-size="9" fill="#7d8590">stop?</text>
+      <text x="664" y="53" text-anchor="middle" font-size="9" fill="#7d8590">save</text>
+    </svg>
+  </div>
 
-    <!-- arrow -->
-    <line x1="142" y1="40" x2="195" y2="40" stroke="#58a6ff60" stroke-width="1.5" marker-end="url(#arr)"/>
-    <text x="168" y="33" text-anchor="middle" fill="#7d8590" font-size="9">meta.json</text>
-    <text x="168" y="52" text-anchor="middle" fill="#7d8590" font-size="9">summary.json</text>
+  <div class="flow-section">
+    <h2>2. 解析パイプライン</h2>
+    <p>summary.json / npz を読み込み、相図・P(q)・スケーリング則・隠れ状態コサイン類似度を解析する。</p>
+    <svg class="flow-svg" height="200" viewBox="0 0 860 200">
+      <defs>
+        <marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#f0883e"/>
+        </marker>
+      </defs>
+      <!-- source files -->
+      <rect x="10" y="30" width="130" height="36" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="75" y="51" text-anchor="middle" font-size="11" fill="#e6edf3">summary.json (N×T grid)</text>
+      <rect x="10" y="76" width="130" height="36" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="75" y="97" text-anchor="middle" font-size="11" fill="#e6edf3">trial_NNN_hidden.npz</text>
 
-    <!-- results/ -->
-    <rect x="197" y="10" width="200" height="60" rx="7" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
-    <text x="297" y="32" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace" font-weight="600">results/hanoi/</text>
-    <text x="297" y="48" text-anchor="middle" fill="#6e7681" font-size="9" font-family="monospace">full_sweep/&lt;slug&gt;/N{N}_T{T}/</text>
-    <text x="297" y="61" text-anchor="middle" fill="#6e7681" font-size="9" font-family="monospace">*.npz（gitignore）</text>
+      <!-- analyzers -->
+      <rect x="200" y="10"  width="160" height="34" rx="6" fill="#1c1005" stroke="#9e6a03"/>
+      <text x="280" y="31" text-anchor="middle" font-size="11" fill="#f0883e">analyze_phase_diagram.py</text>
+      <rect x="200" y="54"  width="160" height="34" rx="6" fill="#1c1005" stroke="#9e6a03"/>
+      <text x="280" y="75" text-anchor="middle" font-size="11" fill="#f0883e">analyze_pq.py</text>
+      <rect x="200" y="98"  width="160" height="34" rx="6" fill="#1c1005" stroke="#9e6a03"/>
+      <text x="280" y="119" text-anchor="middle" font-size="11" fill="#f0883e">analyze_slowing.py</text>
+      <rect x="200" y="142" width="160" height="34" rx="6" fill="#1c1005" stroke="#9e6a03"/>
+      <text x="280" y="163" text-anchor="middle" font-size="11" fill="#f0883e">cosine_sim_phase.py</text>
 
-    <!-- arrow -->
-    <line x1="399" y1="40" x2="450" y2="40" stroke="#58a6ff60" stroke-width="1.5" marker-end="url(#arr)"/>
-    <text x="424" y="33" text-anchor="middle" fill="#7d8590" font-size="9">npz 読込</text>
+      <!-- integrated -->
+      <rect x="430" y="54" width="160" height="34" rx="6" fill="#1c1005" stroke="#9e6a03"/>
+      <text x="510" y="75" text-anchor="middle" font-size="11" fill="#f0883e">analyze_integrated.py</text>
 
-    <!-- run_scripts -->
-    <rect x="452" y="18" width="155" height="44" rx="7" fill="#58a6ff10" stroke="#58a6ff60" stroke-width="1.5" stroke-dasharray="4 3"/>
-    <text x="529" y="37" text-anchor="middle" fill="#58a6ff80" font-size="10" font-weight="600">run_full_sweep.sh</text>
-    <text x="529" y="52" text-anchor="middle" fill="#58a6ff60" font-size="9">/ run_collapse_phase.sh</text>
+      <!-- figures -->
+      <rect x="660" y="30"  width="120" height="34" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="720" y="51" text-anchor="middle" font-size="11" fill="#e6edf3">phase_diagram.png</text>
+      <rect x="660" y="74"  width="120" height="34" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="720" y="95" text-anchor="middle" font-size="11" fill="#e6edf3">pq_summary.png</text>
+      <rect x="660" y="118" width="120" height="34" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="720" y="139" text-anchor="middle" font-size="11" fill="#e6edf3">scaling.png</text>
 
-    <!-- arrow -->
-    <line x1="609" y1="40" x2="656" y2="40" stroke="#58a6ff60" stroke-width="1.5" marker-end="url(#arr)"/>
-    <text x="633" y="33" text-anchor="middle" fill="#7d8590" font-size="9">実行制御</text>
+      <!-- arrows source→analyzers -->
+      <line x1="140" y1="48"  x2="198" y2="27"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <line x1="140" y1="48"  x2="198" y2="71"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <line x1="140" y1="48"  x2="198" y2="115" stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <line x1="140" y1="94"  x2="198" y2="159" stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <!-- analyzers → integrated -->
+      <line x1="360" y1="27"  x2="428" y2="71"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <line x1="360" y1="71"  x2="428" y2="71"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <line x1="360" y1="115" x2="428" y2="71"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <!-- integrated → figures -->
+      <line x1="590" y1="71"  x2="658" y2="47"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <line x1="590" y1="71"  x2="658" y2="91"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <line x1="590" y1="71"  x2="658" y2="135" stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+    </svg>
+  </div>
 
-    <!-- docker -->
-    <rect x="658" y="18" width="190" height="44" rx="7" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
-    <text x="753" y="37" text-anchor="middle" fill="#8b949e" font-size="11" font-weight="600">Docker コンテナ</text>
-    <text x="753" y="52" text-anchor="middle" fill="#6e7681" font-size="9">hanoi-minimal / CUDA</text>
-  </svg>
+  <div class="flow-section">
+    <h2>3. DB 同期パイプライン</h2>
+    <p>meta.json があるディレクトリを再帰的に検出し PostgreSQL に取り込む（冪等）。</p>
+    <svg class="flow-svg" height="100" viewBox="0 0 720 100">
+      <defs>
+        <marker id="arrow3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#bc8cff"/>
+        </marker>
+      </defs>
+      <rect x="10"  y="30" width="120" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="70"  y="55" text-anchor="middle" font-size="11" fill="#e6edf3">meta.json</text>
+      <rect x="180" y="30" width="120" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="240" y="55" text-anchor="middle" font-size="11" fill="#e6edf3">db/sync.sh</text>
+      <rect x="350" y="30" width="120" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="410" y="50" text-anchor="middle" font-size="11" fill="#e6edf3">db/sync_one.py</text>
+      <text x="410" y="63" text-anchor="middle" font-size="10" fill="#7d8590">psycopg2</text>
+      <rect x="520" y="30" width="160" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="600" y="50" text-anchor="middle" font-size="11" fill="#e6edf3">PostgreSQL</text>
+      <text x="600" y="63" text-anchor="middle" font-size="10" fill="#7d8590">experiments + trials</text>
+      <line x1="130" y1="50" x2="178" y2="50" stroke="#bc8cff" stroke-width="1.5" marker-end="url(#arrow3)"/>
+      <line x1="300" y1="50" x2="348" y2="50" stroke="#bc8cff" stroke-width="1.5" marker-end="url(#arrow3)"/>
+      <line x1="470" y1="50" x2="518" y2="50" stroke="#bc8cff" stroke-width="1.5" marker-end="url(#arrow3)"/>
+    </svg>
   </div>
 </div>
+</div>
 
-<div class="df-section">
-  <div class="df-section-label">② 解析パイプライン</div>
-  <div style="overflow-x:auto;">
-  <svg width="860" height="80" style="display:block;">
-    <!-- results/ -->
-    <rect x="10" y="10" width="200" height="60" rx="7" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
-    <text x="110" y="32" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace" font-weight="600">results/hanoi/</text>
-    <text x="110" y="48" text-anchor="middle" fill="#6e7681" font-size="9" font-family="monospace">summary.json / *.npz</text>
-    <text x="110" y="61" text-anchor="middle" fill="#6e7681" font-size="9">（ファイルシステム I/O）</text>
-
-    <!-- arrow -->
-    <line x1="212" y1="40" x2="260" y2="40" stroke="#f0883e60" stroke-width="1.5" marker-end="url(#arr2)"/>
-
-    <!-- analysis -->
-    <rect x="262" y="10" width="290" height="60" rx="7" fill="#f0883e15" stroke="#f0883e" stroke-width="1.5"/>
-    <text x="407" y="30" text-anchor="middle" fill="#f0883e" font-size="10" font-weight="600">analysis/*.py</text>
-    <text x="407" y="45" text-anchor="middle" fill="#f0883e80" font-size="9">analyze_integrated / analyze_pq</text>
-    <text x="407" y="58" text-anchor="middle" fill="#f0883e80" font-size="9">analyze_phase_diagram / analyze_slowing / ...</text>
-
-    <!-- arrow -->
-    <line x1="554" y1="40" x2="600" y2="40" stroke="#f0883e60" stroke-width="1.5" marker-end="url(#arr2)"/>
-
-    <!-- figures -->
-    <rect x="602" y="10" width="245" height="60" rx="7" fill="#f0883e10" stroke="#f0883e60" stroke-width="1.5" stroke-dasharray="4 3"/>
-    <text x="724" y="32" text-anchor="middle" fill="#f0883e80" font-size="11" font-weight="600">figures/</text>
-    <text x="724" y="48" text-anchor="middle" fill="#6e7681" font-size="9">&lt;sweep_type&gt;/&lt;slug&gt;/&lt;図名&gt;.png</text>
-    <text x="724" y="61" text-anchor="middle" fill="#6e7681" font-size="9">（gitignore・再生成可能）</text>
-  </svg>
+<!-- ════════ Tab 3: Quality Metrics ════════ -->
+<div class="tab-pane" id="tab-2">
+<div id="metrics-container">
+  <div class="metrics-grid">
+    <div class="metric-card green"><div class="val">2</div><div class="lbl">CC violations (deferred)</div></div>
+    <div class="metric-card green"><div class="val">0</div><div class="lbl">MI violations</div></div>
+    <div class="metric-card blue"><div class="val">13</div><div class="lbl">tracked modules</div></div>
+    <div class="metric-card blue"><div class="val">3,571</div><div class="lbl">total LOC</div></div>
+    <div class="metric-card green"><div class="val">78%</div><div class="lbl">violation reduction (9→2)</div></div>
   </div>
+
+  <table class="quality-table" id="quality-table">
+    <thead>
+      <tr>
+        <th onclick="sortTable(0)">ファイル ↕</th>
+        <th onclick="sortTable(1)">LOC ↕</th>
+        <th onclick="sortTable(2)">CC max ↕</th>
+        <th onclick="sortTable(3)">CC mean ↕</th>
+        <th onclick="sortTable(4)">MI ↕</th>
+        <th onclick="sortTable(5)">MI rank ↕</th>
+        <th>CC violations</th>
+      </tr>
+    </thead>
+    <tbody id="quality-tbody"></tbody>
+  </table>
+</div>
 </div>
 
-<div class="df-section">
-  <div class="df-section-label">③ DB 同期パイプライン</div>
-  <div style="overflow-x:auto;">
-  <svg width="700" height="80" style="display:block;">
-    <!-- results/ -->
-    <rect x="10" y="10" width="160" height="60" rx="7" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
-    <text x="90" y="32" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace" font-weight="600">results/hanoi/</text>
-    <text x="90" y="48" text-anchor="middle" fill="#6e7681" font-size="9" font-family="monospace">*/meta.json</text>
-    <text x="90" y="61" text-anchor="middle" fill="#6e7681" font-size="9" font-family="monospace">*/summary.json</text>
+<!-- ════════ Tab 4: Refactor History ════════ -->
+<div class="tab-pane" id="tab-3">
+<div id="history-container">
 
-    <!-- arrow -->
-    <line x1="172" y1="40" x2="218" y2="40" stroke="#bc8cff60" stroke-width="1.5" marker-end="url(#arr3)"/>
-    <text x="195" y="33" text-anchor="middle" fill="#7d8590" font-size="9">再帰検出</text>
-
-    <!-- sync.sh -->
-    <rect x="220" y="10" width="160" height="60" rx="7" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
-    <text x="300" y="32" text-anchor="middle" fill="#8b949e" font-size="11" font-family="monospace" font-weight="600">db/sync.sh</text>
-    <text x="300" y="48" text-anchor="middle" fill="#6e7681" font-size="9">sync_one.py を呼び出し</text>
-    <text x="300" y="61" text-anchor="middle" fill="#6e7681" font-size="9">（冪等・重複スキップ）</text>
-
-    <!-- arrow -->
-    <line x1="382" y1="40" x2="427" y2="40" stroke="#bc8cff60" stroke-width="1.5" marker-end="url(#arr3)"/>
-
-    <!-- sync_one -->
-    <rect x="429" y="10" width="125" height="60" rx="7" fill="#bc8cff15" stroke="#bc8cff" stroke-width="1.5"/>
-    <text x="491" y="37" text-anchor="middle" fill="#bc8cff" font-size="11" font-weight="600">sync_one.py</text>
-    <text x="491" y="52" text-anchor="middle" fill="#bc8cff80" font-size="9">psycopg2</text>
-
-    <!-- arrow -->
-    <line x1="556" y1="40" x2="600" y2="40" stroke="#bc8cff60" stroke-width="1.5" marker-end="url(#arr3)"/>
-
-    <!-- PostgreSQL -->
-    <rect x="602" y="10" width="88" height="60" rx="7" fill="#bc8cff10" stroke="#bc8cff60" stroke-width="1.5" stroke-dasharray="4 3"/>
-    <text x="646" y="37" text-anchor="middle" fill="#bc8cff80" font-size="10" font-weight="600">PostgreSQL</text>
-    <text x="646" y="52" text-anchor="middle" fill="#6e7681" font-size="9">db コンテナ</text>
-  </svg>
+  <div class="history-summary">
+    <div class="summary-card">
+      <div class="arrow"><span class="before">9</span> → <span class="after">2</span></div>
+      <div class="clabel">CC violations (78% 削減)</div>
+    </div>
+    <div class="summary-card">
+      <div class="arrow"><span class="before">36</span> → <span class="after">8</span></div>
+      <div class="clabel">最大 CC (generate_with_hidden_states)</div>
+    </div>
+    <div class="summary-card">
+      <div class="arrow"><span class="before">19</span></div>
+      <div class="clabel">リファクタした関数の総数</div>
+    </div>
+    <div class="summary-card">
+      <div class="arrow"><span class="before">0</span></div>
+      <div class="clabel">MI 違反 (変化なし)</div>
+    </div>
   </div>
-</div>
 
-<div class="df-section" style="margin-top:8px;">
-  <div class="df-section-label">⚠️ 注意事項</div>
-  <div style="background:#f8514910;border:1px solid #f8514960;border-radius:8px;padding:12px 16px;font-size:12px;line-height:1.8;max-width:700px;">
-    <strong style="color:#f85149;">analyze_slowing.py</strong> が定数
-    <code style="font-family:monospace;background:#21262d;padding:1px 5px;border-radius:3px;">PHASE_DIAGRAM_DIR</code>・
-    <code style="font-family:monospace;background:#21262d;padding:1px 5px;border-radius:3px;">PQ_SWEEP_DIR</code> にて
-    <code style="font-family:monospace;background:#21262d;padding:1px 5px;border-radius:3px;">results/hanoi/phase_diagram/</code> と
-    <code style="font-family:monospace;background:#21262d;padding:1px 5px;border-radius:3px;">results/hanoi/pq_sweep/</code>
-    を参照しており、これらは <code style="font-family:monospace;background:#21262d;padding:1px 5px;border-radius:3px;">archive/results_legacy/</code> に移行済みのため <strong style="color:#f85149;">パスが壊れています</strong>。
-    要修正。
+  <div class="section-title">🔧 関数ごとの Before / After</div>
+  <table class="refactor-table">
+    <thead>
+      <tr>
+        <th>関数名</th>
+        <th>ファイル</th>
+        <th>Before CC</th>
+        <th>After CC</th>
+        <th>削減</th>
+        <th>抽出したヘルパー</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>generate_with_hidden_states</td>
+        <td>runners/run_local.py</td>
+        <td><span class="strike">36</span></td>
+        <td><span class="cc-chip cc-ok">8</span></td>
+        <td class="delta positive">−28</td>
+        <td>12 helpers (_prepare_input_ids, _apply_repetition_penalty, _sample_next_token … )</td>
+      </tr>
+      <tr>
+        <td>main</td>
+        <td>runners/run_local.py</td>
+        <td><span class="strike">10</span></td>
+        <td><span class="cc-chip cc-ok">3</span></td>
+        <td class="delta positive">−7</td>
+        <td>_build_early_stop_cfg, _resolve_output_paths, _write_meta_json</td>
+      </tr>
+      <tr>
+        <td>check_early_stop</td>
+        <td>runners/run.py</td>
+        <td><span class="strike">17</span></td>
+        <td><span class="cc-chip cc-ok">4</span></td>
+        <td class="delta positive">−13</td>
+        <td>_check_think_budget, _check_no_move, _check_move_ceiling, _check_move_loop</td>
+      </tr>
+      <tr>
+        <td>plot_phase_diagram</td>
+        <td>analysis/analyze_integrated.py</td>
+        <td><span class="strike">29</span></td>
+        <td><span class="cc-chip cc-ok">1</span></td>
+        <td class="delta positive">−28</td>
+        <td>_plot_accuracy_heatmap, _plot_accuracy_vs_T, _plot_phase_heatmap, _plot_Tc_boundary, _find_tc, _fit_power_law, _compute_boundary, _annotate_missing_tc</td>
+      </tr>
+      <tr>
+        <td>plot_summary</td>
+        <td>analysis/analyze_integrated.py</td>
+        <td><span class="strike">15</span></td>
+        <td><span class="cc-chip cc-ok">1</span></td>
+        <td class="delta positive">−14</td>
+        <td>_plot_qea_vs_T, _plot_pm_rate_vs_T, _plot_autocorr, _plot_sg_rate_vs_T</td>
+      </tr>
+      <tr>
+        <td>load_condition</td>
+        <td>analysis/analyze_integrated.py</td>
+        <td><span class="strike">12</span></td>
+        <td><span class="cc-chip cc-ok">9</span></td>
+        <td class="delta positive">−3</td>
+        <td>_early_stop_rate, _load_hidden_from_dir</td>
+      </tr>
+      <tr>
+        <td>classify_phase</td>
+        <td>analysis/analyze_integrated.py</td>
+        <td><span class="strike">10</span></td>
+        <td><span class="cc-chip cc-ok">5</span></td>
+        <td class="delta positive">−5</td>
+        <td>_is_paramagnetic, _is_spin_glass</td>
+      </tr>
+      <tr>
+        <td>print_report</td>
+        <td>analysis/analyze_phase_diagram.py</td>
+        <td><span class="strike">17</span></td>
+        <td><span class="cc-chip cc-ok">1</span></td>
+        <td class="delta positive">−16</td>
+        <td>_print_accuracy_table, _print_boundary_section, _print_early_stop_section, _print_suggestions_section</td>
+      </tr>
+      <tr>
+        <td>plot_phase_diagram</td>
+        <td>analysis/analyze_phase_diagram.py</td>
+        <td><span class="strike">14</span></td>
+        <td><span class="cc-chip cc-ok">1</span></td>
+        <td class="delta positive">−13</td>
+        <td>_plot_heatmap_panel, _plot_accuracy_curve_panel, _plot_token_curve_panel, _plot_boundary_fit_panel</td>
+      </tr>
+      <tr>
+        <td>plot_summary</td>
+        <td>analysis/analyze_pq.py</td>
+        <td><span class="strike">15</span></td>
+        <td><span class="cc-chip cc-ok">1</span></td>
+        <td class="delta positive">−14</td>
+        <td>_render_pq_cell, _render_pq_cell_na, _plot_qea_vs_t, _plot_pm_rate_vs_t, _plot_autocorr, _plot_phase_heatmap</td>
+      </tr>
+      <tr>
+        <td>print_report</td>
+        <td>analysis/analyze_pq.py</td>
+        <td><span class="strike">15</span></td>
+        <td><span class="cc-chip cc-ok">1</span></td>
+        <td class="delta positive">−14</td>
+        <td>_print_main_table, _print_transition_temperatures, _find_crossing</td>
+      </tr>
+      <tr>
+        <td>load_condition</td>
+        <td>analysis/analyze_pq.py</td>
+        <td><span class="strike">14</span></td>
+        <td><span class="cc-chip cc-ok">3</span></td>
+        <td class="delta positive">−11</td>
+        <td>_load_npz_for_condition, _parse_summary</td>
+      </tr>
+      <tr>
+        <td>print_report</td>
+        <td>analysis/analyze_slowing.py</td>
+        <td><span class="strike">12</span></td>
+        <td><span class="cc-chip cc-ok">1</span></td>
+        <td class="delta positive">−11</td>
+        <td>_print_N_section, _print_sgpm_transitions</td>
+      </tr>
+      <tr>
+        <td>main</td>
+        <td>analysis/analyze_slowing.py</td>
+        <td><span class="strike">11</span></td>
+        <td><span class="cc-chip cc-ok">3</span></td>
+        <td class="delta positive">−8</td>
+        <td>_run_fits, _save_plots</td>
+      </tr>
+      <tr>
+        <td>collect_all</td>
+        <td>analysis/analyze_slowing.py</td>
+        <td><span class="strike">10</span></td>
+        <td><span class="cc-chip cc-ok">5</span></td>
+        <td class="delta positive">−5</td>
+        <td>_collect_from_dir, _merge_into</td>
+      </tr>
+      <tr>
+        <td>analyze_trial</td>
+        <td>analysis/cosine_sim_phase.py</td>
+        <td><span class="strike">15</span></td>
+        <td><span class="cc-chip cc-ok">5</span></td>
+        <td class="delta positive">−10</td>
+        <td>_consecutive_sims, _allpair_sims, _centroid_sims</td>
+      </tr>
+      <tr>
+        <td>summarize</td>
+        <td>analysis/cosine_sim_phase.py</td>
+        <td><span class="strike">11</span></td>
+        <td><span class="cc-chip cc-ok">4</span></td>
+        <td class="delta positive">−7</td>
+        <td>_print_metric</td>
+      </tr>
+      <tr>
+        <td>main</td>
+        <td>analysis/cosine_sim_phase.py</td>
+        <td><span class="strike">11</span></td>
+        <td><span class="cc-chip cc-ok">3</span></td>
+        <td class="delta positive">−8</td>
+        <td>_print_layer_comparison, _print_temp_breakdown, _print_per_trial_detail</td>
+      </tr>
+      <tr>
+        <td>print_report</td>
+        <td>tools/measure_quality.py</td>
+        <td><span class="strike">19</span></td>
+        <td><span class="cc-chip cc-ok">3</span></td>
+        <td class="delta positive">−16</td>
+        <td>_print_file_row, _collect_cc_violations, _print_summary_block</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">⚠️ 残存違反（意図的に据え置き）</div>
+  <div class="remaining-card">
+    <div class="rfile">runners/run.py — query_ollama (CC=15)</div>
+    <div class="rfunc">アルゴリズム: Ollama API 経由のランナー本体</div>
+    <div class="rreason">据え置き理由: 現在の実験は run_local.py（HF Transformers）を使用しており、query_ollama は本番では呼ばれない。
+    Ollama 用を分離してもメリットがなく、リファクタリングで挙動が変わるリスクがある。</div>
   </div>
-</div>
+  <div class="remaining-card">
+    <div class="rfile">runners/test_model_architecture.py — print_summary (CC=13), run_t3 (CC=12), run_t1 (CC=11), run_t4 (CC=11), run_t5 (CC=10)</div>
+    <div class="rfunc">テストユーティリティ — モデル別チェックリスト形式</div>
+    <div class="rreason">据え置き理由: テスト検証スクリプト特有の assertion チェーンで CC が高い。
+    分割しても可読性・テスト独立性が下がるだけ。本番コードではない。</div>
+  </div>
 
 </div>
 </div>
 
-<!-- ─── Panel: Metrics ─── -->
-<div class="panel" id="panel-metrics">
-<div id="metrics-wrap">
-<div class="mt-title">品質メトリクス一覧</div>
-<table id="metrics-table">
-<thead>
-<tr>
-  <th onclick="sortTable(0)">ファイル <span class="sort-arrow">↕</span></th>
-  <th onclick="sortTable(1)">レイヤー <span class="sort-arrow">↕</span></th>
-  <th onclick="sortTable(2)">LOC <span class="sort-arrow">↕</span></th>
-  <th onclick="sortTable(3)">CC 合計 <span class="sort-arrow">↕</span></th>
-  <th onclick="sortTable(4)">CC 最大 <span class="sort-arrow">↕</span></th>
-  <th onclick="sortTable(5)">CC 平均 <span class="sort-arrow">↕</span></th>
-  <th onclick="sortTable(6)">関数数 <span class="sort-arrow">↕</span></th>
-  <th onclick="sortTable(7)">MI <span class="sort-arrow">↕</span></th>
-  <th>主な問題関数</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-  <td class="td-file">runners/run_local.py</td>
-  <td><span class="badge badge-runners">runners</span></td>
-  <td>698</td>
-  <td>77</td>
-  <td class="cc-cell cc-bad">36</td>
-  <td>5.9</td>
-  <td>13</td>
-  <td class="mi-cell mi-warn">40.3</td>
-  <td><code>generate_with_hidden_states</code> CC=36</td>
-</tr>
-<tr>
-  <td class="td-file">analysis/analyze_integrated.py</td>
-  <td><span class="badge badge-analysis">analysis</span></td>
-  <td>579</td>
-  <td>110</td>
-  <td class="cc-cell cc-bad">29</td>
-  <td>8.5</td>
-  <td>13</td>
-  <td class="mi-cell mi-bad">25.6</td>
-  <td><code>plot_phase_diagram</code> CC=29</td>
-</tr>
-<tr>
-  <td class="td-file">analysis/analyze_phase_diagram.py</td>
-  <td><span class="badge badge-analysis">analysis</span></td>
-  <td>383</td>
-  <td>54</td>
-  <td class="cc-cell cc-bad">17</td>
-  <td>6.8</td>
-  <td>8</td>
-  <td class="mi-cell mi-warn">44.5</td>
-  <td><code>print_report</code> CC=17</td>
-</tr>
-<tr>
-  <td class="td-file">runners/run.py</td>
-  <td><span class="badge badge-runners">runners</span></td>
-  <td>588</td>
-  <td>69</td>
-  <td class="cc-cell cc-bad">17</td>
-  <td>5.8</td>
-  <td>12</td>
-  <td class="mi-cell mi-warn">46.8</td>
-  <td><code>check_early_stop</code> CC=17, <code>query_ollama</code> CC=15</td>
-</tr>
-<tr>
-  <td class="td-file">analysis/cosine_sim_phase.py</td>
-  <td><span class="badge badge-analysis">analysis</span></td>
-  <td>150</td>
-  <td>47</td>
-  <td class="cc-cell cc-bad">15</td>
-  <td>9.4</td>
-  <td>5</td>
-  <td class="mi-cell mi-warn">46.4</td>
-  <td><code>analyze_trial</code> CC=15（LOC比で高密度）</td>
-</tr>
-<tr>
-  <td class="td-file">analysis/analyze_pq.py</td>
-  <td><span class="badge badge-analysis">analysis</span></td>
-  <td>544</td>
-  <td>91</td>
-  <td class="cc-cell cc-bad">15</td>
-  <td>7.0</td>
-  <td>13</td>
-  <td class="mi-cell mi-warn">36.3</td>
-  <td><code>load_condition</code> CC=14, <code>plot_summary</code> CC=15</td>
-</tr>
-<tr>
-  <td class="td-file">runners/test_model_architecture.py</td>
-  <td><span class="badge badge-runners">runners</span></td>
-  <td>723</td>
-  <td>91</td>
-  <td class="cc-cell cc-bad">13</td>
-  <td>6.5</td>
-  <td>14</td>
-  <td class="mi-cell mi-warn">38.5</td>
-  <td><code>run_t3</code> CC=12, <code>run_t4</code> CC=11</td>
-</tr>
-<tr>
-  <td class="td-file">analysis/analyze_slowing.py</td>
-  <td><span class="badge badge-analysis">analysis</span></td>
-  <td>690</td>
-  <td>82</td>
-  <td class="cc-cell cc-bad">12</td>
-  <td>5.9</td>
-  <td>14</td>
-  <td class="mi-cell mi-warn">35.0</td>
-  <td><code>print_report</code> CC=12 ⚠️ パス壊れあり</td>
-</tr>
-<tr>
-  <td class="td-file">envs/hanoi_env.py</td>
-  <td><span class="badge badge-envs">envs</span></td>
-  <td>331</td>
-  <td>72</td>
-  <td class="cc-cell cc-warn">8</td>
-  <td>2.3</td>
-  <td>31</td>
-  <td class="mi-cell mi-warn">46.8</td>
-  <td>多メソッドで分散、許容範囲</td>
-</tr>
-<tr>
-  <td class="td-file">analysis/plot_scaling.py</td>
-  <td><span class="badge badge-analysis">analysis</span></td>
-  <td>186</td>
-  <td>20</td>
-  <td class="cc-cell cc-warn">8</td>
-  <td>3.3</td>
-  <td>6</td>
-  <td class="mi-cell mi-ok">59.2</td>
-  <td>—</td>
-</tr>
-<tr>
-  <td class="td-file">db/sync_one.py</td>
-  <td><span class="badge badge-db">db</span></td>
-  <td>140</td>
-  <td>9</td>
-  <td class="cc-cell cc-warn">9</td>
-  <td>9.0</td>
-  <td>1</td>
-  <td class="mi-cell mi-ok">71.0</td>
-  <td>単一関数のため CC 高め、許容範囲</td>
-</tr>
-<tr>
-  <td class="td-file">tests/test_early_stop.py</td>
-  <td><span class="badge badge-tests">tests</span></td>
-  <td>141</td>
-  <td>34</td>
-  <td class="cc-cell cc-ok">3</td>
-  <td>2.3</td>
-  <td>15</td>
-  <td class="mi-cell mi-ok">64.4</td>
-  <td>問題なし ✓</td>
-</tr>
-</tbody>
-</table>
-<div style="margin-top:12px;font-size:11px;color:var(--muted);line-height:1.8;">
-  CC = 循環的複雑度（Cyclomatic Complexity）。推奨 &lt; 5、要改善 ≥ 10。<br>
-  MI = 保守性指数（Maintainability Index）。推奨 ≥ 65、要改善 &lt; 20。<br>
-  radon v6 で計測。
-</div>
-</div>
-</div>
-
-<div id="tooltip"></div>
-
-<!-- ─── D3 Script ─── -->
 <script>
-// ─── Data ───
-const LAYER_COLOR = {
-  envs:     "#3fb950",
+// ════════ Tab switching ════════
+function switchTab(idx) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===idx));
+  document.querySelectorAll('.tab-pane').forEach((p,i) => p.classList.toggle('active', i===idx));
+  if (idx === 0 && !window._graphInited) initGraph();
+}
+
+// ════════ Quality table data ════════
+const FILES = [
+  { path:"runners/run.py",                 loc:495, cc_max:15, cc_mean:4.75, mi:45.8, mi_rank:"A", violations:["query_ollama (CC=15)"] },
+  { path:"runners/test_model_arch…py",     loc:608, cc_max:13, cc_mean:6.50, mi:38.5, mi_rank:"A", violations:["print_summary (CC=13)", "run_t3 (CC=12)", "run_t1 (CC=11)", "run_t4 (CC=11)", "run_t5 (CC=10)"] },
+  { path:"analysis/analyze_integrated.py", loc:579, cc_max:9,  cc_mean:4.45, mi:21.1, mi_rank:"A", violations:[] },
+  { path:"analysis/analyze_slowing.py",    loc:611, cc_max:9,  cc_mean:4.20, mi:33.5, mi_rank:"A", violations:[] },
+  { path:"runners/run_local.py",           loc:700, cc_max:9,  cc_mean:3.90, mi:38.9, mi_rank:"A", violations:[] },
+  { path:"tools/measure_quality.py",       loc:375, cc_max:9,  cc_mean:3.50, mi:44.2, mi_rank:"A", violations:[] },
+  { path:"db/sync_one.py",                 loc:116, cc_max:9,  cc_mean:3.20, mi:71.0, mi_rank:"A", violations:[] },
+  { path:"envs/hanoi_env.py",              loc:276, cc_max:8,  cc_mean:2.80, mi:46.8, mi_rank:"A", violations:[] },
+  { path:"analysis/analyze_phase_diagram", loc:362, cc_max:8,  cc_mean:2.60, mi:39.5, mi_rank:"A", violations:[] },
+  { path:"analysis/plot_scaling.py",       loc:156, cc_max:8,  cc_mean:3.20, mi:59.2, mi_rank:"A", violations:[] },
+  { path:"analysis/analyze_pq.py",         loc:542, cc_max:7,  cc_mean:2.50, mi:36.1, mi_rank:"A", violations:[] },
+  { path:"analysis/cosine_sim_phase.py",   loc:135, cc_max:7,  cc_mean:2.40, mi:40.7, mi_rank:"A", violations:[] },
+  { path:"tests/test_early_stop.py",       loc:116, cc_max:3,  cc_mean:1.50, mi:64.4, mi_rank:"A", violations:[] },
+];
+
+function ccChip(v) {
+  if (v >= 15) return `<span class="cc-chip cc-bad">${v}</span>`;
+  if (v >= 10) return `<span class="cc-chip cc-warn">${v}</span>`;
+  return `<span class="cc-chip cc-ok">${v}</span>`;
+}
+
+const tbody = document.getElementById('quality-tbody');
+FILES.forEach(f => {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td style="font-size:11px">${f.path}</td>
+    <td style="text-align:right">${f.loc}</td>
+    <td style="text-align:center">${ccChip(f.cc_max)}</td>
+    <td style="text-align:right">${f.cc_mean.toFixed(2)}</td>
+    <td style="text-align:right">${f.mi.toFixed(1)}</td>
+    <td style="text-align:center">${f.mi_rank}</td>
+    <td style="font-size:10px;color:${f.violations.length ? 'var(--cc-warn)' : 'var(--muted)'}">
+      ${f.violations.length ? f.violations.join('<br>') : '—'}
+    </td>`;
+  tbody.appendChild(tr);
+});
+
+// Simple sort
+let sortDir = {};
+function sortTable(col) {
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const asc = sortDir[col] = !sortDir[col];
+  rows.sort((a,b) => {
+    const av = a.cells[col].textContent.trim();
+    const bv = b.cells[col].textContent.trim();
+    const an = parseFloat(av), bn = parseFloat(bv);
+    const cmp = isNaN(an) ? av.localeCompare(bv) : an - bn;
+    return asc ? cmp : -cmp;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+// ════════ D3 Dependency Graph ════════
+window._graphInited = false;
+
+const NODES = [
+  // runners
+  { id:"run_local",    label:"run_local.py",           group:"runners",  loc:700, cc:9,  desc:"HF実験ランナー (NF4量子化・隠れ状態キャプチャ)" },
+  { id:"run",          label:"run.py",                 group:"runners",  loc:495, cc:15, desc:"早期終了ライブラリ + Ollamaランナー" },
+  { id:"test_arch",    label:"test_model_arch.py",     group:"runners",  loc:608, cc:13, desc:"新モデル追加時の事前検証スクリプト" },
+  // analysis
+  { id:"integrated",   label:"analyze_integrated.py",  group:"analysis", loc:579, cc:9,  desc:"full_sweep + collapse_phase の統合相図" },
+  { id:"phase_diag",   label:"analyze_phase_diagram.py",group:"analysis",loc:362, cc:8,  desc:"相図 (accuracy + early_stop 内訳)" },
+  { id:"pq",           label:"analyze_pq.py",          group:"analysis", loc:542, cc:7,  desc:"P(q) 分布・q_EA・自己相関" },
+  { id:"slowing",      label:"analyze_slowing.py",     group:"analysis", loc:611, cc:9,  desc:"クリティカルスローイング・フィッティング" },
+  { id:"cosine",       label:"cosine_sim_phase.py",    group:"analysis", loc:135, cc:7,  desc:"隠れ状態ベクトルのコサイン類似度 (SG vs PM)" },
+  { id:"scaling",      label:"plot_scaling.py",        group:"analysis", loc:156, cc:8,  desc:"スケーリング則 Tc(N) プロット" },
+  // envs
+  { id:"hanoi",        label:"hanoi_env.py",           group:"envs",     loc:276, cc:8,  desc:"Tower of Hanoi env + evaluate_state()" },
+  // db
+  { id:"sync_one",     label:"db/sync_one.py",         group:"db",       loc:116, cc:9,  desc:"meta.json → PostgreSQL 同期 (psycopg2)" },
+  // tools
+  { id:"quality",      label:"measure_quality.py",     group:"tools",    loc:375, cc:9,  desc:"radon CC/MI 計測 + CI exit code" },
+  // tests
+  { id:"tests",        label:"test_early_stop.py",     group:"tests",    loc:116, cc:3,  desc:"アルゴリズム D/E 単体テスト (pytest)" },
+  // external
+  { id:"transformers", label:"transformers",            group:"external", loc:0,   cc:0,  desc:"HuggingFace Transformers (model load / generate)" },
+  { id:"torch",        label:"torch",                  group:"external", loc:0,   cc:0,  desc:"PyTorch (CUDA tensors / inference)" },
+  { id:"bitsandbytes", label:"bitsandbytes",           group:"external", loc:0,   cc:0,  desc:"NF4 4-bit quantization (14B models)" },
+  { id:"numpy",        label:"numpy",                  group:"external", loc:0,   cc:0,  desc:"数値計算 (npz 読み書き含む)" },
+  { id:"scipy",        label:"scipy",                  group:"external", loc:0,   cc:0,  desc:"統計処理 (curve_fit etc.)" },
+  { id:"matplotlib",   label:"matplotlib",             group:"external", loc:0,   cc:0,  desc:"図の描画 (PNG 出力)" },
+  { id:"psycopg2",     label:"psycopg2",               group:"external", loc:0,   cc:0,  desc:"PostgreSQL クライアント" },
+  { id:"radon",        label:"radon",                  group:"external", loc:0,   cc:0,  desc:"CC / MI 計測 CLI" },
+];
+
+const LINKS = [
+  // internal
+  { source:"run_local",  target:"run",          type:"import" },
+  { source:"run_local",  target:"hanoi",        type:"import" },
+  { source:"tests",      target:"run",          type:"import" },
+  { source:"integrated", target:"phase_diag",   type:"calls"  },
+  { source:"integrated", target:"pq",           type:"calls"  },
+  { source:"integrated", target:"slowing",      type:"calls"  },
+  // runners → external
+  { source:"run_local",  target:"transformers", type:"import" },
+  { source:"run_local",  target:"torch",        type:"import" },
+  { source:"run_local",  target:"bitsandbytes", type:"import" },
+  { source:"run_local",  target:"numpy",        type:"import" },
+  { source:"test_arch",  target:"transformers", type:"import" },
+  { source:"test_arch",  target:"torch",        type:"import" },
+  // analysis → external
+  { source:"integrated", target:"numpy",        type:"import" },
+  { source:"integrated", target:"scipy",        type:"import" },
+  { source:"integrated", target:"matplotlib",   type:"import" },
+  { source:"phase_diag", target:"numpy",        type:"import" },
+  { source:"phase_diag", target:"matplotlib",   type:"import" },
+  { source:"pq",         target:"numpy",        type:"import" },
+  { source:"pq",         target:"scipy",        type:"import" },
+  { source:"pq",         target:"matplotlib",   type:"import" },
+  { source:"slowing",    target:"numpy",        type:"import" },
+  { source:"slowing",    target:"scipy",        type:"import" },
+  { source:"slowing",    target:"matplotlib",   type:"import" },
+  { source:"cosine",     target:"numpy",        type:"import" },
+  { source:"scaling",    target:"numpy",        type:"import" },
+  { source:"scaling",    target:"matplotlib",   type:"import" },
+  // db / tools
+  { source:"sync_one",   target:"psycopg2",     type:"import" },
+  { source:"quality",    target:"radon",        type:"import" },
+];
+
+const GROUP_COLOR = {
   runners:  "#58a6ff",
   analysis: "#f0883e",
+  envs:     "#3fb950",
   db:       "#bc8cff",
   tests:    "#8b949e",
+  tools:    "#ffa657",
   external: "#30363d",
 };
 
-const nodes = [
-  { id: "envs/hanoi_env.py",             short: "hanoi_env",         layer:"envs",     loc:331, cc_max:8,  cc_total:72,  mi:46.8,
-    classes:["BaseEnv","TowerOfHanoiEnv"],
-    exports:["TowerOfHanoiEnv","BaseEnv","evaluate_state","goal_reached","solve"],
-    desc:"環境定義・推論ポテンシャル V(x) の計算基盤。全 runner が依存する唯一のコアモジュール。" },
+function ccRingColor(cc) {
+  if (cc >= 15) return "#f85149";
+  if (cc >= 10) return "#d29922";
+  return "#3fb950";
+}
 
-  { id: "runners/run.py",                short: "run.py",            layer:"runners",  loc:588, cc_max:17, cc_total:69,  mi:46.8,
-    classes:["EarlyStopConfig"],
-    exports:["EarlyStopConfig","check_early_stop","_MOVE_RE","calc_num_predict","calc_think_budget_ratio","calc_default_trials","_estimate_reasoning_tokens"],
-    desc:"早期終了アルゴリズム A〜E の共通ライブラリ。Ollama API ランナーも兼ねる。run_local.py はここから import する。",
-    warning:null },
-
-  { id: "runners/run_local.py",          short: "run_local.py",      layer:"runners",  loc:698, cc_max:36, cc_total:77,  mi:40.3,
-    classes:["ModelProfile","GenerationResult"],
-    exports:["generate_with_hidden_states","load_model_and_tokenizer","run_experiment_hf","ModelProfile","GenerationResult","make_capture_layers","resolve_model_profile"],
-    desc:"メイン実験エントリポイント。HF Transformers + NF4量子化 + hidden state npz 保存。CC最大値 36 は最優先リファクタリング対象。" },
-
-  { id: "runners/test_model_arch.py",    short: "test_model_arch",   layer:"runners",  loc:723, cc_max:13, cc_total:91,  mi:38.5,
-    classes:[],
-    exports:["（CLIツール、非import）"],
-    desc:"新モデル追加時の事前検証ツール（T0〜T5）。run_local.py から多くのシンボルを import する。" },
-
-  { id: "analysis/analyze_integrated.py",   short: "analyze_integrated",  layer:"analysis", loc:579, cc_max:29, cc_total:110, mi:25.6,
-    classes:[],
-    exports:["（CLIツール）"],
-    desc:"full_sweep + collapse_phase の統合相図・P(q) 解析。MI=25.6 は全ファイル中最低。filesystem I/O のみ（内部 import なし）。" },
-
-  { id: "analysis/analyze_phase_diagram.py", short: "analyze_phase_diag",  layer:"analysis", loc:383, cc_max:17, cc_total:54,  mi:44.5,
-    classes:[],
-    exports:["（CLIツール）"],
-    desc:"full_sweep 相図の描画・T_c(N) 推定。" },
-
-  { id: "analysis/analyze_pq.py",            short: "analyze_pq",          layer:"analysis", loc:544, cc_max:15, cc_total:91,  mi:36.3,
-    classes:[],
-    exports:["（CLIツール）"],
-    desc:"P(q) 分布・q_EA・SG 判別。npz から hidden state を読み込む。" },
-
-  { id: "analysis/analyze_slowing.py",       short: "analyze_slowing",     layer:"analysis", loc:690, cc_max:12, cc_total:82,  mi:35.0,
-    classes:[],
-    exports:["（CLIツール）"],
-    desc:"臨界減速の検証。",
-    warning:"PHASE_DIAGRAM_DIR / PQ_SWEEP_DIR が archive 済みのパスを参照しており壊れています。要修正。" },
-
-  { id: "analysis/cosine_sim_phase.py",      short: "cosine_sim_phase",    layer:"analysis", loc:150, cc_max:15, cc_total:47,  mi:46.4,
-    classes:[],
-    exports:["（CLIツール）"],
-    desc:"SG vs PM の hidden state コサイン類似度比較。LOC 150 に対して CC=15 と密度が高い。" },
-
-  { id: "analysis/plot_scaling.py",          short: "plot_scaling",        layer:"analysis", loc:186, cc_max:8,  cc_total:20,  mi:59.2,
-    classes:["Trial"],
-    exports:["（CLIツール）"],
-    desc:"accuracy・token 使用量 vs N のスケーリング則。" },
-
-  { id: "db/sync_one.py",                    short: "sync_one",            layer:"db",       loc:140, cc_max:9,  cc_total:9,   mi:71.0,
-    classes:[],
-    exports:["（CLIツール）"],
-    desc:"meta.json を検出して PostgreSQL に取り込む。冪等（重複スキップ）。" },
-
-  { id: "tests/test_early_stop.py",          short: "test_early_stop",     layer:"tests",    loc:141, cc_max:3,  cc_total:34,  mi:64.4,
-    classes:["TestAlgorithmD","TestAlgorithmE"],
-    exports:["（テストスイート）"],
-    desc:"早期終了アルゴリズム D/E の単体テスト。品質良好。" },
-
-  // External deps
-  { id:"ext:pytorch",   short:"PyTorch\n+Transformers",  layer:"external", ext:true },
-  { id:"ext:numpy",     short:"NumPy",                   layer:"external", ext:true },
-  { id:"ext:matplotlib",short:"Matplotlib",              layer:"external", ext:true },
-  { id:"ext:scipy",     short:"SciPy",                   layer:"external", ext:true },
-  { id:"ext:requests",  short:"Requests\n(Ollama)",      layer:"external", ext:true },
-  { id:"ext:psycopg2",  short:"psycopg2\n(PostgreSQL)",  layer:"external", ext:true },
-  { id:"ext:pytest",    short:"pytest",                  layer:"external", ext:true },
-];
-
-const edges = [
-  // Internal import edges
-  { source:"runners/run.py",             target:"envs/hanoi_env.py",          imports:["TowerOfHanoiEnv"],                                            w:1 },
-  { source:"runners/run_local.py",       target:"envs/hanoi_env.py",          imports:["TowerOfHanoiEnv"],                                            w:1 },
-  { source:"runners/run_local.py",       target:"runners/run.py",             imports:["EarlyStopConfig","check_early_stop","_MOVE_RE","calc_num_predict","calc_think_budget_ratio","calc_default_trials","_estimate_reasoning_tokens"], w:7 },
-  { source:"runners/test_model_arch.py", target:"envs/hanoi_env.py",          imports:["TowerOfHanoiEnv"],                                            w:1 },
-  { source:"runners/test_model_arch.py", target:"runners/run.py",             imports:["calc_num_predict"],                                           w:1 },
-  { source:"runners/test_model_arch.py", target:"runners/run_local.py",       imports:["GenerationResult","ModelProfile","generate_with_hidden_states","load_model_and_tokenizer","make_capture_layers","resolve_model_profile","run_experiment_hf","_MOVE_RE_WITH_DISK"], w:8 },
-  { source:"tests/test_early_stop.py",   target:"runners/run.py",             imports:["check_early_stop","EarlyStopConfig"],                         w:2 },
-  // External edges
-  { source:"runners/run_local.py",           target:"ext:pytorch",     ext:true, w:1 },
-  { source:"runners/test_model_arch.py",     target:"ext:pytorch",     ext:true, w:1 },
-  { source:"runners/run_local.py",           target:"ext:numpy",       ext:true, w:1 },
-  { source:"analysis/analyze_pq.py",         target:"ext:numpy",       ext:true, w:1 },
-  { source:"analysis/analyze_integrated.py", target:"ext:numpy",       ext:true, w:1 },
-  { source:"analysis/cosine_sim_phase.py",   target:"ext:numpy",       ext:true, w:1 },
-  { source:"analysis/analyze_slowing.py",    target:"ext:numpy",       ext:true, w:1 },
-  { source:"analysis/analyze_integrated.py", target:"ext:matplotlib",  ext:true, w:1 },
-  { source:"analysis/analyze_phase_diagram.py",target:"ext:matplotlib",ext:true, w:1 },
-  { source:"analysis/analyze_pq.py",         target:"ext:matplotlib",  ext:true, w:1 },
-  { source:"analysis/analyze_slowing.py",    target:"ext:matplotlib",  ext:true, w:1 },
-  { source:"analysis/plot_scaling.py",       target:"ext:matplotlib",  ext:true, w:1 },
-  { source:"analysis/analyze_slowing.py",    target:"ext:scipy",       ext:true, w:1 },
-  { source:"analysis/cosine_sim_phase.py",   target:"ext:scipy",       ext:true, w:1 },
-  { source:"runners/run.py",                 target:"ext:requests",    ext:true, w:1 },
-  { source:"db/sync_one.py",                 target:"ext:psycopg2",    ext:true, w:1 },
-  { source:"tests/test_early_stop.py",       target:"ext:pytest",      ext:true, w:1 },
-];
-
-// ─── D3 Graph ───
-const svg = d3.select("#graph-svg");
-const container = document.getElementById("graph-wrap").children[0];
-
-function drawGraph() {
-  const W = container.clientWidth;
-  const H = container.clientHeight;
-  svg.attr("width", W).attr("height", H);
-  svg.selectAll("*").remove();
-
-  // Arrow markers
-  const defs = svg.append("defs");
-  ["internal", "external"].forEach(t => {
-    defs.append("marker")
-      .attr("id", `arrow-${t}`)
-      .attr("viewBox","0 -4 8 8")
-      .attr("refX", 18).attr("refY", 0)
-      .attr("markerWidth", 6).attr("markerHeight", 6)
-      .attr("orient","auto")
-      .append("path")
-      .attr("d","M0,-4L8,0L0,4")
-      .attr("fill", t === "internal" ? "#58a6ff60" : "#30363d80");
-  });
+function initGraph() {
+  window._graphInited = true;
+  const svg = d3.select("#graph-svg");
+  const W = svg.node().clientWidth || 900;
+  const H = svg.node().clientHeight || 600;
 
   const g = svg.append("g");
 
@@ -833,264 +835,107 @@ function drawGraph() {
     .scaleExtent([0.3, 3])
     .on("zoom", e => g.attr("transform", e.transform)));
 
-  // Node radius by LOC
-  const locExtent = d3.extent(nodes.filter(n => !n.ext), n => n.loc);
-  const rScale = d3.scaleSqrt().domain(locExtent).range([16, 34]);
-
-  // Initial positions
-  const cx = W / 2, cy = H / 2;
-  const layerPos = {
-    envs:     { x: cx - 220, y: cy + 40 },
-    runners:  { x: cx,       y: cy - 60 },
-    analysis: { x: cx + 180, y: cy + 40 },
-    db:       { x: cx - 80,  y: cy + 160 },
-    tests:    { x: cx + 60,  y: cy + 160 },
-    external: { x: cx + 340, y: cy - 60 },
-  };
-  const layerCounts = {};
-  nodes.forEach(n => {
-    layerCounts[n.layer] = (layerCounts[n.layer] || 0) + 1;
-  });
-  const layerIdx = {};
-  nodes.forEach(n => {
-    layerIdx[n.layer] = (layerIdx[n.layer] || 0);
-    const count = layerCounts[n.layer];
-    const pos = layerPos[n.layer];
-    const angle = (layerIdx[n.layer] / count) * 2 * Math.PI - Math.PI / 2;
-    const spread = n.ext ? 90 : 60;
-    n.x = pos.x + Math.cos(angle) * spread;
-    n.y = pos.y + Math.sin(angle) * spread;
-    layerIdx[n.layer]++;
-  });
+  // Arrow marker
+  svg.append("defs").append("marker")
+    .attr("id","arrowhead")
+    .attr("markerWidth",8).attr("markerHeight",8)
+    .attr("refX",12).attr("refY",3)
+    .attr("orient","auto")
+    .append("path").attr("d","M0,0 L0,6 L8,3 z").attr("fill","#30363d");
 
   // Simulation
-  const sim = d3.forceSimulation(nodes)
-    .force("link", d3.forceLink(edges).id(d => d.id).distance(d => d.ext ? 120 : 90).strength(d => d.ext ? 0.2 : 0.4))
-    .force("charge", d3.forceManyBody().strength(d => d.ext ? -60 : -180))
-    .force("x", d3.forceX(d => layerPos[d.layer]?.x ?? cx).strength(0.18))
-    .force("y", d3.forceY(d => layerPos[d.layer]?.y ?? cy).strength(0.18))
-    .force("collision", d3.forceCollide(d => (d.ext ? 26 : rScale(d.loc || 100)) + 8));
+  const sim = d3.forceSimulation(NODES)
+    .force("link", d3.forceLink(LINKS).id(d=>d.id).distance(d => d.source.group==="external"||d.target.group==="external" ? 140 : 100).strength(0.6))
+    .force("charge", d3.forceManyBody().strength(-320))
+    .force("center", d3.forceCenter(W/2, H/2))
+    .force("collision", d3.forceCollide().radius(d => nodeR(d)+14));
 
-  // Edges
+  // Links
   const link = g.append("g").selectAll("line")
-    .data(edges).enter().append("line")
-    .attr("class", d => "link" + (d.ext ? " link-ext" : ""))
-    .attr("stroke", d => d.ext ? "#30363d" : "#58a6ff50")
-    .attr("stroke-width", d => d.ext ? 1 : Math.sqrt(d.w || 1) * 0.9 + 0.5)
-    .attr("marker-end", d => `url(#arrow-${d.ext ? "external" : "internal"})`);
+    .data(LINKS).join("line")
+    .attr("stroke","#30363d")
+    .attr("stroke-width",1.2)
+    .attr("marker-end","url(#arrowhead)");
 
-  // Node groups
-  const node = g.append("g").selectAll(".node")
-    .data(nodes).enter().append("g")
-    .attr("class","node")
+  // Nodes
+  const node = g.append("g").selectAll("g")
+    .data(NODES).join("g")
+    .attr("cursor","pointer")
     .call(d3.drag()
-      .on("start", (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
-      .on("drag",  (e, d) => { d.fx = e.x; d.fy = e.y; })
-      .on("end",   (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }));
+      .on("start", (e,d) => { if(!e.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
+      .on("drag",  (e,d) => { d.fx=e.x; d.fy=e.y; })
+      .on("end",   (e,d) => { if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; })
+    )
+    .on("click", (e,d) => showInfo(d));
 
-  // Circles
+  function nodeR(d) {
+    if (d.group === "external") return 18;
+    return Math.max(20, Math.min(36, 14 + d.loc / 30));
+  }
+
+  // Outer CC ring
+  node.filter(d=>d.group!=="external").append("circle")
+    .attr("r", d=>nodeR(d)+5)
+    .attr("fill","none")
+    .attr("stroke", d=>ccRingColor(d.cc))
+    .attr("stroke-width",2.5)
+    .attr("opacity",.7);
+
+  // Main circle
   node.append("circle")
-    .attr("r", d => d.ext ? 20 : rScale(d.loc))
-    .attr("fill", d => d.ext ? "#21262d" : LAYER_COLOR[d.layer] + "22")
-    .attr("stroke", d => d.ext ? "#444" : LAYER_COLOR[d.layer])
-    .attr("stroke-width", 1.5);
-
-  // CC warning ring (internal only)
-  node.filter(d => !d.ext).append("circle")
-    .attr("class","node-ring")
-    .attr("r", d => rScale(d.loc) + 4)
-    .attr("stroke", d => {
-      if (d.cc_max >= 10) return "#f85149";
-      if (d.cc_max >= 5)  return "#d29922";
-      return "#3fb950";
-    });
+    .attr("r", nodeR)
+    .attr("fill", d=>d.group==="external" ? "#161b22" : d3.color(GROUP_COLOR[d.group]).darker(1.2))
+    .attr("stroke", d=>GROUP_COLOR[d.group])
+    .attr("stroke-width", d=>d.group==="external"?1:1.8);
 
   // Labels
-  node.filter(d => !d.ext).append("text")
-    .attr("class","node-label")
-    .attr("dy", "0.35em")
-    .text(d => d.short);
-
-  node.filter(d => d.ext).each(function(d) {
-    const lines = d.short.split("\n");
-    const el = d3.select(this);
-    lines.forEach((line, i) => {
-      el.append("text")
-        .attr("class","node-label-ext")
-        .attr("dy", `${(i - (lines.length-1)/2) * 12}px`)
-        .text(line);
+  node.append("text")
+    .attr("text-anchor","middle")
+    .attr("dy","0.35em")
+    .attr("font-size", d=>d.group==="external"?9:10)
+    .attr("fill", d=>d.group==="external"?"#6e7681":"#e6edf3")
+    .attr("pointer-events","none")
+    .text(d=>{
+      if (d.group==="external") return d.label;
+      const nm = d.label.replace(".py","");
+      return nm.length>12 ? nm.slice(0,11)+"…" : nm;
     });
-  });
-
-  // Tooltip & click
-  const tooltip = document.getElementById("tooltip");
-  node.on("mousemove", (e, d) => {
-    if (d.ext) {
-      tooltip.innerHTML = `<div class="tt-name">${d.short.replace("\n"," ")}</div><div class="tt-metric">外部ライブラリ</div>`;
-    } else {
-      const ccColor = d.cc_max >= 10 ? "#f85149" : d.cc_max >= 5 ? "#d29922" : "#3fb950";
-      tooltip.innerHTML = `
-        <div class="tt-name">${d.id}</div>
-        <div class="tt-metric">LOC: ${d.loc} ・ CC最大: <span style="color:${ccColor}">${d.cc_max}</span> ・ MI: ${d.mi}</div>`;
-    }
-    tooltip.style.display = "block";
-    tooltip.style.left = (e.clientX + 14) + "px";
-    tooltip.style.top  = (e.clientY - 10) + "px";
-  }).on("mouseleave", () => {
-    tooltip.style.display = "none";
-  }).on("click", (e, d) => {
-    if (d.ext) return;
-    showSidePanel(d, edges);
-    // Highlight
-    link.style("stroke-opacity", l => (l.source.id === d.id || l.target.id === d.id) ? 1 : 0.1);
-    node.select("circle").style("opacity", n => {
-      if (n.id === d.id) return 1;
-      const connected = edges.some(l => (l.source.id === d.id && l.target.id === n.id) ||
-                                        (l.target.id === d.id && l.source.id === n.id));
-      return connected ? 1 : 0.25;
-    });
-  });
-
-  svg.on("click", (e) => {
-    if (e.target === svg.node()) {
-      link.style("stroke-opacity", null);
-      node.select("circle").style("opacity", null);
-      document.getElementById("side-panel").innerHTML = `<div class="sp-hint">ノードをクリックすると<br>詳細が表示されます</div>`;
-    }
-  });
 
   sim.on("tick", () => {
-    link
-      .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
-      .attr("x2", d => {
-        const r = d.target.ext ? 22 : rScale(d.target.loc) + 6;
-        const dx = d.target.x - d.source.x, dy = d.target.y - d.source.y;
-        const dist = Math.sqrt(dx*dx+dy*dy) || 1;
-        return d.target.x - dx/dist*r;
-      })
-      .attr("y2", d => {
-        const r = d.target.ext ? 22 : rScale(d.target.loc) + 6;
-        const dx = d.target.x - d.source.x, dy = d.target.y - d.source.y;
-        const dist = Math.sqrt(dx*dx+dy*dy) || 1;
-        return d.target.y - dy/dist*r;
-      });
-    node.attr("transform", d => `translate(${d.x},${d.y})`);
+    link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y)
+        .attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+    node.attr("transform",d=>`translate(${d.x},${d.y})`);
   });
+
+  // Info panel
+  function showInfo(d) {
+    const deps_out = LINKS.filter(l=>l.source.id===d.id||l.source===d).map(l=>l.target.id||l.target);
+    const deps_in  = LINKS.filter(l=>l.target.id===d.id||l.target===d).map(l=>l.source.id||l.source);
+    const panel = document.getElementById("info-panel");
+    const ring = d.group!=="external"
+      ? `<div class="info-row"><span class="info-label">CC max</span><span class="info-val" style="color:${ccRingColor(d.cc)}">${d.cc}</span></div>`
+      : "";
+    const locRow = d.loc
+      ? `<div class="info-row"><span class="info-label">LOC</span><span class="info-val">${d.loc}</span></div>`
+      : "";
+    panel.innerHTML = `
+      <h3>${d.label}</h3>
+      <div class="info-path">${d.group}</div>
+      <p style="color:var(--muted);font-size:11px;margin-bottom:10px">${d.desc}</p>
+      ${ring}${locRow}
+      <div class="info-section">
+        <h4>依存先 (imports / calls)</h4>
+        ${deps_out.map(x=>`<span class="dep-pill">${x}</span>`).join("") || '<span style="color:var(--muted);font-size:11px">なし</span>'}
+      </div>
+      <div class="info-section">
+        <h4>依存元 (imported by)</h4>
+        ${deps_in.map(x=>`<span class="dep-pill">${x}</span>`).join("") || '<span style="color:var(--muted);font-size:11px">なし</span>'}
+      </div>`;
+  }
 }
 
-// ─── Side Panel ───
-function showSidePanel(d, edges) {
-  const panel = document.getElementById("side-panel");
-  const ccColor = d.cc_max >= 10 ? "bad" : d.cc_max >= 5 ? "warn" : "ok";
-  const miColor = d.mi >= 65 ? "ok" : d.mi >= 20 ? "warn" : "bad";
-  const layerLabel = { envs:"envs",runners:"runners",analysis:"analysis",db:"db",tests:"tests" }[d.layer];
-
-  // incoming imports (what this file imports FROM)
-  const incoming = edges.filter(e => !e.ext && e.source.id === d.id);
-  // outgoing imports (what imports FROM this file)
-  const outgoing = edges.filter(e => !e.ext && e.target.id === d.id);
-
-  const importsHtml = incoming.length ? `
-    <div class="sp-section">依存先（import する）</div>
-    ${incoming.map(e => `
-      <div class="sp-import-row">
-        <div class="sp-import-arrow">→</div>
-        <div>
-          <div style="font-size:11px;font-weight:600;font-family:monospace;">${e.target.id}</div>
-          <div class="sp-import-sym">${e.imports.join(', ')}</div>
-        </div>
-      </div>`).join('')}` : '';
-
-  const usedByHtml = outgoing.length ? `
-    <div class="sp-section">被依存（import される）</div>
-    ${outgoing.map(e => `
-      <div class="sp-import-row">
-        <div class="sp-import-arrow" style="color:var(--analysis)">←</div>
-        <div style="font-size:11px;font-weight:600;font-family:monospace;">${e.source.id}</div>
-      </div>`).join('')}` : '';
-
-  const classesHtml = d.classes?.length ? `
-    <div class="sp-section">クラス</div>
-    <div>${d.classes.map(c => `<span class="sp-chip">${c}</span>`).join('')}</div>` : '';
-
-  const exportsHtml = d.exports?.length ? `
-    <div class="sp-section">主な公開シンボル</div>
-    <div>${d.exports.slice(0,8).map(e => `<span class="sp-chip">${e}</span>`).join('')}${d.exports.length > 8 ? `<span class="sp-chip">+${d.exports.length-8}</span>` : ''}</div>` : '';
-
-  const warningHtml = d.warning ? `<div class="sp-warning">⚠️ ${d.warning}</div>` : '';
-
-  panel.innerHTML = `
-    <div class="sp-filename">${d.layer}</div>
-    <div class="sp-title">${d.short}</div>
-    <div class="sp-desc">${d.desc}</div>
-    <div class="sp-metrics">
-      <div class="sp-metric">
-        <div class="label">LOC</div>
-        <div class="value">${d.loc}</div>
-      </div>
-      <div class="sp-metric ${ccColor}">
-        <div class="label">CC 最大</div>
-        <div class="value">${d.cc_max}</div>
-      </div>
-      <div class="sp-metric">
-        <div class="label">CC 合計</div>
-        <div class="value">${d.cc_total}</div>
-      </div>
-      <div class="sp-metric ${miColor}">
-        <div class="label">MI</div>
-        <div class="value">${d.mi}</div>
-      </div>
-    </div>
-    ${classesHtml}
-    ${exportsHtml}
-    ${importsHtml}
-    ${usedByHtml}
-    ${warningHtml}
-  `;
-}
-
-// ─── Tabs ───
-function switchTab(name) {
-  document.querySelectorAll(".tab").forEach((t,i) => {
-    const names = ["graph","dataflow","metrics"];
-    t.classList.toggle("active", names[i] === name);
-  });
-  document.querySelectorAll(".panel").forEach(p => {
-    p.classList.toggle("active", p.id === `panel-${name}`);
-  });
-  if (name === "graph") setTimeout(drawGraph, 50);
-}
-
-// ─── Table Sort ───
-let sortCol = -1, sortAsc = true;
-function sortTable(col) {
-  const tbody = document.querySelector("#metrics-table tbody");
-  const rows = Array.from(tbody.querySelectorAll("tr"));
-  if (sortCol === col) sortAsc = !sortAsc;
-  else { sortCol = col; sortAsc = true; }
-
-  rows.sort((a, b) => {
-    const av = a.cells[col].textContent.trim().replace(/[^\d.]/g,"");
-    const bv = b.cells[col].textContent.trim().replace(/[^\d.]/g,"");
-    const an = parseFloat(av), bn = parseFloat(bv);
-    if (!isNaN(an) && !isNaN(bn)) return sortAsc ? an - bn : bn - an;
-    return sortAsc
-      ? a.cells[col].textContent.localeCompare(b.cells[col].textContent)
-      : b.cells[col].textContent.localeCompare(a.cells[col].textContent);
-  });
-
-  document.querySelectorAll("#metrics-table th").forEach((th, i) => {
-    th.classList.toggle("sorted", i === col);
-    const arr = th.querySelector(".sort-arrow");
-    if (arr) arr.textContent = i === col ? (sortAsc ? "↑" : "↓") : "↕";
-  });
-
-  rows.forEach(r => tbody.appendChild(r));
-}
-
-// ─── Init ───
-window.addEventListener("load", drawGraph);
-window.addEventListener("resize", drawGraph);
+// Auto-init graph on load (Tab 0 is active)
+window.addEventListener('load', () => initGraph());
 </script>
 </body>
 </html>

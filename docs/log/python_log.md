@@ -187,3 +187,72 @@
 ## 2026-05-21 13:53:57
 - **File**: /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
 
+## 2026-05-21 20:47:10
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/stagnation_diagnostic.py
+
+## 2026-05-21 21:00:14
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/stagnation_diagnostic.py
+
+## 2026-05-21 21:00:19
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/stagnation_diagnostic.py
+
+## 2026-05-21 21:00:23
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/stagnation_diagnostic.py
+
+## 2026-05-21 21:00:46
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/stagnation_diagnostic.py
+
+## 2026-05-21 21:03:59
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/stagnation_diagnostic.py
+
+## 2026-05-21 21:04:05
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/stagnation_diagnostic.py
+
+## 2026-05-21 21:04:12
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/stagnation_diagnostic.py
+
+## 2026-05-21 21:04:17
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/stagnation_diagnostic.py
+
+## 2026-05-21 21:20:09
+- **File**: /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+
+## 2026-05-21 21:20:16
+- **File**: /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+
+## 2026-05-21 21:20:24
+- **File**: /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+
+## 2026-05-21 21:21:32
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/stagnation_diagnostic.py
+
+## 2026-05-21 21:22:06
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/stagnation_diagnostic.py
+
+## 2026-05-22 07:39:56
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/pq_phase_classifier.py
+
+## 2026-05-22 07:39:59
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/pq_phase_classifier.py
+
+## 2026-05-22 08:41:27
+- **File**: /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+
+## 2026-05-22 12:26:20
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/pq_phase_classifier.py
+
+## 2026-05-22 12:26:24
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/pq_phase_classifier.py
+
+## 2026-05-22 12:36:24
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/isotropy.py
+
+## 2026-05-22 12:36:28
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/isotropy.py
+
+## 2026-05-22 12:36:32
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/isotropy.py
+
+## 2026-05-22 12:39:13
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/isotropy.py
+
