@@ -43,7 +43,7 @@ def build_config(args: argparse.Namespace) -> dict:
     defaults = {
         "ns": BaseAnalyzer.NS_DEFAULT,
         "ts": BaseAnalyzer.TS_DEFAULT,
-        "layer": "layer_m8",
+        "layer": "layer_mid",
         "analyzers": ["phase_transition", "spin_glass", "critical_dynamics"],
     }
     merged = {**defaults, **config}
@@ -51,6 +51,8 @@ def build_config(args: argparse.Namespace) -> dict:
         value = getattr(args, key, None)
         if value is not None:
             merged[key] = value
+    if getattr(args, "no_fit", False):
+        merged["no_fit"] = True
     if "data_dir" not in merged or "out_dir" not in merged:
         raise ValueError("data_dir and out_dir are required via --config or CLI")
     return merged
@@ -72,6 +74,8 @@ def run_pipeline(config: dict) -> list[AnalysisResult]:
         }
         if name == "critical_dynamics":
             kwargs["num_predict_fallback"] = config.get("num_predict_fallback", 4096)
+            if config.get("no_fit"):
+                kwargs["no_fit"] = True
         analyzer = cls(**kwargs)
         result = analyzer.run_analysis()
         results.append(result)
@@ -92,6 +96,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--layer", default=None)
     parser.add_argument("--analyzers", nargs="+", choices=sorted(ANALYZER_REGISTRY), default=None)
     parser.add_argument("--num-predict-fallback", type=int, default=None)
+    parser.add_argument("--no-fit", dest="no_fit", action="store_true", default=False)
     return parser.parse_args()
 
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 import contextlib
 import io
 import warnings
-from typing import Dict, Optional
 
 import matplotlib
 
@@ -28,7 +27,7 @@ def _power_law(x: np.ndarray, tau0: float, Tc: float, znu: float) -> np.ndarray:
     return tau0 * np.abs(x - Tc) ** (-znu)
 
 
-def fit_critical_slowing(Ts: np.ndarray, taus: np.ndarray, Tc_init: float, side: str = "both") -> Optional[Dict]:
+def fit_critical_slowing(Ts: np.ndarray, taus: np.ndarray, Tc_init: float, side: str = "both") -> dict | None:
     mask = np.isfinite(taus) & (taus > 0)
     if side == "left":
         mask &= Ts < Tc_init
@@ -52,8 +51,8 @@ def fit_critical_slowing(Ts: np.ndarray, taus: np.ndarray, Tc_init: float, side:
         return None
 
 
-def build_summary_table(data: Dict[int, list[Dict]]) -> Dict[int, Dict]:
-    tables: Dict[int, Dict] = {}
+def build_summary_table(data: dict[int, list[dict]]) -> dict[int, dict]:
+    tables: dict[int, dict] = {}
     for N, conds in data.items():
         Ts, mu_v, sem_v, mu_i, sem_i, fb, nv = [], [], [], [], [], [], []
         for c in conds:
@@ -117,9 +116,9 @@ class CriticalDynamicsAnalyzer(BaseAnalyzer):
             "fallback_rate": fallback_count / n if n > 0 else float("nan"),
         }
 
-    def _collect_all(self) -> Dict[int, list[Dict]]:
+    def _collect_all(self) -> dict[int, list[dict]]:
         conditions = self.load_all(load_hidden=True)
-        by_n: Dict[int, list[Dict]] = {}
+        by_n: dict[int, list[dict]] = {}
         for cond in conditions.values():
             if not cond.move_steps:
                 continue
@@ -127,7 +126,7 @@ class CriticalDynamicsAnalyzer(BaseAnalyzer):
         return {N: sorted(vals, key=lambda c: c["T"]) for N, vals in by_n.items()}
 
     @staticmethod
-    def _estimate_tc_init(tbl: Dict) -> float:
+    def _estimate_tc_init(tbl: dict) -> float:
         mu = tbl["mean_tau_valid"]
         T = tbl["T"]
         mask = np.isfinite(mu)
@@ -135,8 +134,8 @@ class CriticalDynamicsAnalyzer(BaseAnalyzer):
             return 1.0
         return float(T[mask][np.argmax(mu[mask])])
 
-    def _run_fits(self, tables: Dict[int, Dict], ns_available: list[int]) -> Dict[int, Optional[Dict]]:
-        fit_results: Dict[int, Optional[Dict]] = {}
+    def _run_fits(self, tables: dict[int, dict], ns_available: list[int]) -> dict[int, dict | None]:
+        fit_results: dict[int, dict | None] = {}
         if self.no_fit:
             for N in ns_available:
                 fit_results[N] = None
@@ -148,7 +147,7 @@ class CriticalDynamicsAnalyzer(BaseAnalyzer):
         return fit_results
 
     @staticmethod
-    def plot_tau_vs_T(tables: Dict[int, Dict], ns: list[int], fit_results: Dict[int, Optional[Dict]]):
+    def plot_tau_vs_T(tables: dict[int, dict], ns: list[int], fit_results: dict[int, dict | None]):
         fig, axes = plt.subplots(1, len(ns), figsize=(4.5 * len(ns), 4.5), sharey=False)
         if len(ns) == 1:
             axes = [axes]
@@ -182,7 +181,7 @@ class CriticalDynamicsAnalyzer(BaseAnalyzer):
         return fig
 
     @staticmethod
-    def plot_fallback_rate(tables: Dict[int, Dict], ns: list[int]):
+    def plot_fallback_rate(tables: dict[int, dict], ns: list[int]):
         fig, ax = plt.subplots(figsize=(7, 4.5))
         for N in ns:
             if N not in tables:
@@ -207,7 +206,7 @@ class CriticalDynamicsAnalyzer(BaseAnalyzer):
         return fig
 
     @staticmethod
-    def plot_tau_imputed(tables: Dict[int, Dict], ns: list[int]):
+    def plot_tau_imputed(tables: dict[int, dict], ns: list[int]):
         fig, ax = plt.subplots(figsize=(7, 4.5))
         for N in ns:
             if N not in tables:
@@ -226,7 +225,7 @@ class CriticalDynamicsAnalyzer(BaseAnalyzer):
         return fig
 
     @staticmethod
-    def plot_combined(tables: Dict[int, Dict], ns: list[int], fit_results: Dict[int, Optional[Dict]]):
+    def plot_combined(tables: dict[int, dict], ns: list[int], fit_results: dict[int, dict | None]):
         fig, axes = plt.subplots(2, 2, figsize=(12, 9))
         ax_tau, ax_fb, ax_imp, ax_log = axes.flat
         for N in ns:
@@ -279,7 +278,7 @@ class CriticalDynamicsAnalyzer(BaseAnalyzer):
         return fig
 
     @staticmethod
-    def _print_report(tables: Dict[int, Dict], fit_results: Dict[int, Optional[Dict]]) -> None:
+    def _print_report(tables: dict[int, dict], fit_results: dict[int, dict | None]) -> None:
         print()
         print("=" * 70)
         print("  Critical Slowing Down — Summary Report")

@@ -54,7 +54,7 @@ class BaseAnalyzer(ABC):
         ns: list[int] | None = None,
         ts: list[float] | None = None,
         title: str = "",
-        layer: str = "layer_m8",
+        layer: str = "layer_mid",
     ) -> None:
         self.data_dir = Path(data_dir)
         self.out_dir = Path(out_dir)

@@ -12,7 +12,7 @@ from analysis.base_analyzer import AnalysisResult, BaseAnalyzer, ConditionData
 from analysis.io_utils import _cosine
 
 
-LAYER_DEFAULT = "layer_m8"
+LAYER_DEFAULT = "layer_mid"
 Q_BINS = np.linspace(-0.1, 1.05, 47)
 PHASE_COLORS = {
     "ordered": "#1f77b4",

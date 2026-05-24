@@ -37,6 +37,7 @@ def main() -> None:
         ns=args.ns,
         ts=args.ts,
         title=args.title or Path(args.dir).name,
+        threshold=args.threshold,
     )
     result = analyzer.run_analysis()
     print(result.report_text, end="")

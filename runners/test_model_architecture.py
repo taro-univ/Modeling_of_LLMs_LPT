@@ -23,6 +23,7 @@ import numpy as np
 import torch
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
+from envs.base_env import BaseEnv
 from envs.hanoi_env import TowerOfHanoiEnv
 from runners.run import calc_num_predict
 from runners.run_local import (
@@ -407,7 +408,7 @@ def run_t2(
 
 def run_t3(
     gen_result: GenerationResult,
-    env: TowerOfHanoiEnv,
+    env: BaseEnv,
 ) -> list[TestResult]:
     """Move 抽出の件数・自己ループ・ディスク番号範囲・パーサ整合性を確認する。"""
     print("\n[T3] 出力フォーマット検証")

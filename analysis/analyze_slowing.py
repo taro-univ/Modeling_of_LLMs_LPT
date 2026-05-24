@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from analysis.critical_dynamics import CriticalDynamicsAnalyzer, build_summary_table, fit_critical_slowing
+from analysis.critical_dynamics import CriticalDynamicsAnalyzer
 
 
 def parse_args() -> argparse.Namespace:
@@ -22,7 +22,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-dir", default="figures")
     parser.add_argument("--num-predict", type=int, default=4096)
     parser.add_argument("--no-fit", action="store_true")
-    parser.add_argument("--tc-init", nargs="+", type=float, default=None, help=argparse.SUPPRESS)
     return parser.parse_args()
 
 

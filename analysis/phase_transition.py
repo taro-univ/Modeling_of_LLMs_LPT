@@ -16,6 +16,10 @@ BOUNDARY_THRESHOLD = 0.5
 class PhaseTransitionAnalyzer(BaseAnalyzer):
     """H-PT analyzer: order-disorder phase transition and Tc(N)."""
 
+    def __init__(self, *args, threshold: float = BOUNDARY_THRESHOLD, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.threshold = threshold
+
     def _compute_stats(self, cond: ConditionData) -> dict:
         trials = cond.trials
         acc = [r["accuracy"] for r in trials]
@@ -205,7 +209,7 @@ class PhaseTransitionAnalyzer(BaseAnalyzer):
         conditions = self.load_all(load_hidden=False)
         stats = {k: self._compute_stats(v) for k, v in conditions.items() if v.trials}
         acc_mat = self._build_matrix(stats, self.ns, self.ts, "accuracy_mean")
-        boundary = self._estimate_boundary(acc_mat, self.ns, self.ts)
+        boundary = self._estimate_boundary(acc_mat, self.ns, self.ts, threshold=self.threshold)
         fig = self._plot_phase_diagram(stats, boundary)
         figure_path = self._save_figure(fig, "phase_diagram")
         buf = io.StringIO()

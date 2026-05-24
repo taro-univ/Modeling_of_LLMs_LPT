@@ -19,11 +19,15 @@ def _cosine(a: np.ndarray, b: np.ndarray) -> float:
 
 
 def load_condition(dirs, N: int, T: float, layer: str):
-    """Compatibility loader backed by BaseAnalyzer._load_condition."""
+    """Compatibility loader backed by BaseAnalyzer._load_condition.
+
+    Returns a flat dict compatible with the functional API in pq_metrics /
+    pq_phase_classifier / stagnation_diagnostic.  Does NOT import spin_glass
+    to avoid a layer-inversion dependency.
+    """
     from pathlib import Path
 
     from analysis.base_analyzer import BaseAnalyzer
-    from analysis.spin_glass import condition_to_dict
 
     class _Loader(BaseAnalyzer):
         def run_analysis(self):  # pragma: no cover
@@ -34,9 +38,19 @@ def load_condition(dirs, N: int, T: float, layer: str):
         cond = loader._load_condition(N, T, load_hidden=True)
         if cond is None:
             continue
-        d = condition_to_dict(cond, layer)
-        d["sg_rate"] = cond.sg_rate
-        d["ordered_rate"] = cond.ordered_rate
+        hidden = cond.hidden.get(layer, [])
+        d = {
+            "hidden": hidden,
+            "is_fallback": cond.is_fallback[: len(hidden)],
+            "accuracy": [r["accuracy"] for r in cond.trials],
+            "early_stop": cond.early_stop,
+            "pm_rate": cond.pm_rate,
+            "sg_rate": cond.sg_rate,
+            "ordered_rate": cond.ordered_rate,
+            "n_trials": len(hidden),
+            "N": cond.N,
+            "T": cond.T,
+        }
         if d["hidden"]:
             return d
     return None
