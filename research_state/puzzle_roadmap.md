@@ -35,12 +35,14 @@
 
 ### Lights Out
 - **状態空間**：GF(2) 線形代数。$5 \times 5$ で $2^{25}$ 状態
-- **K(N)**：最小手数（線形代数で計算可能）
+- **K(N)**：最小手数（線形代数で計算可能、一意解制約で固定）
 - **一意解**：✅（初期配置を選べば解が一意）
 - **physics-agent 評価**：⭕ control 実験として有用。**フラストレーション構造がない**ため、SG 相が出れば LLM 固有の現象（外在的ではなく内在的 SG）として解釈できる
 - **research-agent 評価**：⭕ GF(2) 構造 → REM / random code SG 理論と接続。LLM benchmark がほぼゼロで novelty 高い
 - **両エージェント**：一致して推薦
-- **status**：🟡 保留（Frog Jump / River Crossing 実装後に検討）
+- **実装詳細**：N=3,4,5 のみ対応（`LightsOutEnv`）。Algorithm C 無効化（involution のため）。`--seed` で盤面固定
+- **sweep スクリプト**：`run_lights_out_sweep.sh`（T=0.1-1.0）、`run_lights_out_collapse_sweep.sh`（T=1.1-3.0）整備済み
+- **status**：✅ **実装・スクリプト完了**（2026-05-26）。DeepSeek-7B での実験待ち
 
 ### 8-puzzle（スライドパズル）
 - **状態空間**：$(3 \times 3)$ グリッド、181,440 状態
@@ -92,9 +94,10 @@
 ## 実装優先順位（現時点）
 
 ```
-Phase 1（進行中）   : Tower of Hanoi — 5 モデル展開
+Phase 1（進行中）   : Tower of Hanoi — 4 モデル展開（Qwen3-8B/14B 追加中）
+                      Lights Out — DeepSeek-7B で実験待ち（スクリプト整備済み）
 Phase 2（次）       : Frog Jump + River Crossing — 実装確定
-Phase 3（候補検討） : Lights Out / 8-puzzle / Pancake Sorting から選定
+Phase 3（候補検討） : 8-puzzle（Lights Out の結果を見てから）
 Phase 4（任意）     : Tower of London（LLM 先行研究との比較が必要と判断した場合）
 ```
 

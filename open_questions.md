@@ -72,6 +72,37 @@ deepseek-r1-distill-qwen-14B の NF4 量子化で RTX 5070 12GB へのロード�
 
 ---
 
+### U10：ハミルトニアンの相互作用次数 $p$ の決定（2026-05-25 追加）
+
+physics-agent 審査で球面 $p$-スピン型が推奨枠組みとなったが、$p$ の値が未確定。
+
+- $p=2$: 標準 Hopfield。Tc2 の N 非依存性を説明できない
+- $p=3$: LLM の attention（Q×K×V）が3次相互作用であることから物理的に示唆的
+- $p \to \infty$: Modern Hopfield / softmax attention に対応（Ramsauer et al. 2020）
+
+各 $p$ で Tc1/Td/Tc^stat の解析的表式が異なる。Crisanti-Sommers (1992) の結果を参照して決定する。
+
+→ リサーチエージェントへの依頼案件（Crisanti-Sommers 1992、Cugliandolo-Kurchan 1993）
+
+### U11：記憶パターン $\xi^\mu$ の同定方法（2026-05-25 追加）
+
+推奨 Hamiltoian の実証フィットには $\xi^1$（正解経路）と $\xi^{\mu>1}$（ループ basin）の同定が必要。
+
+- $\xi^1$: goal_reached trial の hidden state を Move 完了ステップで平均する（経験的方針）
+- $\xi^{\mu>1}$: move_loop_repeat trial をループパターン (src, dst) でクラスタリングし、各クラスタ内の hidden state を平均する
+
+→ user の方針確認待ち（open_questions.md U10 と並行）
+
+### U12：球面拘束の実測検証（2026-05-25 追加）
+
+推奨 Hamiltonian の球面拘束（$\|h\|^2 = d$）の根拠として LayerNorm/RMSNorm を挙げたが、実際に hidden state のノルムが層内でほぼ一定か未検証。
+
+既取得 npz から $\|h^\alpha\|$ の分布を N, T, layer（top/mid/low）ごとに測定して確認する。
+
+→ 小規模追加実験で確認可能。実施前に U10/U11 の方針が固まってから着手。
+
+---
+
 ## 既存リソース・サーベイ
 
 ### U9：「LLM × 統計力学」既存研究の体系的サーベイ

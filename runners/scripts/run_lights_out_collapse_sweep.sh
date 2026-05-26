@@ -1,30 +1,24 @@
 #!/bin/bash
-# run_lights_out_sweep.sh — Lights Out パズルのフルスイープ
+# run_lights_out_collapse_sweep.sh — Lights Out 崩壊相スイープ（T≥1.1）
 #
-# Hanoi の run_full_sweep.sh に相当するが、以下の点が異なる：
-#   - --puzzle lights_out   : LightsOutEnv を使用
-#   - --seed SEED           : 同一 N なら全 T で同一初期盤面を保証（公平な比較）
-#   - --no-loop-detection   : Algorithm C を無効化（involution により誤検知するため）
-#   - N: 3, 4, 5 のみ      : LightsOutEnv の対応サイズ
-#
-# 出力先: results/lights_out/<model-slug>/N{N}_T{T}/
+# run_lights_out_sweep.sh（T=0.1-1.0）の続き。崩壊相内部の SG/PM 境界を精密測定する。
+# Hanoi の run_collapse_phase_sweep.sh に相当。
 #
 # Usage:
-#   docker compose exec hanoi-minimal bash runners/scripts/run_lights_out_sweep.sh [OPTIONS]
+#   docker compose exec hanoi-minimal bash runners/scripts/run_lights_out_collapse_sweep.sh [OPTIONS]
 #
 # OPTIONS:
 #   --models "ID1 ID2 ..."  スイープするモデル ID（スペース区切り・引用符必須）
-#                           (default: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B")
-#   --trials N              1セルあたりの試行数 (default: 25)
+#   --trials N              1セルあたりの試行数 (default: 30)
 #   --ns "3 4 5"            N の範囲（LightsOutEnv は 3,4,5 のみ対応）
-#   --ts "0.2 0.4 ..."      温度グリッド
+#   --ts "1.1 1.2 ..."      温度グリッド
 #   --seed N                初期盤面シード (default: 42)
 #   --analyze               スイープ完了後に解析パイプラインを自動実行
 #   --dry-run               コマンドを表示するのみ・実行しない
 #
 # 例:
-#   bash runners/scripts/run_lights_out_sweep.sh
-#   bash runners/scripts/run_lights_out_sweep.sh --models "Qwen/Qwen3-7B" --dry-run
+#   bash runners/scripts/run_lights_out_collapse_sweep.sh
+#   bash runners/scripts/run_lights_out_collapse_sweep.sh --dry-run
 
 set -e
 
@@ -33,9 +27,9 @@ set -e
 # ===========================================================================
 
 MODELS_STR="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
-TRIALS=25
+TRIALS=30
 NS_STR="3 4 5"
-TS_STR="0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0"
+TS_STR="1.1 1.2 1.3 1.4 1.5 1.8 2.0 2.5 3.0"
 SEED=42
 DO_ANALYZE=false
 DRY_RUN=false
@@ -65,7 +59,6 @@ read -ra MODELS <<< "$MODELS_STR"
 read -ra NS     <<< "$NS_STR"
 read -ra TS     <<< "$TS_STR"
 
-# N の値を検証（3,4,5 のみ）
 for N in "${NS[@]}"; do
     if [[ "$N" != "3" && "$N" != "4" && "$N" != "5" ]]; then
         echo "[ERROR] LightsOutEnv は N=3,4,5 のみ対応しています（指定: N=${N}）"
@@ -89,17 +82,17 @@ TOTAL_PER_MODEL=$(( ${#NS[@]} * ${#TS[@]} * TRIALS ))
 TOTAL=$(( ${#MODELS[@]} * TOTAL_PER_MODEL ))
 
 echo "========================================================"
-echo "  Lights Out Sweep"
+echo "  Lights Out Collapse Phase Sweep  (T>=1.1)"
 echo "========================================================"
 echo "  モデル数   : ${#MODELS[@]}"
 for M in "${MODELS[@]}"; do
     echo "    - $M"
 done
-echo "  N          : ${NS[*]}  (LightsOutEnv: 3,4,5 のみ)"
+echo "  N          : ${NS[*]}"
 echo "  T          : ${TS[*]}"
 echo "  trials/セル : ${TRIALS}"
 echo "  seed       : ${SEED}  (盤面固定)"
-echo "  loop検出   : 無効 (--no-loop-detection, involution のため)"
+echo "  loop検出   : 無効 (--no-loop-detection)"
 echo "  総試行数   : ${TOTAL}  (${TOTAL_PER_MODEL} × ${#MODELS[@]} モデル)"
 echo "========================================================"
 echo ""
@@ -115,10 +108,10 @@ fi
 
 check_vram() {
     local model_id="$1"
-    python3 /tmp/check_vram_lights_out.py "$model_id"
+    python3 /tmp/check_vram_lo_collapse.py "$model_id"
 }
 
-cat > /tmp/check_vram_lights_out.py << 'PYEOF'
+cat > /tmp/check_vram_lo_collapse.py << 'PYEOF'
 import sys
 
 model_id = sys.argv[1]
@@ -143,7 +136,7 @@ PYEOF
 
 for MODEL_ID in "${MODELS[@]}"; do
     SLUG=$(model_slug "$MODEL_ID")
-    BASE_DIR="results/lights_out/${SLUG}"
+    BASE_DIR="results/lights_out_collapse/${SLUG}"
 
     echo "###################################################################"
     echo "  MODEL: $MODEL_ID"
@@ -171,7 +164,6 @@ for MODEL_ID in "${MODELS[@]}"; do
             echo "  [${COUNT}/${CELLS}]  model=${SLUG}  N=${N}  T=${T}  seed=${SEED}"
             echo "--------------------------------------------------"
 
-            # 既存結果をスキップ（冪等）
             if [[ -f "$SUMMARY" ]]; then
                 EXISTING=$(python3 -c \
                     "import json; d=json.load(open('$SUMMARY')); print(len(d))" \
@@ -183,16 +175,16 @@ for MODEL_ID in "${MODELS[@]}"; do
             fi
 
             CMD="python3 runners/run_local.py \
-                --model-id          ${MODEL_ID}    \
-                --puzzle            lights_out     \
-                --N                 ${N}           \
-                --trials            ${TRIALS}      \
-                --temperature       ${T}           \
-                --seed              ${SEED}        \
-                --no-loop-detection                \
-                --n-shot            0              \
-                --sweep-type        lights_out_sweep \
-                --output-dir        ${OUT_DIR}     \
+                --model-id          ${MODEL_ID}         \
+                --puzzle            lights_out          \
+                --N                 ${N}                \
+                --trials            ${TRIALS}           \
+                --temperature       ${T}                \
+                --seed              ${SEED}             \
+                --no-loop-detection                     \
+                --n-shot            0                   \
+                --sweep-type        lights_out_collapse  \
+                --output-dir        ${OUT_DIR}          \
                 --output            ${SUMMARY}"
 
             if [[ "$DRY_RUN" == true ]]; then
@@ -214,13 +206,13 @@ for MODEL_ID in "${MODELS[@]}"; do
         echo "###################################################################"
         echo ""
 
-        FIG_DIR="figures/lights_out_sweep/${SLUG}"
+        FIG_DIR="figures/lights_out_collapse/${SLUG}"
         mkdir -p "$FIG_DIR"
 
         python3 analysis/run_pipeline.py \
             --data-dir  "$BASE_DIR"                            \
             --out-dir   "$FIG_DIR"                             \
-            --title     "${SLUG} (Lights Out)"                 \
+            --title     "${SLUG} (Lights Out Collapse)"        \
             --ns        "${NS[@]}"                             \
             --ts        "${TS[@]}"                             \
             --analyzers phase_transition spin_glass
@@ -244,8 +236,8 @@ echo ""
 echo "  解析コマンド（--analyze を付けなかった場合）:"
 for MODEL_ID in "${MODELS[@]}"; do
     SLUG=$(model_slug "$MODEL_ID")
-    BASE_DIR="results/lights_out/${SLUG}"
-    FIG_DIR="figures/lights_out_sweep/${SLUG}"
+    BASE_DIR="results/lights_out_collapse/${SLUG}"
+    FIG_DIR="figures/lights_out_collapse/${SLUG}"
     echo ""
     echo "  python3 analysis/run_pipeline.py \\"
     echo "    --data-dir ${BASE_DIR} \\"
