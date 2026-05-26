@@ -728,14 +728,18 @@ def parse_args() -> argparse.Namespace:
                         help="隠れ状態 npz の保存先ディレクトリ（省略時は自動生成）")
     parser.add_argument("--no-save-hidden", action="store_true",
                         help="隠れ状態の npz を保存しない")
-    parser.add_argument("--no-early-stop",  action="store_true",
+    parser.add_argument("--no-early-stop",      action="store_true",
                         help="早期終了アルゴリズムを無効化する")
+    parser.add_argument("--no-loop-detection",  action="store_true",
+                        help="Algorithm C（ループ検出）を無効化する。Lights Out など involution を持つパズル向け")
 
     # 早期終了パラメータ
     parser.add_argument("--es-think-ratio", type=float, default=None)
     parser.add_argument("--es-move-mult",   type=float, default=1.5)
     parser.add_argument("--es-loop-window", type=int,   default=6)
     parser.add_argument("--es-loop-count",  type=int,   default=2)
+    parser.add_argument("--seed",           type=int,   default=None,
+                        help="env 初期状態の乱数シード（Lights Out で盤面を固定する場合に使用）")
     parser.add_argument("--temperature",         type=float, default=0.6,
                         help="サンプリング温度 (default: 0.6)")
     parser.add_argument("--repetition-penalty",  type=float, default=1.1,
@@ -767,6 +771,7 @@ def _build_early_stop_cfg(args) -> Optional[EarlyStopConfig]:
         max_move_multiplier=args.es_move_mult,
         loop_window=args.es_loop_window,
         loop_min_count=args.es_loop_count,
+        enable_move_loop=not args.no_loop_detection,
     )
 
 
@@ -820,7 +825,11 @@ def main() -> None:
         "lights_out": LightsOutEnv,
     }
     env_factory = puzzle_factories[args.puzzle]
-    env = env_factory(args.N)
+    env = (
+        env_factory(args.N, seed=args.seed)
+        if args.seed is not None
+        else env_factory(args.N)
+    )
 
     trials         = args.trials if args.trials is not None else calc_default_trials(args.N)
     early_stop_cfg = _build_early_stop_cfg(args)
