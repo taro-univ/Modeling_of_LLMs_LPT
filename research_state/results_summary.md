@@ -4,7 +4,25 @@
 
 詳細な数値・図表は `docs/Modeling_idea.md`、`results/hanoi/full_sweep/`、`results/hanoi/collapse_phase/` を参照。
 
-最終更新：2026-05-26。Qwen3-8B full_sweep N2-3 完了・N4 進行中。llama-8B は補足モデル扱いに確定。4モデル戦略（DeepSeek-7B/14B + Qwen3-8B/14B）を採用。
+最終更新：2026-06-05。**ゴールペグ・パリティ交絡を発見し、B/C 対称化を採用（physics-agent ラチファイ済み）**。観測4/5 は再解析待ちで降格。4モデル戦略（DeepSeek-7B/14B + Qwen3-8B/14B）を継続。
+
+---
+
+## ⚠️ 重大な方法論訂正：ゴールペグ・パリティ交絡（2026-06-05）
+
+**発見**：env のゴールが peg C 固定だったため、モデルが暗記した正準ハノイ解を「Move 1 from A to C」から復唱する高温域で、**偶数 N は完全最適解が peg B に積み上がり accuracy=0 と誤判定**されていた（奇数 N は C に乗り正解）。これにより偶数 N の「崩壊相」が人工的に水増しされていた。
+
+**決定（user, 2026-06-05）**：peg B/C は $S_3$ ペグ置換対称性で gauge 等価（physics-agent 審査・ラチファイ済み、Hanoi graph 自己同型群 = $S_3$, Park arXiv:0809.1179）。以下を採用：
+1. **秩序変数を対称化**：$m = \mathbb{1}[\exists t:\ x(t) \in \{\text{full-B},\ \text{full-C}\}]$（A 以外の単一ペグに N 枚 size-ordered, first-passage）
+2. **ポテンシャル対称化**：$V(x) = \lambda_d \cdot \min(D_{\to B}, D_{\to C})/(2^N-1) + \lambda_p \cdot \text{illegal}$（二重井戸、鞍点 = 初期状態のみ）
+3. **暗記復唱（reasoning_tokens=0）も秩序相に含める**（基底状態到達のため）
+
+**補正後の全データ再計算**（`research_state/symmetric_accuracy.json`、保存済み move_texts から再計算・再 sweep 不要）：
+- 延べ +257 試行が正解に転化。交絡規模はモデル依存（qwen3-14b 最大：full_sweep +61, collapse +77）
+- **新しい物理的特徴**：偶数 N の高温域で acc が温度とともに**増加**する「**recitation-ordered 領域**」が出現（qwen3-8b N4 collapse は T1.1→3.0 で 0→最大10、qwen3-14b N4 は T1.5 で 20/25）。低温＝推論失敗、高温＝暗記復唱成功という従来不可視だった構造
+- N6 は perfect-B=0 で**真正崩壊**（63手は誦じきれない）。汚染は偶数 N の中〜高温に集中
+
+**残作業（D-1〜D-4）**：env コードの対称化（Codex 委譲・仕様書化）、相図再生成、recitation/reasoning order の sub-classify、L2 での full-B/full-C 縮退ペア検証。
 
 ---
 
@@ -26,9 +44,12 @@
 
 $\ln(p_i/p_{PM})$ vs $1/T$ の直線性検定を deepseek-7b/14b/llama-8b の全モデル・全 $N$ で実施。**有意な直線性はほぼ確認できなかった**（deepseek-14b N=3 O/PM の r=0.559 が唯一有意）。平衡ボルツマン記述が成立しないことは非平衡 SG 理論フレームを支持する（→ H5）。
 
-### 観測 4：$T_{c2}$ の N 非依存性（EXP-002, 2026-05-25）
+### 観測 4：$T_{c2}$ の N 非依存性（EXP-002, 2026-05-25 / 再確認 EXP-008, 2026-06-05）
 
-シグモイドフィットによる SG→PM 転移温度 $T_{c2}$：
+> ✅ **DeepSeek について再確認・復帰（2026-06-05, EXP-008）**：対称化分類で $T_{c2}$ を再フィットした結果、DeepSeek は高温で暗記復唱しない（p_O(T≥1.8)=0.00）ためパリティ交絡の影響をほぼ受けておらず、**N 非依存性（$T_{c2}\approx 1.0$–1.2, N3-5）はそのまま確認**された（deepseek-7b: 1.13/1.10/1.05、deepseek-14b: 1.24/1.13）。詳細：`research_state/tc2_refit_symmetric.md`。
+> ⚠️ **Qwen は保留**：Qwen は高温で recitation-order に転じ p_PM が非単調になるため、単純3相シグモイドで $T_{c2}$ を定義できない。recitation/reasoning の sub-classify（D-3）後に再定義が必要。
+
+シグモイドフィットによる SG→PM 転移温度 $T_{c2}$（旧値、deepseek/llama、EXP-002）：
 
 - **deepseek-7b**：N=2〜6 で $T_{c2} \approx 1.0$〜$1.15$（ほぼ N 非依存）
 - **deepseek-14b**：N=2〜4 で $T_{c2} \approx 1.0$〜$1.2$（誤差大）
@@ -37,6 +58,8 @@ $\ln(p_i/p_{PM})$ vs $1/T$ の直線性検定を deepseek-7b/14b/llama-8b の全
 $T_{c1}$（Ordered→SG）は N 増加とともに急落し、N≥4 では測定範囲内に Ordered 相が存在しない。
 
 ### 観測 5：モデル間の相図の質的差異（EXP-002/EXP-003, 2026-05-25/26）
+
+> ⚠️ **一部降格（2026-06-05）**：偶数 N（特に N=4）の崩壊判定はパリティ交絡を含む。低温 T=0.1 の数値は影響小だが、「N=4 即崩壊」「容量崖」の主張は対称化 accuracy で再確認が必要（recitation-ordered 領域の存在を反映していない）。
 
 | モデル | N=2 T=0.1 | N=3 T=0.1 | N=4 T=0.1 | 特徴 |
 |---|---|---|---|---|
@@ -88,7 +111,7 @@ collapse_phase sweep（T=1.1〜3.0）の解析：
 |---|---|---|---|---|
 | deepseek-r1-distill-qwen-7B | **主軸** | ✅ 50/50 完了 | ✅ 36/36（N3_T1_0 は低優先） | 取得済み |
 | deepseek-r1-distill-qwen-14B | **主軸** | ⚠️ 47/48（N6_T0_8 クラッシュ） | ✅ 36/36 完了 | 取得済み |
-| qwen3-8b | **主軸** | 🔄 N2-3 完了・N4 進行中 | — | 取得中 |
+| qwen3-8b | **主軸** | ✅ 50/50 完了（2026-05-28） | 🔄 実行中（N3-6 × T1.1-3.0） | 取得済み |
 | qwen3-14b | **主軸** | ⬜ 未着手 | — | — |
 | llama-8b | **補足** | ✅ 完了（N≥4 は acc=0） | ✅ N3-5 完了・N6 T1.8 進行中 | 取得済み |
 
@@ -113,8 +136,8 @@ collapse_phase sweep（T=1.1〜3.0）の解析：
 
 ## 未実施で重要なもの
 
-- **Qwen3-8B 全 N sweep 完了**（N4〜N6 実行中）
-- **Qwen3-14B 全 sweep**（8B 完了後に開始）
+- **Qwen3-8B collapse_phase 解析**（実行完了後に `run_pipeline.py`）
+- **Qwen3-14B 全 sweep**（8B collapse_phase 完了後に開始）
 - **14B / N6_T0_8 の補完**
 - **Lights Out × DeepSeek-7B の sweep**（スクリプト整備済み、実行待ち）
 - **4 モデル × Hanoi の P(q) 横断解析**（npz は 7B/14B/llama-8B で揃っている）

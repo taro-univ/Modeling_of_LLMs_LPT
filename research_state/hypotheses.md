@@ -26,10 +26,10 @@
 
 副観察：$T_{c2}$（SG→PM 境界）が deepseek 系で $N$ にほぼ非依存（$T_{c2} \approx 1.0$〜$1.2$）。これは SG 相の消滅が問題サイズ $N$ ではなく温度ノイズだけで駆動される内部転移であることを示唆し、非平衡 SG の固定点描像と整合する。
 
-- **status**: active（physics-agent 確認待ち）
-- **evidence**: EXP-002 — deepseek-7b/14b/llama-8b の全データで直線性不成立を確認。Tc2 の N 非依存性は deepseek-7b で最も明確（N=2〜6 で $T_{c2} \approx 1.0$〜$1.15$、誤差内で一定）
-- **changed**: 2026-05-25 新規追加
-- **exp_refs**: EXP-002
+- **status**: active（physics-agent 確認待ち。**Tc2 証拠は DeepSeek で回復済み**、2026-06-05）
+- **evidence**: EXP-002 — 直線性不成立（ゴール到達 vs 非到達の二値評価でペグ交絡の影響限定的）。副観察「$T_{c2}$ の N 非依存性」は EXP-008（2026-06-05）で**対称化分類により再フィット → DeepSeek で確認**（高温 recitation なし p_O(T≥1.8)=0.00、$T_{c2}\approx 1.0$–1.2 が N3-5 で N 非依存）。**Qwen は recitation-order により非単調化し保留**（D-3 後に再定義）。再解析：`research_state/tc2_refit_symmetric.md`, `research_state/symmetric_accuracy.json`
+- **changed**: 2026-05-25 新規追加 / 2026-06-05 交絡対処後 DeepSeek で Tc2 N 非依存性を再確認、Qwen は保留
+- **exp_refs**: EXP-002, EXP-008
 
 ### H6：モデル固有の相図差異（モデルアーキテクチャが相図に反映される）
 
@@ -54,10 +54,16 @@
 
 **位置づけ**：4モデル軸（DeepSeek 7B/14B + Qwen3 8B/14B）での比較が主眼。llama-8b は「Ordered 相を持たないモデルの例」として補足資料に。
 
-- **status**: active（Qwen3-14B データ待ち）
-- **evidence**: EXP-002（llama-8b）、EXP-004（qwen3-8b N2-3 完了分）
-- **changed**: 2026-05-26 EXP-004 の知見を追記
-- **exp_refs**: EXP-002, EXP-003, EXP-004
+**高温崩壊様式の質的差異（EXP-008 + D-3, 2026-06-05、physics-agent 審査済み）**：
+- **Qwen（8B/14B）は中〜高温で推論を放棄し暗記正準解を復唱する**（recitation-order = 記憶想起チャネル）。判別子は tokens_per_move<15（move 列は一意ゆえ区別不能、計算量で分離）。相構造：reasoning-order（低温・融解）→ recitation-order（中高温 T1.3-2.0、ピーク T≈2.0）→ 全面 PM（T≳2.5）。熱駆動の「窓」（「athermal」ではない）。
+- **DeepSeek（7B/14B）は recitation せず真正崩壊**（recitation 総数 7b=0, 14b≈16）。
+- 機構の作業仮説：エントロピー/エネルギー競合（高温で reasoning の自由エネルギーが記憶想起を上回る）。詳細・条件は `research_state/subclass_d3.md`。
+- **Qwen の $T_{c2}$ は降ろす**：N≥4 は「ordered 相不在」ではなく「SG↔PM 境界が不明瞭」。$T_{c2}$ N 非依存性は DeepSeek の性質（H5）。
+
+- **status**: active（physics-agent 確認待ち）
+- **evidence**: EXP-002（llama-8b）、EXP-004（qwen3-8b）、EXP-008（高温 recitation のモデル差、対称化分類）
+- **changed**: 2026-05-26 EXP-004 追記 / 2026-06-05 EXP-008 で高温 recitation のモデル差を追加
+- **exp_refs**: EXP-002, EXP-003, EXP-004, EXP-008
 
 ### H3：move loop ↔ ポテンシャル上の局所安定状態
 
