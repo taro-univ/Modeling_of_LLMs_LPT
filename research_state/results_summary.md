@@ -111,9 +111,11 @@ collapse_phase sweep（T=1.1〜3.0）の解析：
 |---|---|---|---|---|
 | deepseek-r1-distill-qwen-7B | **主軸** | ✅ 50/50 完了 | ✅ 36/36（N3_T1_0 は低優先） | 取得済み |
 | deepseek-r1-distill-qwen-14B | **主軸** | ⚠️ 47/48（N6_T0_8 クラッシュ） | ✅ 36/36 完了 | 取得済み |
-| qwen3-8b | **主軸** | ✅ 50/50 完了（2026-05-28） | 🔄 実行中（N3-6 × T1.1-3.0） | 取得済み |
-| qwen3-14b | **主軸** | ⬜ 未着手 | — | — |
+| qwen3-8b | **主軸** | ✅ 50/50 完了 | ✅ 36/36 完了（EXP-005） | 取得済み |
+| qwen3-14b | **主軸** | ✅ 51/52（N6_T0_6 欠損, EXP-006） | ✅ 36/36 完了（EXP-007, 2026-06-05） | 取得済み |
 | llama-8b | **補足** | ✅ 完了（N≥4 は acc=0） | ✅ N3-5 完了・N6 T1.8 進行中 | 取得済み |
+
+> **4モデル軸の Hanoi データが全て揃った（2026-06-05）**。秩序変数は B/C 対称化版に確定（EXP-008）。秩序相は reasoning-order / recitation-order にサブ分類（D-3）。14B 比較相図：`figures/phase_diagram_symmetric/compare_14b_subclass.png`（DeepSeek=真正崩壊、Qwen3=高温 recitation）。
 
 ### missing セルの詳細
 

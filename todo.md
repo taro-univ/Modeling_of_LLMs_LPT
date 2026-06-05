@@ -13,7 +13,7 @@ llama-8B は補足扱い（スケーリング則分析から除外）。
 
 ## P0：実験実行中
 
-- 🔄 **Qwen3-14B collapse_phase**（EXP-007）— 2026-06-05 開始。36セル × 25試行（N3-6, T1.1-3.0）
+- （なし）Hanoi 4モデル軸の sweep は全完了（EXP-007 完了 2026-06-05）。
 
 ---
 
@@ -21,12 +21,13 @@ llama-8B は補足扱い（スケーリング則分析から除外）。
 
 1. ~~**Qwen3-8B collapse_phase**~~ → 完了（EXP-005、36/36）
 2. ~~**Qwen3-14B full_sweep**~~ → 完了（EXP-006、51/52、N6_T0_6 欠損）
-2. **Lights Out × DeepSeek-7B sweep**（スクリプト整備済み）
+3. ~~**Qwen3-14B collapse_phase**~~ → 完了（EXP-007、36/36、2026-06-05）
+4. **Lights Out × DeepSeek-7B sweep**（スクリプト整備済み）
    ```bash
    bash runners/scripts/run_lights_out_sweep.sh
    bash runners/scripts/run_lights_out_collapse_sweep.sh
    ```
-3. **14B / N6_T0_8 補完**（クラッシュセルの再実行）
+5. **14B / N6_T0_8 補完**（クラッシュセルの再実行、低優先）
 
 ---
 

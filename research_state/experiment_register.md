@@ -17,7 +17,7 @@
 | EXP-004 | 2026-05-26 | ad-hoc | H6 | qwen3-8b | full_sweep（N2-6, T0.1-1.0） | N=2: 全T で acc=72-100%（T=1.0 で25/25完璧）。N=3: 全T で acc=52-80%（deepseek-7b の T=1.0 acc=12% に対し 52%）。N=4 T=0.1: acc=0（no_move_catchall 72%、即PM崩壊）。N=3→N=4 の容量崖が非常にシャープ | H6 追記 — Qwen3-8B は N=3 で thinking robust、N=4 で即崩壊という独自パターン。DeepSeek 系とは崩壊様式が異なる | done（50/50 完了 2026-05-28） |
 | EXP-005 | 2026-05-28 | ad-hoc | H6 | qwen3-8b | collapse_phase（N3-6, T1.1-3.0） | 36/36 完了（2026-06-05）。結果サマリは解析待ち | H6 — 解析後に更新予定 | done（36/36 完了 2026-06-05） |
 | EXP-006 | 2026-06-02 | ad-hoc | H6 | qwen3-14b | full_sweep（N2-6, T0.1-1.0） | 51/52 完了。N6_T0_6 のみ欠損 | H6 — 14B サイズでの相図・Tc スケーリング確認 | done（51/52、N6_T0_6 欠損） |
-| EXP-007 | 2026-06-05 | ad-hoc | H6 | qwen3-14b | collapse_phase（N3-6, T1.1-3.0） | 実行中（2026-06-05 開始）。36セル × 25試行 | H6 — Qwen3-14B の崩壊相内部構造。Qwen3-8B / DeepSeek-14B との比較 | running |
+| EXP-007 | 2026-06-05 | ad-hoc | H6 | qwen3-14b | collapse_phase（N3-6, T1.1-3.0） | **36/36 完了**（2026-06-05）。崩壊相内部構造データ取得。EXP-008 の対称化・D-3 解析に使用 | H6 — Qwen3-14B の高温で recitation-order が顕著（DeepSeek-14B との決定的差） | done |
 | EXP-008 | 2026-06-05 | ad-hoc（Track B, physics ラチファイ済み） | H5, H6 | 全4モデル + llama-8b | full_sweep + collapse_phase（再解析のみ） | ゴールペグ・パリティ交絡を発見・補正。対称化 accuracy で全432セル再計算（`symmetric_accuracy.json`、延べ +257 正解化）。相図再生成（`figures/phase_diagram_symmetric/`）。Tc2 再フィット（`tc2_refit_symmetric.md`）：**DeepSeek で N 非依存性を再確認**（高温 recitation なし）、Qwen は recitation-order で非単調化し保留。env 対称化を Codex 実装（commit 9137c23、43テスト pass、物理不変量検証済み） | **H5 — Tc2 N非依存性を DeepSeek で回復・確認（証拠復帰）**。H6 強化 — 高温崩壊様式のモデル差（Qwen=暗記復唱、DeepSeek=真正崩壊）。秩序変数・V(x) 対称化を正式採用・実装済み | done |
 
 ---
