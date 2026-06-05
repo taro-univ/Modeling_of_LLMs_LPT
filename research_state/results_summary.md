@@ -4,7 +4,7 @@
 
 詳細な数値・図表は `docs/Modeling_idea.md`、`results/hanoi/full_sweep/`、`results/hanoi/collapse_phase/` を参照。
 
-最終更新：2026-06-05。**ゴールペグ・パリティ交絡を発見し、B/C 対称化を採用（physics-agent ラチファイ済み）**。観測4/5 は再解析待ちで降格。4モデル戦略（DeepSeek-7B/14B + Qwen3-8B/14B）を継続。
+最終更新：2026-06-05（夜）。L2 秩序変数の再定式化実施（Track B 完了）。**recitation basin は Ω=1 の単一決定論的 attractor** と判明。$p_\text{recit}(T)$ が真の秩序変数。H7（inverse melting）は要再定式化・ヒステリシス実験実施中。Qwen3-8B 解析完了（$T_\text{SG→PM}(N=3)\approx1.95$）。
 
 ---
 
@@ -81,6 +81,38 @@ collapse_phase sweep（T=1.1〜3.0）の解析：
 - **$T_{\mathrm{SG\to PM}}(N=6) \approx 1.16$**（collapse_phase 範囲内で唯一遷移を捕捉）
 - N=3〜5 は T=1.1 時点で既に PM 支配（遷移は T<1.1 で起きている）
 - 大きい N ほど SG 的ふるまいが高温まで持続する傾向を確認
+
+### 観測 7：Qwen3-8B の崩壊相内部構造（EXP-005、解析 2026-06-05）
+
+collapse_phase sweep（N=3–6, T=1.1–3.0）の run_pipeline.py 解析：
+- **N=3** は T=1.5 まで acc≥0.5 を維持（ordered 判定）。$T_\text{SG→PM}(N=3)\approx1.95$
+- **N=4–5**：collapse_phase 全域で paramagnetic（no_move 支配）。全面 PM 崩壊
+- **N=6**：T=1.2–2.0 で move_loop_repeat 支配（SG 的）。$T_\text{SG→PM}(N=6)\approx1.86$
+- Qwen3-8B は N=3 が robust で N=4 以上は即 PM という容量崖が collapse phase でも確認
+- 図：`figures/collapse_phase/qwen3-8b/`
+
+### 観測 8：L2 秩序変数の再定式化（Track B、2026-06-05）
+
+per-trial replica pair $q_{ab}$ の正しい計算と、raw cosine（centering なし）を用いた解析：
+
+**recitation basin の構造（Qwen3-14B）**：
+- **Ω ≈ 1**（単一 basin）：全 T（T=1.3–2.0）にわたり hierarchical clustering で cluster 数 = 1
+- **raw $q_{EA}$ ≈ 0.97–1.0**（T によらず一定）：basin の鋭さは温度非依存の定数
+- **$p_\text{recit}(T)$ が真の秩序変数**：basin アクセス確率が T 依存、basin 自体は固定
+- $\hat\xi^1$ 投影：recitation も reasoning も $m\approx0.98$（両方ゴール到達）。ξ^1 方向は両チャネルに共通。recitation 固有パターンは ξ^1 直交補空間に存在
+
+**H3（move_loop = SG）の L2 反証**：
+- per-trial pair $q_{ab}$（centering 後）：reasoning≈+0.25、recitation≈+0.9–1.0（raw）、move_loop≈0、PM≈−0.2
+- per-move 時間方向 overlap：move_loop のオフダイアゴナルが全て負（同一 basin への再訪なし）
+- → move_loop はエルゴーディックな遍歴（PM 的）を支持。SG 相の積極的証拠なし
+
+**H7（inverse melting）への含意**：
+- Ω=1 は Schupper-Shnerb の写像（Ω>>1 が必要）と矛盾
+- H7 は再定式化が必要：「多重縮退による TS 安定化」→「単一決定論的 attractor の kinetic dominance」
+- 詳細は `research_state/hypotheses.md` H7 を参照。ヒステリシス実験（一次転移性検証）実施中
+
+**DeepSeek-7B との比較**：
+- 全温度域で $q_{EA}\approx0.02$（スケール2桁差）、recitation basin 不在を確認
 
 ---
 

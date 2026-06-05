@@ -2,7 +2,7 @@
 
 論文・書籍の読書進捗を追跡する。report-bot が毎朝読み込む。
 
-最終更新：2026-05-28
+最終更新：2026-06-05
 
 ---
 
@@ -19,9 +19,14 @@
 
 - **タイトル**: "The Reasoning-Memorization Interplay Is Mediated by a Single Direction"
 - **著者**: Hong et al. (2025)
-- **関連仮説**: H3, H6（推論と記憶の干渉 → SG 相との対応）
-- **状況**: 読み始め中（2026-05-31〜）
-- **メモ**: H3（move loop = 局所安定状態）と直結する可能性あり
+- **関連仮説**: H4（介入設計）、H6（モデル差異）、H7（inverse melting）
+- **状況**: 内容確認済み（2026-06-05、research-agent 経由）
+- **要点**:
+  - 残差ストリームの**単一線形方向**（difference-in-means）で reasoning↔memory を分離
+  - **中間層（layer_mid 相当）が最顕著**、介入で因果的に切替可能
+  - 本研究の「layer_mid の $q_{EA}$ で記憶 basin が顕在化」と層位置まで一致
+  - 温度・$q_{EA}$ などの物理量化はなし（＝本研究の novelty）
+- **URL**: https://arxiv.org/abs/2503.23084
 
 ### スピングラス理論（Spin-Glass Theory for Pedestrians）
 
@@ -29,6 +34,28 @@
 - **用途**: 理論の参考書として随時参照
 - **状況**: 読み進め中（参照用）
 - **メモ**: RSB・replica 計算・Parisi の形式論の導入として活用
+
+---
+
+## 次に読む（⭐ 最優先、2026-06-05 追加）
+
+### Schupper-Shnerb 2004/2005 — inverse melting
+
+- **タイトル**: "Spin Model for Inverse Melting and Inverse Glass Transition" / "Inverse melting and inverse freezing: a spin model"
+- **著者**: Schupper & Shnerb
+- **DOI**: 10.1103/PhysRevLett.93.037202 / 10.1103/PhysRevE.72.046107
+- **arXiv**: cond-mat/0403674 / cond-mat/0502033
+- **関連仮説**: H7（inverse melting 機構）
+- **優先度**: ⭐⭐ 最優先
+- **メモ**: 機構の核心「相互作用状態の縮退度 $\Omega$ が大きいと $TS$ 項で高温秩序化」。本研究の recitation 窓の理論的基盤。Schupper-Shnerb の縮退度パラメータを LLM 量に対応付けるために精読必須。完全版（PRE 2005）を読む。
+
+### arXiv:2601.11061 — Spurious Rewards Paradox（RLVR Memorization）
+
+- **著者**: 2026年
+- **関連仮説**: H6（訓練方式差）、H7（inverse melting 機構の LLM 側根拠）
+- **優先度**: ⭐ 高
+- **メモ**: RLVR 訓練が中間層 L18-L20 の Anchor-Adapter 回路を通じて暗記モードへのトリガーを作る。Qwen（RL）vs DeepSeek（SFT）の recitation 差の直接的機構仮説。査読状況未確認。
+- **URL**: https://arxiv.org/abs/2601.11061
 
 ---
 
@@ -64,6 +91,22 @@
 - **関連仮説**: H3, H5（Hopfield 模型の統計力学、SG相の理論）
 - **優先度**: ⭐ 最優先（todo.md 参照）
 - **メモ**: AGS 相図の recall/SG/PM 構造の理論的出典。本研究の相図と比較するための基礎
+
+### arXiv:2504.00509 — Recitation over Reasoning
+
+- **タイトル**: "Recitation over Reasoning: How Cutting-Edge LMs Can Fail on Elementary Reasoning Problems"
+- **関連仮説**: H6、H7（novelty 確認用）
+- **優先度**: 中（novelty positioning に必要）
+- **メモ**: 用語 "recitation over reasoning" の先行文献。RoR-Bench で変種への性能低下を測定。温度・$q_{EA}$ 等の物理量化はなし（本研究が novelty）。
+- **URL**: https://arxiv.org/abs/2504.00509
+
+### arXiv:2304.14964 — Dense Associative Memories（Lucibello-Mézard 2023）
+
+- **タイトル**: "The Exponential Capacity of Dense Associative Memories"
+- **関連仮説**: H7（$N=6$ で recitation 消失の容量上限）
+- **優先度**: 中
+- **メモ**: Dense AM は $P = \exp(\alpha N)$。N=6（63手）で recitation が消えることと容量限界の定量的対応付けに使用。系列容量（sequence capacity）版 arXiv:2601.00984 も参照。
+- **URL**: https://arxiv.org/abs/2304.14964
 
 ### 西森「スピングラス理論と情報統計力学」
 

@@ -1,0 +1,7 @@
+{
+  "environment": "hanoi",
+  "model": "Qwen/Qwen3-8B",
+  "N": 3,
+  "temperature": 1.2,
+  "sweep_type": "collapse_phase"
+}

@@ -272,14 +272,18 @@ archiveフォルダーについては、実験済みのものを保存してあ�
 - **解は一意であること**（成功・失敗を明確に判定するため）
 - それ以外（branching factor, 状態空間の連続性, ポテンシャル地形, 報酬の deceptive さ）は **制約なし**。多様に試す
 
-### 対象モデル（5 種）
+### 対象モデル（4 モデル軸 + 補足 1）
 
+**主軸（2 ファミリー × 2 サイズの 2×2 設計）**：
 - `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B`
 - `deepseek-ai/DeepSeek-R1-Distill-Qwen-14B`
-- `meta-llama/Meta-Llama-3-8B`（系列）
-- `Qwen/Qwen3-7B`
+- `Qwen/Qwen3-8B`
 - `Qwen/Qwen3-14B`
 
+**補足**（スケーリング則分析から除外）：
+- `meta-llama/Meta-Llama-3.1-8B-Instruct`（N≥3 で Ordered 相がほぼ存在しない）
+
+> 4 モデル軸は 2026-05-26 に確定。追加モデルは不要。パズル軸拡張の方が科学的価値が高い。
 > 各モデルの sweep 進捗は `research_state/results_summary.md` を参照（ここには書かない）。
 
 ### 計算資源
@@ -308,6 +312,55 @@ archiveフォルダーについては、実験済みのものを保存してあ�
 | **品質チェックエージェント** | コード品質審査。実装後に差分をチェックする。実装エージェントとは独立（`.claude/agents/quality-check-agent.md`） | Claude Code（Sonnet） |
 | **リサーチエージェント** | 文献調査の単一窓口。user・フィジックス・実装チームへ参考文献を供給する潤滑油役（`.claude/agents/research-agent.md`） | Claude Code（Sonnet） |
 | **パイプラインオーケストレーター** | GATE C 通過後の「スイープ実行 → DB 同期 → 進捗更新」を自動化する裏方（役割定義は `.claude/agents/pipeline-orchestrator.md`） | Claude Code（Sonnet サブエージェント） |
+| **プレゼンテーションエージェント** | 中間報告・教授向け資料の生成専用。hypotheses / results / specs を読み込み、物理的に一貫した説明（数式・背景・先行研究・仮説・手法・結果）を Markdown で構成し pandoc 経由で pptx に変換する。数式セクション生成後は physics-agent のレビューを受ける。`docs/design_system.yml` を記号定義の唯一の権威とする（役割定義は `.claude/agents/presentation-agent.md`） | Claude Code（Sonnet） |
+
+### presentation-agent の呼び出しルール
+
+orchestration は以下の条件でプレゼンテーションエージェントを起動する：
+
+**起動条件**（手動トリガーのみ）：
+- user が「資料作って」「中間報告スライド」「実験レポート」などを明示した場合
+
+**2 段階ワークフロー（必ず守ること）：**
+
+```
+Stage 1: 構成表生成 → physics-agent レビュー → ユーザー承認
+Stage 2: marp pptx 生成（承認後のみ）
+```
+
+**Stage 1 の起動方法**（Claude Code の `Agent` ツールを使用）：
+```
+subagent_type: "presentation-agent"
+prompt: ".claude/agents/presentation-agent.md の指示に従い、以下のパラメータで実行:
+  report_type: progress または experiment-report
+  spec_id: (experiment-report の場合のみ) SPEC-YYYY-MM-DD-NNN
+  output_stem: (任意) ファイル名ベース
+  stage: structure"
+```
+
+**Stage 1 完了後の必須手順**：
+1. presentation-agent の Stage 1 完了レポートを確認
+2. `[PHYSICS-REVIEW-REQUIRED]` が含まれていれば physics-agent を呼び出し数式スライドを審査
+3. physics-agent の指摘を構成表にフィードバックして修正させる
+4. 構成表（`docs/reports/<stem>_structure.md`）を user に提示し承認を求める
+5. user が「OK」を出したら Stage 2 を起動する
+
+**Stage 2 の起動方法**（ユーザー承認後のみ）：
+```
+subagent_type: "presentation-agent"
+prompt: ".claude/agents/presentation-agent.md の指示に従い、以下のパラメータで実行:
+  report_type: progress または experiment-report
+  output_stem: <Stage 1 と同じ stem>
+  stage: build
+  structure_file: docs/reports/<stem>_structure.md"
+```
+
+**Stage 2 完了後の必須手順**：
+1. Stage 2 完了レポートを確認
+2. 生成された pptx のパスを user に報告する
+
+**design_system.yml の更新が必要な場合**：
+新しい物理量・記号を導入する際は presentation-agent が `docs/design_system.yml` の `notation` と `variable_mapping` を先に更新してから資料に使う。
 
 ### Codex（実装エージェント）の呼び出しルール
 
@@ -402,14 +455,48 @@ Agent への prompt では `#` 見出しを使わず、以下の代替表記を�
 
 ---
 
-## 研究状態ファイル
+## セッション管理（開始 / 終了）
 
-研究の現状は以下のファイルに分けて管理する。会話の冒頭で参照する。
+### セッション開始プロトコル
 
-- `research_state/hypotheses.md` — 仮説（大方針・本命・作業枠組み・棚上げ）
-- `research_state/results_summary.md` — 観測事実と既存データの要約
-- `todo.md` — 優先度付きタスク
-- `open_questions.md` — 未解決の論点（未定項目は未定として明示）
+新しいセッションを開始したら、以下の順番でファイルを Read して現状を把握する。
+
+**Step 1: memory（自動ロード）を確認する**
+
+`project_roadmap.md` が system-reminder で自動挿入される。「実験状況」「パズル状況」の欄で 🔄 マークを探し、走っている実験があるかどうかを最初に把握する。
+
+**Step 2: 研究状態ファイルを順番に Read する（4 ファイル）**
+
+| 順番 | ファイル | 読み取るポイント |
+|---|---|---|
+| 1 | `todo.md` | P0「実行中」「実験キュー」を確認。次の行動を最初に把握する |
+| 2 | `research_state/results_summary.md` | 最新の観測事実・データ蓄積状況 |
+| 3 | `research_state/hypotheses.md` | 仮説の status / evidence の更新状況 |
+| 4 | `research_state/experiment_register.md` | running / done の最新実験 ID |
+
+**Step 3: 必要に応じて GPU 状態を確認する**
+
+```bash
+nvidia-smi   # 実験が走っているかどうかを確認
+```
+
+`project_roadmap.md` に 🔄 マークがあれば実験が走っている可能性がある。GPU 使用率が高ければ割り込まない。
+
+---
+
+### セッション終了プロトコル
+
+セッション終了時は必ず **`/wrap-up`** を実行する（`.claude/commands/wrap-up.md` で定義）。
+
+`/wrap-up` が自動で行うこと：
+1. `results_summary.md` / `hypotheses.md` / `todo.md` / `experiment_register.md` を差分更新
+2. `memory/project_roadmap.md` の実験状況・パズル状況欄を最新化
+3. 完了レポートと次回セッションの開始点を出力する
+
+> **補足ファイル**（必要なとき参照）：
+> - `research_state/puzzle_roadmap.md` — パズル選定・評価・実装優先順位
+> - `open_questions.md` — 未解決の論点
+> - `research_state/phase2_strategy.md` — Phase 2 移行計画
 
 ---
 

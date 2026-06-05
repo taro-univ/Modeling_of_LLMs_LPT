@@ -13,7 +13,8 @@ llama-8B は補足扱い（スケーリング則分析から除外）。
 
 ## P0：実験実行中
 
-- （なし）Hanoi 4モデル軸の sweep は全完了（EXP-007 完了 2026-06-05）。
+- 🔄 **Lights Out × DeepSeek-7B + Qwen3-8B full_sweep**（N=3,4,5、T=0.1–1.0、25 trials）— 2026-06-06 開始。H7' 普遍性検証・4動力学レジームの puzzle-agnostic 確認
+- ~~**ヒステリシス実験**~~ → 完了（2026-06-06）。tpm 双峰性確認・asymmetric melting として H7' 確定
 
 ---
 
@@ -43,14 +44,14 @@ llama-8B は補足扱い（スケーリング則分析から除外）。
   - [x] **L2 $P(q)$ で recitation basin の分離を検証** → PASS（2026-06-05）
     - recitation: 平均中心化 $q_\text{mean}=+0.53$（記憶 basin・$q_{EA}>0$）、reasoning/SG: $q\approx0$。`subclass_d3.md` の L2 検証節、`figures/recitation_order/<model>/pq_centered.png`
     - **H_eff への記憶 basin 組み込みゲート通過**。多井戸描像（full-B/C 縮退 + 高温記憶 basin）が L2 で裏付け
-  - [ ] **H_eff（多井戸ハミルトニアン）の構築**：full-B/full-C 縮退基底 + 高温で顕在化する記憶 basin。reasoning/memorization の有効温度分離（高温記憶想起の符号問題 H-2）を理論側で詰める ★モデリング本体へ
+  - [ ] **H7 再定式化**（ヒステリシス実験完了後）：Ω=1 の単一 attractor kinetic dominance として再記述 → physics-agent 再審査
+  - [ ] **H_eff（多井戸ハミルトニアン）の構築**：full-B/full-C 縮退基底 + 高温で顕在化する記憶 basin。H7 確定後に着手 ★モデリング本体へ
   - [ ] **L2：full-B/full-C 経路の隠れ状態 overlap 検証**（二重井戸の縮退ペア確認、D-2）
 - [ ] **SPEC-2026-05-22-001 の多モデル展開**（P(q) 分類器）
   - DeepSeek-14B（データあり）に対して実行
   - `q_tail_mass` の再キャリブレーションは全 4 モデルデータ揃い次第
-- [ ] **Qwen3-8B collapse_phase 完了後の解析**
-  - `run_pipeline.py` で相図 + P(q) 生成
-- [ ] **Qwen3-8B full_sweep 解析**（全 N2-6 完了済み、相図の傾向確認）
+- [x] **Qwen3-8B collapse_phase 解析**（2026-06-05）— $T_\text{SG→PM}(N=3)\approx1.95$、N=6 SG 確認。`figures/collapse_phase/qwen3-8b/`
+- [x] **Qwen3-8B full_sweep 解析**（2026-06-05）— N=3 全 T robust、N=4 即 PM 確認。`figures/full_sweep/qwen3-8b/`
 
 ---
 
