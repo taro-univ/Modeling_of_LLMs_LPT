@@ -14,7 +14,8 @@ class TowerOfHanoiEnv(BaseEnv):
     ハノイの塔の環境シミュレータおよび推論ポテンシャルの絶対評価。
 
     円盤数 N で初期化し、初期状態（A に全円盤）と
-    ゴール状態（C に全円盤）を管理する。
+    プロンプト用ゴール状態（C に全円盤）と、評価用の対称ゴール集合
+    （B/C に全円盤）を管理する。
     """
 
     LAMBDA_DIST = 1.0
@@ -34,6 +35,13 @@ class TowerOfHanoiEnv(BaseEnv):
             'B': [],
             'C': list(range(N, 0, -1)),
         }
+        self._goal_states: tuple[dict, ...] = (
+            self._make_full_peg_state('B'),
+            self._make_full_peg_state('C'),
+        )
+        self._goal_state_keys: frozenset[tuple] = frozenset(
+            self.state_to_key(state) for state in self._goal_states
+        )
 
     # ------------------------------------------------------------------
     # 公開 API
@@ -50,6 +58,11 @@ class TowerOfHanoiEnv(BaseEnv):
     @property
     def goal_state(self) -> dict:
         return self._goal_state
+
+    @property
+    def goal_states(self) -> tuple[dict, ...]:
+        """評価用の gauge 等価なゴール集合を返す。"""
+        return self._goal_states
 
     def make_sub_env(self, N: int) -> 'TowerOfHanoiEnv':
         return TowerOfHanoiEnv(N)
@@ -115,7 +128,7 @@ class TowerOfHanoiEnv(BaseEnv):
         illegal_count = 0
 
         for move_str in current_moves:
-            if state == self.goal_state:
+            if self._is_goal_state(state):
                 break
             parsed = self._parse_move(move_str)
             if parsed is None:
@@ -135,7 +148,7 @@ class TowerOfHanoiEnv(BaseEnv):
         state = {k: list(v) for k, v in self.initial_state.items()}
 
         for move_str in current_moves:
-            if state == self.goal_state:
+            if self._is_goal_state(state):
                 return True
             parsed = self._parse_move(move_str)
             if parsed is None:
@@ -143,7 +156,7 @@ class TowerOfHanoiEnv(BaseEnv):
             disk, src, dst = parsed
             self._apply_move(state, disk, src, dst)
 
-        return state == self.goal_state
+        return self._is_goal_state(state)
 
     def solve(self) -> list:
         """最適手列を文字列リストで返す（O(2^N) 再帰）。"""
@@ -187,12 +200,19 @@ class TowerOfHanoiEnv(BaseEnv):
         return coord
 
     def _min_moves_from(self, state: dict) -> int:
-        """任意の盤面状態からゴールまでの最短手数を O(N) 再帰で返す。"""
+        """任意の盤面状態から C ゴールまでの最短手数を O(N) 再帰で返す。"""
         return self._min_moves_to_peg(state, self.N, 'C')
+
+    def _min_moves_from_symmetric(self, state: dict) -> int:
+        """任意の盤面状態から B/C ゴール集合までの最短手数を返す。"""
+        return min(
+            self._min_moves_to_peg(state, self.N, 'B'),
+            self._min_moves_to_peg(state, self.N, 'C'),
+        )
 
     def _compute_V(self, state: dict, illegal_count: int = 0) -> float:
         """ハノイ固有の推論ポテンシャル V(x) を計算する。"""
-        d_hat = self._min_moves_from(state) / self.min_moves
+        d_hat = self._min_moves_from_symmetric(state) / self.min_moves
         penalty = self.LAMBDA_PENALTY * illegal_count
         return round(self.LAMBDA_DIST * d_hat + penalty, 6)
 
@@ -207,6 +227,16 @@ class TowerOfHanoiEnv(BaseEnv):
             disk_str = ', '.join(str(d) for d in disks) if disks else '(empty)'
             lines.append(f"  Peg {peg}: [{disk_str}]")
         return '\n'.join(lines)
+
+    def _make_full_peg_state(self, peg: str) -> dict:
+        return {
+            'A': list(range(self.N, 0, -1)) if peg == 'A' else [],
+            'B': list(range(self.N, 0, -1)) if peg == 'B' else [],
+            'C': list(range(self.N, 0, -1)) if peg == 'C' else [],
+        }
+
+    def _is_goal_state(self, state: dict) -> bool:
+        return self.state_to_key(state) in self._goal_state_keys
 
     def _parse_move(self, move_str: str):
         """
