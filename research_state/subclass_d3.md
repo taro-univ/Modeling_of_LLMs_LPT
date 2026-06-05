@@ -41,6 +41,24 @@ onset は sigmoid ではなく「窓」（立ち上がり T≈1.2-1.4・ほぼ N
 
 1. **Qwen の $T_{c2}$ 主張は降ろす**（physics-agent 条件3）。N≥4 は「ordered 相不在」ではなく「**SG↔PM 境界が不明瞭**」と記述（M-3、真因＝統計不足／$T_{c1}$ 測定窓外／SG が低温まで広い、は未分離）。3相枠組みは全面改訂せず「ordered が N で測定窓から消える」精緻化に留める（L-1）。
 2. **$T_{c2}$ の N 非依存性は DeepSeek ファミリーの性質**（H5、recitation 交絡なしで確認済み）。Qwen は別の崩壊様式（recitation フォールバック）を持つ（H6）。
-3. **記憶 basin の H_eff 組み込みは L2 の $P(q)$ 検証を通過するまで保留**（physics-agent 条件5・user 決定）。次タスク：recitation 群と reasoning 群で L2 隠れ状態（layer_mid, npz 取得済み）の $P(q)$ overlap が分離するか（recitation=鋭いアトラクタ $q_{EA}\to1$）を検証。
+3. **記憶 basin の H_eff 組み込み前提条件＝L2 $P(q)$ 検証は PASS**（2026-06-05、下記）。
 
-データ：`research_state/subclass_d3.json`（335セル）。図：`figures/recitation_order/<model>/`。
+## L2 $P(q)$ 検証結果（条件5・D-2 ゲート）→ PASS
+
+recitation 群 / reasoning 群 / SG 群で、layer_mid 隠れ状態の試行平均ベクトル間 overlap $q$ を群内 pairwise に計算（per-cell で算出しプール）。
+
+**生 cosine**（qwen3-14b）：recitation $q=0.999\pm0.001$（デルタ的）、reasoning $0.967\pm0.019$、SG $0.963\pm0.019$。recitation の分散が約20分の1。
+
+**平均中心化**（共通成分＝異方性を除去、proper な $P(q)$）：
+
+| 群 | $q_\text{mean}$ | median | 解釈 |
+|---|---|---|---|
+| **recitation** | **+0.527** | **+0.795** | レプリカ整列、有限 $q_{EA}$ ＝**構造化された記憶 basin** |
+| reasoning | −0.002 | −0.057 | overlap≈0、凍結共通方向なし |
+| SG | −0.022 | −0.044 | 同上 |
+
+**結論**：recitation-order は隠れ状態空間で**鋭い記憶アトラクタ（想起された記憶パターン、$q_{EA}\approx0.53$）**として実在し、reasoning/SG（$q\approx0$）と明確に分離。スピングラス/Hopfield の retrieval 相署名。**多井戸描像（full-B/full-C 縮退基底 + 高温で顕在化する記憶 basin）が L2 で直接裏付けられた → H_eff への記憶 basin 組み込みのゲートを通過**。
+
+未決：SG が trial-mean レベルで $q\approx0$（per-move の細かい解像度では構造が出る可能性、別途）。reasoning channel と memorization channel の有効温度分離（高温記憶想起の符号問題、H-2）は理論側で要詰め。
+
+データ：`research_state/subclass_d3.json`（335セル）。図：`figures/recitation_order/<model>/`（recitation_fraction.png, pq_centered.png）。

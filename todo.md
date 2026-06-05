@@ -39,8 +39,10 @@ llama-8B は補足扱い（スケーリング則分析から除外）。
   - [x] **観測4「$T_{c2}$ の N 非依存性」を対称化 accuracy で再フィット** → DeepSeek で確認・H5 証拠回復（`research_state/tc2_refit_symmetric.md`）
   - [x] **recitation order と reasoning-driven order の sub-classify**（D-3、2026-06-05、physics-agent 審査済み）
     - 判別子 tokens_per_move<15（move 列は一意ゆえ区別不能・計算量で分離）。相構造 reasoning→recitation→PM 確定。`research_state/subclass_d3.md`
-  - [ ] **L2 $P(q)$ で recitation basin の分離を検証**（D-3 条件5・H_eff 記憶 basin 組み込みの前提）★次の優先
-    - recitation 群 vs reasoning 群で layer_mid 隠れ状態の overlap 分布が分離するか（recitation=鋭いアトラクタ $q_{EA}\to1$）。npz 取得済み
+  - [x] **L2 $P(q)$ で recitation basin の分離を検証** → PASS（2026-06-05）
+    - recitation: 平均中心化 $q_\text{mean}=+0.53$（記憶 basin・$q_{EA}>0$）、reasoning/SG: $q\approx0$。`subclass_d3.md` の L2 検証節、`figures/recitation_order/<model>/pq_centered.png`
+    - **H_eff への記憶 basin 組み込みゲート通過**。多井戸描像（full-B/C 縮退 + 高温記憶 basin）が L2 で裏付け
+  - [ ] **H_eff（多井戸ハミルトニアン）の構築**：full-B/full-C 縮退基底 + 高温で顕在化する記憶 basin。reasoning/memorization の有効温度分離（高温記憶想起の符号問題 H-2）を理論側で詰める ★モデリング本体へ
   - [ ] **L2：full-B/full-C 経路の隠れ状態 overlap 検証**（二重井戸の縮退ペア確認、D-2）
 - [ ] **SPEC-2026-05-22-001 の多モデル展開**（P(q) 分類器）
   - DeepSeek-14B（データあり）に対して実行
