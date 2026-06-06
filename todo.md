@@ -13,7 +13,8 @@ llama-8B は補足扱い（スケーリング則分析から除外）。
 
 ## P0：実験実行中
 
-- 🔄 **Lights Out × DeepSeek-7B + Qwen3-8B full_sweep**（N=3,4,5、T=0.1–1.0、25 trials）— 2026-06-06 開始。H7' 普遍性検証・4動力学レジームの puzzle-agnostic 確認
+- （実行中の実験なし）
+- ~~**Lights Out × DeepSeek-7B + Qwen3-8B full_sweep**~~ → **保留**（2026-06-06、EXP-009）。7B が N=3 を予算内で解けず秩序相が立たない。スイープは停止・データ破棄。詳細：観測 9 / memory `finding_lights_out_held.md`
 - ~~**ヒステリシス実験**~~ → 完了（2026-06-06）。tpm 双峰性確認・asymmetric melting として H7' 確定
 
 ---
@@ -23,11 +24,7 @@ llama-8B は補足扱い（スケーリング則分析から除外）。
 1. ~~**Qwen3-8B collapse_phase**~~ → 完了（EXP-005、36/36）
 2. ~~**Qwen3-14B full_sweep**~~ → 完了（EXP-006、51/52、N6_T0_6 欠損）
 3. ~~**Qwen3-14B collapse_phase**~~ → 完了（EXP-007、36/36、2026-06-05）
-4. **Lights Out × DeepSeek-7B sweep**（スクリプト整備済み）
-   ```bash
-   bash runners/scripts/run_lights_out_sweep.sh
-   bash runners/scripts/run_lights_out_collapse_sweep.sh
-   ```
+4. ~~**Lights Out × DeepSeek-7B sweep**~~ → **保留**（EXP-009、7B 解けず）。再開するなら 14B で能力確認が先
 5. **14B / N6_T0_8 補完**（クラッシュセルの再実行、低優先）
 
 ---
@@ -54,6 +51,13 @@ llama-8B は補足扱い（スケーリング則分析から除外）。
 - [x] **Qwen3-8B full_sweep 解析**（2026-06-05）— N=3 全 T robust、N=4 即 PM 確認。`figures/full_sweep/qwen3-8b/`
 
 ---
+
+## P0：パズル横断インフラ（Lights Out 保留に伴う整理）
+
+- [x] **SPEC-2026-06-06-003 実装**（2026-06-06）：「手」処理を `BaseEnv` に env 委譲化（`count_moves`/`get_system_hint`/`extract_moves_with_position`、early-stop D/B）。Hanoi 専用前提の漏れを修正。commit 45c4db0、pytest 50 passed、physics PASS、Hanoi 回帰ゼロ。**N-puzzle/Frog Jump 用の汎用インフラとして保持**
+- [ ] **採点バグ修正**（enumerate 型パズルを次に扱う前に）：`extract_moves_from_text` が本文全体（思考中の Toggle 含む）を採点 → `</think>` 以降の解答のみ採点に変更。Lights Out で顕在化・Hanoi 軽微
+- [ ] **SPEC-2026-06-06-004（Algorithm C の OOP化）**：draft で park。physics 確定（C は censoring 降格、move_loop→Oscillatory は L2 $J_{ss}$ で確定・Hanoi にも波及）。Lights Out 再開 or 他 enumerate パズル着手時に final 化
+- [ ] **次パズルの選定**（user 判断）：N-puzzle（SPEC-2026-06-06-001）/ Frog Jump（SPEC-2026-06-06-002）の draft あり。または Lights Out を 14B で再評価
 
 ## P1：解析
 

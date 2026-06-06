@@ -4,7 +4,7 @@
 
 詳細な数値・図表は `docs/Modeling_idea.md`、`results/hanoi/full_sweep/`、`results/hanoi/collapse_phase/` を参照。
 
-最終更新：2026-06-05（夜）。L2 秩序変数の再定式化実施（Track B 完了）。**recitation basin は Ω=1 の単一決定論的 attractor** と判明。$p_\text{recit}(T)$ が真の秩序変数。H7（inverse melting）は要再定式化・ヒステリシス実験実施中。Qwen3-8B 解析完了（$T_\text{SG→PM}(N=3)\approx1.95$）。
+最終更新：2026-06-06。**Lights Out を保留**（7B が N=3 を予算内で解けず秩序相が立たない、観測 9）。SPEC-2026-06-06-003 で「手」処理を env 委譲化（Hanoi 専用前提の漏れを修正、汎用インフラとして保持）。前回（2026-06-05）：L2 秩序変数の再定式化（Track B 完了）、**recitation basin は Ω=1 の単一決定論的 attractor**、$p_\text{recit}(T)$ が真の秩序変数、H7→H7'（asymmetric melting）。
 
 ---
 
@@ -114,6 +114,17 @@ per-trial replica pair $q_{ab}$ の正しい計算と、raw cosine（centering �
 **DeepSeek-7B との比較**：
 - 全温度域で $q_{EA}\approx0.02$（スケール2桁差）、recitation basin 不在を確認
 
+### 観測 9：Lights Out は 7B では秩序相が立たない → 保留（EXP-009, 2026-06-06）
+
+Lights Out（GF(2) 一意解パズル）の DeepSeek-7B 検証で **計16 trial 全 accuracy=0**。原因は3層：
+
+1. **測定漏れ（修正済み）**：early-stop の手数カウントが Hanoi 専用 `_MOVE_RE` で `Toggle (r,c)` を拾えず `no_move_catchall` 誤爆 → 推論途中で強制打ち切り。SPEC-2026-06-06-003 で env 委譲化して修正（commit 45c4db0、pytest 50 passed、physics PASS、Hanoi 回帰ゼロ）。L2 キャプチャも `__fallback__` から実 Toggle 位置取得に回復。
+2. **予算切れ**：`num_predict=4096`（8192/10000 も）で 7B が GF(2) 9元系を立式→ガウス消去途中で切断、`</think>` を閉じきれない。
+3. **能力不足**：閉じた 1 trial も誤答（64手, v=0.667）。GF(2) 手計算が 7B には不安定。
+4. **未修正の採点バグ**：`extract_moves_from_text` が本文全体（思考中の試行錯誤 Toggle 含む）を採点 → `</think>` 以降の解答のみ採点すべき。Lights Out で顕在化、Hanoi では軽微。
+
+**決定（user, 2026-06-06）**：Lights Out 保留・再考。SPEC-003 の env 委譲修正は N-puzzle/Frog Jump 用の汎用インフラとして保持。SPEC-2026-06-06-004（Algorithm C の OOP化）は draft で park。再考の選択肢：N-puzzle（SPEC-001）/ Frog Jump（SPEC-002）優先、または Lights Out を 14B で再評価。詳細：memory `finding_lights_out_held.md`。
+
 ---
 
 ## 暫定転移温度（$N=3$, deepseek-r1-distill-qwen-7B）
@@ -173,6 +184,6 @@ per-trial replica pair $q_{ab}$ の正しい計算と、raw cosine（centering �
 - **Qwen3-8B collapse_phase 解析**（実行完了後に `run_pipeline.py`）
 - **Qwen3-14B 全 sweep**（8B collapse_phase 完了後に開始）
 - **14B / N6_T0_8 の補完**
-- **Lights Out × DeepSeek-7B の sweep**（スクリプト整備済み、実行待ち）
+- ~~**Lights Out × DeepSeek-7B の sweep**~~ → **保留**（観測 9、7B 解けず・EXP-009）
 - **4 モデル × Hanoi の P(q) 横断解析**（npz は 7B/14B/llama-8B で揃っている）
 - **3 モデリング案のフィッティング**（データが揃い次第）

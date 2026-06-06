@@ -148,9 +148,9 @@ $$
 
 **未確認条件**：$E_r > E_m$（reasoning の探索コスト > recitation 起動コスト at high T）は仮定。軌道エントロピー $S_\text{reason}$ と basin depth $E$ の実測が次の検証課題。
 
-- **status**: active（physics-agent 条件付き合格 2026-06-06。$S$/$E$ 符号の実測と他パズルでの普遍性確認が残条件）
+- **status**: active（physics-agent 条件付き合格 2026-06-06。$S$/$E$ 符号の実測と他パズルでの普遍性確認が残条件。**他パズル普遍性の Lights Out 検証は保留** — 7B が解けず秩序相が立たない、EXP-009/observation 9。N-puzzle・Frog Jump か 14B での再検証が必要）
 - **evidence**: Ω=1 確定（basin count クラスタリング）、tpm 双峰性（ヒステリシス実験 2026-06-06）、raw $q_\text{EA}\approx0.97$–$1.0$（T 非依存定数）、$J_\text{mem}$ オン/オフ（arXiv:2601.11061）
-- **changed**: 2026-06-05 H7 新規 / **2026-06-06 H7' に全面改訂（asymmetric melting、Schupper-Shnerb 撤回）**
+- **changed**: 2026-06-05 H7 新規 / **2026-06-06 H7' に全面改訂（asymmetric melting、Schupper-Shnerb 撤回）** / 2026-06-06 他パズル普遍性検証は Lights Out 保留により N-puzzle/Frog Jump/14B へ持ち越し
 - **refs**: arXiv:2601.11061（RLVR Anchor-Adapter）; Schupper-Shnerb は撤回
 
 ---
