@@ -267,7 +267,7 @@ class LightsOutEnv(BaseEnv):
         )
 
     def _parse_move(self, move_str: str) -> Optional[tuple[int, int]]:
-        match = re.search(r"Toggle\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)", move_str, re.IGNORECASE)
+        match = self.MOVE_RE.search(move_str)
         if not match:
             return None
         return int(match.group(1)), int(match.group(2))

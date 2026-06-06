@@ -28,6 +28,18 @@ def _d_only_cfg(no_move_ratio: float) -> EarlyStopConfig:
     )
 
 
+def _b_only_cfg(max_move_multiplier: float) -> EarlyStopConfig:
+    """Algorithm B のみを有効にした設定を返す。"""
+    return EarlyStopConfig(
+        max_move_multiplier=max_move_multiplier,
+        enable_think_budget=False,
+        enable_no_move=False,
+        enable_move_ceiling=True,
+        enable_move_loop=False,
+        enable_stagnation=False,
+    )
+
+
 def check_stagnation(
     last_move_chunk: int | None,
     current_chunk: int,
@@ -126,6 +138,29 @@ class TestAlgorithmD:
         )
 
         assert result == "no_move_catchall"
+
+
+# ===========================================================================
+# Algorithm B テスト（move_ceiling の env 委譲検証）
+# ===========================================================================
+
+class TestAlgorithmB:
+
+    def test_b1_lights_out_toggle_count_triggers_move_ceiling(self):
+        """B-1: Lights Out の Toggle 数が上限を超えると move_ceiling が発火する。"""
+        env = LightsOutEnv(N=3, seed=42)
+        cfg = _b_only_cfg(max_move_multiplier=1.0)
+        text = "\n".join("Toggle (0,0)" for _ in range(env.min_moves + 1))
+
+        result = check_early_stop(
+            text,
+            num_predict=4096,
+            min_moves=env.min_moves,
+            cfg=cfg,
+            env=env,
+        )
+
+        assert result == "move_ceiling"
 
 
 # ===========================================================================

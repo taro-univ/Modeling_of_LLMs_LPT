@@ -60,6 +60,24 @@ def test_hanoi_extract_moves_from_text():
     ]
 
 
+def test_hanoi_extract_moves_with_position_returns_normalized_text_and_start():
+    env = TowerOfHanoiEnv(N=3)
+    text = "thinking\nMove 1 from A to C\nnoise\nmove 2 from a to b"
+
+    assert env.extract_moves_with_position(text) == [
+        ("Move 1 from A to C", text.index("Move 1 from A to C")),
+        ("Move 2 from A to B", text.index("move 2 from a to b")),
+    ]
+
+
+def test_hanoi_system_hint_is_puzzle_specific():
+    env = TowerOfHanoiEnv(N=3)
+    hint = env.get_system_hint()
+
+    assert "Tower of Hanoi" in hint
+    assert "Lights Out" not in hint
+
+
 def test_hanoi_state_to_key_and_simulate_states_use_public_key_method():
     env = TowerOfHanoiEnv(N=2)
     states = env._simulate_states(env.initial_state, ["Move 1 from A to B"])

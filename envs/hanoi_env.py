@@ -264,10 +264,7 @@ class TowerOfHanoiEnv(BaseEnv):
         "Move <disk> from <src> to <dst>" 形式をパースする。
         マッチしない場合は None を返す。
         """
-        m = re.search(
-            r'Move\s+(\d+)\s+from\s+([ABC])\s+to\s+([ABC])',
-            move_str, re.IGNORECASE,
-        )
+        m = self.MOVE_RE.search(move_str)
         if m:
             return int(m.group(1)), m.group(2).upper(), m.group(3).upper()
         return None

@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -769,7 +770,17 @@ def parse_args() -> argparse.Namespace:
         choices=["hanoi", "lights_out"],
         help="パズル種を選択（デフォルト: hanoi）",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.puzzle != "lights_out" and args.seed is not None:
+        parser.error("--seed is only supported with --puzzle lights_out")
+    if args.puzzle == "lights_out" and args.n_shot > 0:
+        print(
+            f"[WARN] Lights Out uses n_shot=0 by SPEC-2026-06-06-003 decision #5; "
+            f"overriding --n-shot {args.n_shot} to 0.",
+            file=sys.stderr,
+        )
+        args.n_shot = 0
+    return args
 
 
 def _build_early_stop_cfg(args) -> Optional[EarlyStopConfig]:
@@ -841,7 +852,7 @@ def main() -> None:
     env_factory = puzzle_factories[args.puzzle]
     env = (
         env_factory(args.N, seed=args.seed)
-        if args.seed is not None
+        if args.puzzle == "lights_out"
         else env_factory(args.N)
     )
 
