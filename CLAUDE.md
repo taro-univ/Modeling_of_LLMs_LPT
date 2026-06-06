@@ -144,17 +144,25 @@ analysis/*.py
 
 ### early_stop の種類と物理的解釈
 
-| 値 | アルゴリズム | 暫定的な相対応 |
-|---|---|---|
-| `goal_reached` | run_local.py | 秩序相 (Ordered) |
-| `move_loop_repeat` / `move_loop_reverse` | C | スピングラス相 (SG) |
-| `no_move_catchall` | D | 常磁性相 (PM) |
-| `move_ceiling` | B | 常磁性相 (PM) |
-| `stagnation_after_move` | E | **未確定**（SG / PM 両解釈あり、SPEC-2026-05-21-001 で調査中） |
-| `think_budget` | A | **相分類から除外**（測定上の打ち切り。censored data として扱う） |
+> **重要（2026-06-06 改訂）**：early_stop ラベルは**動力学レジームの暫定的な手がかり / 停止理由の記録（censoring）**であり、
+> **熱力学的な「相」ではない**。レジーム/相の確定帰属は **L2 hidden-state の P(q) / $q_{EA}$ パイプライン**に一本化する
+> （ラベル比率からの相推定は `docs/phase_classification_review.md` で**不合格・要再設計**判定。SPEC-2026-06-06-004 physics 審査で確定）。
+> 旧「3相（Ordered / SG / PM）」は **4 動力学レジーム**へ更新（`research_state/hypotheses.md` 参照）。
 
-> 相対応の詳細・問題点は `docs/phase_classification_review.md` を参照。
-> 現行の分類アルゴリズムは physics-agent 審査で**不合格（要再設計）**と判定されており、P(q) ベース再設計を進行中。
+| 値 | アルゴリズム | 動力学レジーム対応（2026-06-06 改訂） |
+|---|---|---|
+| `goal_reached` | run_local.py | **Reasoning-ordered**（推論型）/ **Recitation-ordered**（復唱型・Qwen のみ、`tokens_per_move<15` で判別） |
+| `move_loop_repeat` / `move_loop_reverse` | C | **Oscillatory レジーム**（非勾配循環・NESS 確率カレント $J_{ss}\neq0$ 候補、実測で確定予定）。**旧「SG 相」は 2026-06-06 撤回** |
+| `no_move_catchall` | D | **PM**（常磁性・拡散的） |
+| `move_ceiling` | B | **PM**（常磁性） |
+| `stagnation_after_move` | E | **PM**（拡散的・構造なし。旧「未確定」を 4-regime で PM に整理） |
+| `think_budget` | A | **相分類から除外**（測定上の打ち切り・censored data として扱う） |
+
+> **動力学レジームは熱力学的な相ではない**（双安定・確率選択・ノイズ誘起遷移を含む非平衡描像）。
+> ベクトル場 $\dot{h} = -\nabla V + A + \text{noise}$ の文脈で記述する（`research_state/hypotheses.md` H3/H4）。
+> 可換パズル（Lights Out 等、GF(2) involution）では `move_loop` は順序 gauge アーティファクトを含むため
+> **動的循環解析は移植不可**で、C ラベルは純 censoring として扱う（SPEC-2026-06-06-003 caveat A / -004）。
+> 詳細・問題点は `docs/phase_classification_review.md` を参照。
 
 ---
 
@@ -196,6 +204,9 @@ analysis/*.py
 | `accuracy` (0 or 1) | 秩序変数 $m$ | 磁化（1=秩序、0=無秩序） |
 | `n_shot` (int) | few-shot 例示数 | 外部磁場 $h$（秩序相を安定化） |
 | `K(N) = 2^N - 1` | 最短解の手数 | Hopfield 項のパターン数（記憶容量に対応） |
+
+> **n_shot の実験条件に関する注意**：現行の本番スイープ（`run_full_sweep.sh` / `run_collapse_phase_sweep.sh` / `run_full_sweep_v2.sh` / `run_lights_out_sweep.sh`）は**すべて `n_shot=0`（外部磁場 $h=0$）**で実行している（各スクリプトの既定 `N_SHOT=0`）。
+> `run_local.py` の関数デフォルト `n_shot=2` および CLI デフォルト `1` は**実験条件ではない**ので、相図・cross-puzzle 比較の $h$ 条件は一律 $h=0$ として扱うこと（ハノイ・Lights Out とも $h=0$ で揃っている）。
 
 ### 相図の読み方
 
