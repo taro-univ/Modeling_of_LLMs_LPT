@@ -9,6 +9,7 @@ Algorithm D（no_move_ratio 閾値変更）と Algorithm E（stagnation_after_mo
 """
 
 import pytest
+from envs.lights_out_env import LightsOutEnv
 from runners.run import check_early_stop, EarlyStopConfig
 
 
@@ -22,6 +23,18 @@ def _d_only_cfg(no_move_ratio: float) -> EarlyStopConfig:
         no_move_ratio=no_move_ratio,
         enable_think_budget=False,
         enable_move_ceiling=False,
+        enable_move_loop=False,
+        enable_stagnation=False,
+    )
+
+
+def _b_only_cfg(max_move_multiplier: float) -> EarlyStopConfig:
+    """Algorithm B のみを有効にした設定を返す。"""
+    return EarlyStopConfig(
+        max_move_multiplier=max_move_multiplier,
+        enable_think_budget=False,
+        enable_no_move=False,
+        enable_move_ceiling=True,
         enable_move_loop=False,
         enable_stagnation=False,
     )
@@ -91,6 +104,63 @@ class TestAlgorithmD:
         )
         assert old_result is None
         assert new_result == "no_move_catchall"
+
+    def test_d6_lights_out_toggle_prevents_no_move_catchall(self):
+        """D-6: Lights Out の Toggle は env 委譲で手として数える。"""
+        cfg = _d_only_cfg(no_move_ratio=0.25)
+        env = LightsOutEnv(N=3, seed=42)
+        text = "A" * 3600 + "\nToggle (0,0)\n"
+
+        legacy_result = check_early_stop(text, num_predict=4096, min_moves=7, cfg=cfg)
+        delegated_result = check_early_stop(
+            text,
+            num_predict=4096,
+            min_moves=env.min_moves,
+            cfg=cfg,
+            env=env,
+        )
+
+        assert legacy_result == "no_move_catchall"
+        assert delegated_result is None
+
+    def test_d7_lights_out_still_fires_when_no_toggle_exists(self):
+        """D-7: env 委譲後も Toggle なしなら no_move_catchall は維持する。"""
+        cfg = _d_only_cfg(no_move_ratio=0.25)
+        env = LightsOutEnv(N=3, seed=42)
+        text = "A" * 3600
+
+        result = check_early_stop(
+            text,
+            num_predict=4096,
+            min_moves=env.min_moves,
+            cfg=cfg,
+            env=env,
+        )
+
+        assert result == "no_move_catchall"
+
+
+# ===========================================================================
+# Algorithm B テスト（move_ceiling の env 委譲検証）
+# ===========================================================================
+
+class TestAlgorithmB:
+
+    def test_b1_lights_out_toggle_count_triggers_move_ceiling(self):
+        """B-1: Lights Out の Toggle 数が上限を超えると move_ceiling が発火する。"""
+        env = LightsOutEnv(N=3, seed=42)
+        cfg = _b_only_cfg(max_move_multiplier=1.0)
+        text = "\n".join("Toggle (0,0)" for _ in range(env.min_moves + 1))
+
+        result = check_early_stop(
+            text,
+            num_predict=4096,
+            min_moves=env.min_moves,
+            cfg=cfg,
+            env=env,
+        )
+
+        assert result == "move_ceiling"
 
 
 # ===========================================================================

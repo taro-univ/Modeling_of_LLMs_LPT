@@ -81,3 +81,54 @@ N 依存性（スケーリング則 $T_c(N) = A \cdot N^{-\alpha}$）を複数�
 1. **モデル1** → すぐにフィット可能、$T_{c1}$・$T_{c2}$ を定量化できる
 2. **モデル2** → npz の $P(q)$ 解析と組み合わせると SG 相の物理的定義が確立する
 3. **モデル3** → 複数 N の $T_c(N)$ が揃ってから検証（N=4,5,6 のデータ待ち）
+
+---
+
+## ハミルトニアン審査結果（2026-05-25, physics-agent）
+
+EXP-002（ボルツマン直線性不成立・Tc2 N 非依存性）を踏まえた physics-agent による候補審査。
+
+### 各候補の判定
+
+| 候補 | 判定 | 根拠 |
+|---|---|---|
+| A: Hopfield（静的） | 条件付き推奨（単独不可） | Tc1 急落は説明できるが Tc2 N 非依存性が出ない。H_eff の骨格としては有用 |
+| B: REM | **棄却確定** | Tc2 N 非依存性を原理的に説明不可（β_c ~ sqrt(2 ln M) が M に依存する構造から逃れられない） |
+| C: Langevin（非平衡） | **強推奨**（フレーム） | H5（平衡ボルツマン不成立）と直接整合。f_drive が H4（制御外力）の居場所 |
+| D: Landau（2秩序変数） | 条件付き推奨 | h レベルのハミルトニアンではなく粗視化記述。h レベル理論と並行保持 |
+
+### physics-agent 推奨表式
+
+**フレーム**: 候補 C (Langevin) + H_eff として**球面 $p$-スピン型**（連続 Hopfield 高次版）
+
+$$
+\tau \frac{dh^\alpha}{dt} = -\frac{\partial H_\text{eff}}{\partial h^\alpha} + f_\text{drive}^\alpha - \mu(t) h^\alpha + \sqrt{2T}\,\xi^\alpha(t)
+$$
+
+$$
+H_\text{eff}(h) = -\frac{1}{p!\, d^{p-1}} \sum_{\mu=1}^{P(N)} \bigl(h \cdot \xi^\mu\bigr)^p
+$$
+
+各記号の意味：
+
+| 記号 | 意味 | 備考 |
+|---|---|---|
+| $h^\alpha \in \mathbb{R}^d$ | trial $\alpha$ の隠れ状態（layer_mid, $d=4096$） | 球面拘束 $\|h\|^2 = d$（LayerNorm の帰結） |
+| $\xi^\mu$ | 記憶パターン | $\mu=1$: 正解経路、$\mu>1$: ループ basin |
+| $P(N)$ | パターン数 | 暫定 $P(N) \sim 2^N - 1 = K(N)$ |
+| $p$ | 相互作用次数 | **未定**。$p=2$（標準 Hopfield）, $p=3$（attention の Q×K×V 対応候補）, $p \to \infty$（softmax attention） |
+| $f_\text{drive}$ | 非保存力（制御外力） | H4 の居場所。autoregressive 性に由来する非平衡駆動 |
+| $\mu(t)$ | Lagrange 乗数 | 球面拘束を課す |
+
+### Tc1/Tc2 の非対称性の理論的説明（球面 $p$-スピン, $p \geq 3$）
+
+- **Tc1（Ordered→SG、N依存・急落）**: 正解 basin が熱揺らぎで消滅する温度 → $P(N) \sim 2^N$ に対して依存（指数的低下）
+- **Tc2（SG→PM、N非依存）**: 個々のループ basin が消滅する動的転移温度 $T_d$ → basin の深さ（LLM重みのスケール $J$）で決まり $P$ に鈍感
+
+標準 Hopfield ($p=2$) では Tc2 も P 依存するため説明できない。$p \geq 3$ の球面 p-スピン模型が必要。
+
+### 未確定事項（open_questions.md U10〜U12 参照）
+
+1. $p$ の値（$p=2, 3, \infty$ のどれか）
+2. $\xi^\mu$ の同定方法（正解経路の hidden state を直接使うか、別手法か）
+3. 本命枠組みの採否（user 確認待ち）

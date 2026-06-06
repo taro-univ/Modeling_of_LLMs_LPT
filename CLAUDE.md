@@ -86,14 +86,15 @@ bash runners/scripts/run_full_sweep.sh \
 ### 5. 解析
 
 ```bash
-# 相図（accuracy + early_stop 内訳の 2相/3相）
-python3 analysis/analyze_phase_diagram.py --dir results/hanoi/full_sweep/<slug>/
+# 統合解析パイプライン（相図 + P(q) + 臨界減速）
+python3 analysis/run_pipeline.py \
+    --data-dir results/hanoi/full_sweep/<slug>/ \
+    --out-dir figures/full_sweep/<slug>/ \
+    --title "<model name>" \
+    --analyzers phase_transition spin_glass critical_dynamics
 
-# P(q) 分布・q_EA・自己相関（SG 判別）
-python3 analysis/analyze_pq.py --dir results/hanoi/full_sweep/<slug>/
-
-# full_sweep + collapse_phase の統合相図
-python3 analysis/analyze_integrated.py --model <slug>
+# YAML config から実行
+python3 analysis/run_pipeline.py --config analysis/configs/template.yaml
 ```
 
 ### 6. DB 同期
@@ -143,17 +144,25 @@ analysis/*.py
 
 ### early_stop の種類と物理的解釈
 
-| 値 | アルゴリズム | 暫定的な相対応 |
-|---|---|---|
-| `goal_reached` | run_local.py | 秩序相 (Ordered) |
-| `move_loop_repeat` / `move_loop_reverse` | C | スピングラス相 (SG) |
-| `no_move_catchall` | D | 常磁性相 (PM) |
-| `move_ceiling` | B | 常磁性相 (PM) |
-| `stagnation_after_move` | E | **未確定**（SG / PM 両解釈あり、SPEC-2026-05-21-001 で調査中） |
-| `think_budget` | A | **相分類から除外**（測定上の打ち切り。censored data として扱う） |
+> **重要（2026-06-06 改訂）**：early_stop ラベルは**動力学レジームの暫定的な手がかり / 停止理由の記録（censoring）**であり、
+> **熱力学的な「相」ではない**。レジーム/相の確定帰属は **L2 hidden-state の P(q) / $q_{EA}$ パイプライン**に一本化する
+> （ラベル比率からの相推定は `docs/phase_classification_review.md` で**不合格・要再設計**判定。SPEC-2026-06-06-004 physics 審査で確定）。
+> 旧「3相（Ordered / SG / PM）」は **4 動力学レジーム**へ更新（`research_state/hypotheses.md` 参照）。
 
-> 相対応の詳細・問題点は `docs/phase_classification_review.md` を参照。
-> 現行の分類アルゴリズムは physics-agent 審査で**不合格（要再設計）**と判定されており、P(q) ベース再設計を進行中。
+| 値 | アルゴリズム | 動力学レジーム対応（2026-06-06 改訂） |
+|---|---|---|
+| `goal_reached` | run_local.py | **Reasoning-ordered**（推論型）/ **Recitation-ordered**（復唱型・Qwen のみ、`tokens_per_move<15` で判別） |
+| `move_loop_repeat` / `move_loop_reverse` | C | **Oscillatory レジーム**（非勾配循環・NESS 確率カレント $J_{ss}\neq0$ 候補、実測で確定予定）。**旧「SG 相」は 2026-06-06 撤回** |
+| `no_move_catchall` | D | **PM**（常磁性・拡散的） |
+| `move_ceiling` | B | **PM**（常磁性） |
+| `stagnation_after_move` | E | **PM**（拡散的・構造なし。旧「未確定」を 4-regime で PM に整理） |
+| `think_budget` | A | **相分類から除外**（測定上の打ち切り・censored data として扱う） |
+
+> **動力学レジームは熱力学的な相ではない**（双安定・確率選択・ノイズ誘起遷移を含む非平衡描像）。
+> ベクトル場 $\dot{h} = -\nabla V + A + \text{noise}$ の文脈で記述する（`research_state/hypotheses.md` H3/H4）。
+> 可換パズル（Lights Out 等、GF(2) involution）では `move_loop` は順序 gauge アーティファクトを含むため
+> **動的循環解析は移植不可**で、C ラベルは純 censoring として扱う（SPEC-2026-06-06-003 caveat A / -004）。
+> 詳細・問題点は `docs/phase_classification_review.md` を参照。
 
 ---
 
@@ -195,6 +204,9 @@ analysis/*.py
 | `accuracy` (0 or 1) | 秩序変数 $m$ | 磁化（1=秩序、0=無秩序） |
 | `n_shot` (int) | few-shot 例示数 | 外部磁場 $h$（秩序相を安定化） |
 | `K(N) = 2^N - 1` | 最短解の手数 | Hopfield 項のパターン数（記憶容量に対応） |
+
+> **n_shot の実験条件に関する注意**：現行の本番スイープ（`run_full_sweep.sh` / `run_collapse_phase_sweep.sh` / `run_full_sweep_v2.sh` / `run_lights_out_sweep.sh`）は**すべて `n_shot=0`（外部磁場 $h=0$）**で実行している（各スクリプトの既定 `N_SHOT=0`）。
+> `run_local.py` の関数デフォルト `n_shot=2` および CLI デフォルト `1` は**実験条件ではない**ので、相図・cross-puzzle 比較の $h$ 条件は一律 $h=0$ として扱うこと（ハノイ・Lights Out とも $h=0$ で揃っている）。
 
 ### 相図の読み方
 
@@ -271,14 +283,18 @@ archiveフォルダーについては、実験済みのものを保存してあ�
 - **解は一意であること**（成功・失敗を明確に判定するため）
 - それ以外（branching factor, 状態空間の連続性, ポテンシャル地形, 報酬の deceptive さ）は **制約なし**。多様に試す
 
-### 対象モデル（5 種）
+### 対象モデル（4 モデル軸 + 補足 1）
 
+**主軸（2 ファミリー × 2 サイズの 2×2 設計）**：
 - `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B`
 - `deepseek-ai/DeepSeek-R1-Distill-Qwen-14B`
-- `meta-llama/Meta-Llama-3-8B`（系列）
-- `Qwen/Qwen3-7B`
+- `Qwen/Qwen3-8B`
 - `Qwen/Qwen3-14B`
 
+**補足**（スケーリング則分析から除外）：
+- `meta-llama/Meta-Llama-3.1-8B-Instruct`（N≥3 で Ordered 相がほぼ存在しない）
+
+> 4 モデル軸は 2026-05-26 に確定。追加モデルは不要。パズル軸拡張の方が科学的価値が高い。
 > 各モデルの sweep 進捗は `research_state/results_summary.md` を参照（ここには書かない）。
 
 ### 計算資源
@@ -307,6 +323,55 @@ archiveフォルダーについては、実験済みのものを保存してあ�
 | **品質チェックエージェント** | コード品質審査。実装後に差分をチェックする。実装エージェントとは独立（`.claude/agents/quality-check-agent.md`） | Claude Code（Sonnet） |
 | **リサーチエージェント** | 文献調査の単一窓口。user・フィジックス・実装チームへ参考文献を供給する潤滑油役（`.claude/agents/research-agent.md`） | Claude Code（Sonnet） |
 | **パイプラインオーケストレーター** | GATE C 通過後の「スイープ実行 → DB 同期 → 進捗更新」を自動化する裏方（役割定義は `.claude/agents/pipeline-orchestrator.md`） | Claude Code（Sonnet サブエージェント） |
+| **プレゼンテーションエージェント** | 中間報告・教授向け資料の生成専用。hypotheses / results / specs を読み込み、物理的に一貫した説明（数式・背景・先行研究・仮説・手法・結果）を Markdown で構成し pandoc 経由で pptx に変換する。数式セクション生成後は physics-agent のレビューを受ける。`docs/design_system.yml` を記号定義の唯一の権威とする（役割定義は `.claude/agents/presentation-agent.md`） | Claude Code（Sonnet） |
+
+### presentation-agent の呼び出しルール
+
+orchestration は以下の条件でプレゼンテーションエージェントを起動する：
+
+**起動条件**（手動トリガーのみ）：
+- user が「資料作って」「中間報告スライド」「実験レポート」などを明示した場合
+
+**2 段階ワークフロー（必ず守ること）：**
+
+```
+Stage 1: 構成表生成 → physics-agent レビュー → ユーザー承認
+Stage 2: marp pptx 生成（承認後のみ）
+```
+
+**Stage 1 の起動方法**（Claude Code の `Agent` ツールを使用）：
+```
+subagent_type: "presentation-agent"
+prompt: ".claude/agents/presentation-agent.md の指示に従い、以下のパラメータで実行:
+  report_type: progress または experiment-report
+  spec_id: (experiment-report の場合のみ) SPEC-YYYY-MM-DD-NNN
+  output_stem: (任意) ファイル名ベース
+  stage: structure"
+```
+
+**Stage 1 完了後の必須手順**：
+1. presentation-agent の Stage 1 完了レポートを確認
+2. `[PHYSICS-REVIEW-REQUIRED]` が含まれていれば physics-agent を呼び出し数式スライドを審査
+3. physics-agent の指摘を構成表にフィードバックして修正させる
+4. 構成表（`docs/reports/<stem>_structure.md`）を user に提示し承認を求める
+5. user が「OK」を出したら Stage 2 を起動する
+
+**Stage 2 の起動方法**（ユーザー承認後のみ）：
+```
+subagent_type: "presentation-agent"
+prompt: ".claude/agents/presentation-agent.md の指示に従い、以下のパラメータで実行:
+  report_type: progress または experiment-report
+  output_stem: <Stage 1 と同じ stem>
+  stage: build
+  structure_file: docs/reports/<stem>_structure.md"
+```
+
+**Stage 2 完了後の必須手順**：
+1. Stage 2 完了レポートを確認
+2. 生成された pptx のパスを user に報告する
+
+**design_system.yml の更新が必要な場合**：
+新しい物理量・記号を導入する際は presentation-agent が `docs/design_system.yml` の `notation` と `variable_mapping` を先に更新してから資料に使う。
 
 ### Codex（実装エージェント）の呼び出しルール
 
@@ -362,16 +427,87 @@ prompt: ".claude/agents/pipeline-orchestrator.md の指示に従い、以下の�
 - デバッグ目的のドライラン（`--dry-run`）
 - GPU メモリチェック（`runners/scripts/check_gpu_memory.sh`）
 
+### サブエージェントへの Bash コマンド生成ルール
+
+**全サブエージェント（特に implementation-agent）へのプロンプトに必ず以下の一文を含めること：**
+
+> 「Bash コマンドの中で複数行の `python3 -c "..."` にコメント（`#`）を含めないこと。
+> 代わりに Write ツールで `/tmp/script_<用途>.py` に書き出してから `python3 /tmp/script_<用途>.py` で実行すること。」
+
+**背景**：Claude Code のセキュリティ機構「Newline followed by # inside a quoted argument」は、
+引数内の改行＋`#` のパターンをコマンドインジェクションの可能性として検出し、
+allowlist に登録済みのコマンドであっても**強制的にブロック**する（security override）。
+この制約はプロジェクト設定では回避できないため、コード生成側で対処する必要がある。
+
+**OK な書き方**（ファイル経由）：
+```bash
+# Write ツールで /tmp/check_env.py を作成してから：
+python3 /tmp/check_env.py
+```
+
+**NG な書き方**（インライン複数行 + コメント）：
+```bash
+# これはセキュリティ override でブロックされる
+python3 -c "
+import sys  # check version
+print(sys.version)
+"
+```
+
+**Agent prompt 内の `#` 見出しも同様にブロックされる（追記 2026-05-24）**：
+
+Agent ツールの `prompt` パラメータに改行 + `#`（Markdown 見出し `##` `###` 等）が含まれると、
+同じ security override が発動して Agent ツール呼び出し自体がブロックされる。
+
+Agent への prompt では `#` 見出しを使わず、以下の代替表記を使うこと：
+- `===` や `---` の ASCII アンダーライン区切り
+- `**太字**` でのセクション名
+- 番号付きリスト
+
 ---
 
-## 研究状態ファイル
+## セッション管理（開始 / 終了）
 
-研究の現状は以下のファイルに分けて管理する。会話の冒頭で参照する。
+### セッション開始プロトコル
 
-- `research_state/hypotheses.md` — 仮説（大方針・本命・作業枠組み・棚上げ）
-- `research_state/results_summary.md` — 観測事実と既存データの要約
-- `todo.md` — 優先度付きタスク
-- `open_questions.md` — 未解決の論点（未定項目は未定として明示）
+新しいセッションを開始したら、以下の順番でファイルを Read して現状を把握する。
+
+**Step 1: memory（自動ロード）を確認する**
+
+`project_roadmap.md` が system-reminder で自動挿入される。「実験状況」「パズル状況」の欄で 🔄 マークを探し、走っている実験があるかどうかを最初に把握する。
+
+**Step 2: 研究状態ファイルを順番に Read する（4 ファイル）**
+
+| 順番 | ファイル | 読み取るポイント |
+|---|---|---|
+| 1 | `todo.md` | P0「実行中」「実験キュー」を確認。次の行動を最初に把握する |
+| 2 | `research_state/results_summary.md` | 最新の観測事実・データ蓄積状況 |
+| 3 | `research_state/hypotheses.md` | 仮説の status / evidence の更新状況 |
+| 4 | `research_state/experiment_register.md` | running / done の最新実験 ID |
+
+**Step 3: 必要に応じて GPU 状態を確認する**
+
+```bash
+nvidia-smi   # 実験が走っているかどうかを確認
+```
+
+`project_roadmap.md` に 🔄 マークがあれば実験が走っている可能性がある。GPU 使用率が高ければ割り込まない。
+
+---
+
+### セッション終了プロトコル
+
+セッション終了時は必ず **`/wrap-up`** を実行する（`.claude/commands/wrap-up.md` で定義）。
+
+`/wrap-up` が自動で行うこと：
+1. `results_summary.md` / `hypotheses.md` / `todo.md` / `experiment_register.md` を差分更新
+2. `memory/project_roadmap.md` の実験状況・パズル状況欄を最新化
+3. 完了レポートと次回セッションの開始点を出力する
+
+> **補足ファイル**（必要なとき参照）：
+> - `research_state/puzzle_roadmap.md` — パズル選定・評価・実装優先順位
+> - `open_questions.md` — 未解決の論点
+> - `research_state/phase2_strategy.md` — Phase 2 移行計画
 
 ---
 

@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from analysis.analyze_integrated import TS_ALL, TS_PQ, load_condition
+from analysis.io_utils import TS_ALL, TS_PQ, load_condition
 from analysis.isotropy import fit_isotropy
 from analysis.pq_metrics import compute_pq_moments, pairwise_overlaps, trial_mean_vectors
 

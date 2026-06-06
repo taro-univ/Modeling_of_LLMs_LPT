@@ -280,13 +280,13 @@ table.refactor-table tr:hover td { background: #1c2128; }
 <div class="header">
   <div>
     <h1>📦 Modeling_of_LLMs_LPT — コード依存マップ</h1>
-    <div class="sub">updated: 2026-05-21 | radon CC threshold: 10 | MI threshold: 20</div>
+    <div class="sub">updated: 2026-05-25 | radon CC threshold: 10 | MI threshold: 20</div>
   </div>
   <div class="badges">
-    <span class="badge blue">13 internal modules</span>
+    <span class="badge blue">20 internal modules</span>
     <span class="badge blue">8 external libs</span>
-    <span class="badge green">CC violations: 2 (deferred)</span>
-    <span class="badge green">MI violations: 0</span>
+    <span class="badge yellow">CC violations: 5 files (deferred)</span>
+    <span class="badge yellow">MI violations: 3 (lights_out / spin_glass / critical_dynamics)</span>
   </div>
 </div>
 
@@ -315,100 +315,122 @@ table.refactor-table tr:hover td { background: #1c2128; }
 
   <div class="flow-section">
     <h2>1. 実験実行パイプライン</h2>
-    <p>run_local.py がモデルをロードし、Hanoi 問題を解かせる。Move ごとに hidden state を npz へ書き出す。</p>
-    <svg class="flow-svg" height="120" viewBox="0 0 860 120">
+    <p>run_local.py がモデルをロードし、<code>--puzzle</code> で選択したパズル（Hanoi / Lights Out）を解かせる。Move ごとに hidden state を npz へ書き出す。</p>
+    <svg class="flow-svg" height="160" viewBox="0 0 860 160">
       <defs>
         <marker id="arrow1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
           <path d="M0,0 L0,6 L8,3 z" fill="#58a6ff"/>
         </marker>
       </defs>
-      <!-- boxes -->
+      <!-- run_local -->
       <g>
-        <rect x="10"  y="40" width="120" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
-        <text x="70"  y="65" text-anchor="middle" font-size="11" fill="#e6edf3">run_local.py</text>
+        <rect x="10"  y="60" width="120" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+        <text x="70"  y="78" text-anchor="middle" font-size="11" fill="#e6edf3">run_local.py</text>
+        <text x="70"  y="91" text-anchor="middle" font-size="9"  fill="#7d8590">--puzzle hanoi|lights_out</text>
+      </g>
+      <!-- HF Transformers -->
+      <g>
+        <rect x="180" y="60" width="120" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+        <text x="240" y="85" text-anchor="middle" font-size="11" fill="#e6edf3">HF Transformers</text>
+      </g>
+      <!-- env factory (branching) -->
+      <g>
+        <rect x="350" y="20" width="130" height="34" rx="6" fill="#0f2d0f" stroke="#3fb950"/>
+        <text x="415" y="38" text-anchor="middle" font-size="10" fill="#3fb950">hanoi_env.py</text>
+        <text x="415" y="49" text-anchor="middle" font-size="9"  fill="#7d8590">TowerOfHanoiEnv</text>
       </g>
       <g>
-        <rect x="180" y="40" width="120" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
-        <text x="240" y="65" text-anchor="middle" font-size="11" fill="#e6edf3">HF Transformers</text>
+        <rect x="350" y="66" width="130" height="34" rx="6" fill="#0f2d0f" stroke="#3fb950"/>
+        <text x="415" y="84" text-anchor="middle" font-size="10" fill="#3fb950">lights_out_env.py</text>
+        <text x="415" y="95" text-anchor="middle" font-size="9"  fill="#7d8590">LightsOutEnv</text>
       </g>
       <g>
-        <rect x="350" y="40" width="120" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
-        <text x="410" y="60" text-anchor="middle" font-size="11" fill="#e6edf3">hanoi_env.py</text>
-        <text x="410" y="73" text-anchor="middle" font-size="10" fill="#7d8590">evaluate_state()</text>
+        <rect x="350" y="112" width="130" height="30" rx="6" fill="#111828" stroke="#30363d"/>
+        <text x="415" y="131" text-anchor="middle" font-size="9"  fill="#7d8590">↑ BaseEnv (ABC)</text>
       </g>
+      <!-- run.py -->
       <g>
-        <rect x="520" y="40" width="120" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
-        <text x="580" y="60" text-anchor="middle" font-size="11" fill="#e6edf3">run.py</text>
-        <text x="580" y="73" text-anchor="middle" font-size="10" fill="#7d8590">check_early_stop()</text>
+        <rect x="530" y="60" width="120" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+        <text x="590" y="78" text-anchor="middle" font-size="11" fill="#e6edf3">run.py</text>
+        <text x="590" y="91" text-anchor="middle" font-size="10" fill="#7d8590">check_early_stop()</text>
       </g>
+      <!-- output -->
       <g>
-        <rect x="690" y="40" width="140" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
-        <text x="760" y="60" text-anchor="middle" font-size="11" fill="#e6edf3">summary.json</text>
-        <text x="760" y="73" text-anchor="middle" font-size="10" fill="#7d8590">trial_NNN_hidden.npz</text>
+        <rect x="700" y="60" width="140" height="40" rx="6" fill="#161b22" stroke="#30363d"/>
+        <text x="770" y="78" text-anchor="middle" font-size="11" fill="#e6edf3">summary.json</text>
+        <text x="770" y="91" text-anchor="middle" font-size="10" fill="#7d8590">trial_NNN_hidden.npz</text>
       </g>
       <!-- arrows -->
-      <line x1="130" y1="60" x2="178" y2="60" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
-      <line x1="300" y1="60" x2="348" y2="60" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
-      <line x1="470" y1="60" x2="518" y2="60" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
-      <line x1="640" y1="60" x2="688" y2="60" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
+      <line x1="130" y1="80" x2="178" y2="80" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
+      <line x1="300" y1="72" x2="348" y2="37"  stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
+      <line x1="300" y1="80" x2="348" y2="83"  stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
+      <line x1="480" y1="37"  x2="528" y2="72" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
+      <line x1="480" y1="83"  x2="528" y2="83" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
+      <line x1="650" y1="80" x2="698" y2="80" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
       <!-- labels -->
-      <text x="154" y="53" text-anchor="middle" font-size="9" fill="#7d8590">generate</text>
-      <text x="324" y="53" text-anchor="middle" font-size="9" fill="#7d8590">moves</text>
-      <text x="494" y="53" text-anchor="middle" font-size="9" fill="#7d8590">stop?</text>
-      <text x="664" y="53" text-anchor="middle" font-size="9" fill="#7d8590">save</text>
+      <text x="154" y="73" text-anchor="middle" font-size="9" fill="#7d8590">generate</text>
+      <text x="320" y="55" text-anchor="middle" font-size="9" fill="#7d8590">factory</text>
+      <text x="674" y="73" text-anchor="middle" font-size="9" fill="#7d8590">save</text>
     </svg>
   </div>
 
   <div class="flow-section">
-    <h2>2. 解析パイプライン</h2>
-    <p>summary.json / npz を読み込み、相図・P(q)・スケーリング則・隠れ状態コサイン類似度を解析する。</p>
-    <svg class="flow-svg" height="200" viewBox="0 0 860 200">
+    <h2>2. 解析パイプライン (SPEC-2026-05-25-001 OOP アーキテクチャ)</h2>
+    <p>run_pipeline.py が ANALYZER_REGISTRY から具象 Analyzer を dispatch し、BaseAnalyzer.load_all() でデータを統一ロード、各 Analyzer.run_analysis() が図を生成する。後方互換ラッパー (analyze_*.py) は旧 CLI を維持しつつ OOP クラスに委譲。</p>
+    <svg class="flow-svg" height="240" viewBox="0 0 900 240">
       <defs>
         <marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
           <path d="M0,0 L0,6 L8,3 z" fill="#f0883e"/>
         </marker>
       </defs>
-      <!-- source files -->
-      <rect x="10" y="30" width="130" height="36" rx="6" fill="#161b22" stroke="#30363d"/>
-      <text x="75" y="51" text-anchor="middle" font-size="11" fill="#e6edf3">summary.json (N×T grid)</text>
-      <rect x="10" y="76" width="130" height="36" rx="6" fill="#161b22" stroke="#30363d"/>
-      <text x="75" y="97" text-anchor="middle" font-size="11" fill="#e6edf3">trial_NNN_hidden.npz</text>
+      <!-- input data -->
+      <rect x="10" y="50" width="130" height="36" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="75" y="71" text-anchor="middle" font-size="11" fill="#e6edf3">summary.json</text>
+      <rect x="10" y="96" width="130" height="36" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="75" y="117" text-anchor="middle" font-size="10" fill="#e6edf3">trial_NNN_hidden.npz</text>
 
-      <!-- analyzers -->
-      <rect x="200" y="10"  width="160" height="34" rx="6" fill="#1c1005" stroke="#9e6a03"/>
-      <text x="280" y="31" text-anchor="middle" font-size="11" fill="#f0883e">analyze_phase_diagram.py</text>
-      <rect x="200" y="54"  width="160" height="34" rx="6" fill="#1c1005" stroke="#9e6a03"/>
-      <text x="280" y="75" text-anchor="middle" font-size="11" fill="#f0883e">analyze_pq.py</text>
-      <rect x="200" y="98"  width="160" height="34" rx="6" fill="#1c1005" stroke="#9e6a03"/>
-      <text x="280" y="119" text-anchor="middle" font-size="11" fill="#f0883e">analyze_slowing.py</text>
-      <rect x="200" y="142" width="160" height="34" rx="6" fill="#1c1005" stroke="#9e6a03"/>
-      <text x="280" y="163" text-anchor="middle" font-size="11" fill="#f0883e">cosine_sim_phase.py</text>
+      <!-- BaseAnalyzer -->
+      <rect x="180" y="70" width="145" height="36" rx="6" fill="#1a1a2e" stroke="#58a6ff"/>
+      <text x="252" y="88" text-anchor="middle" font-size="10" fill="#58a6ff">base_analyzer.py</text>
+      <text x="252" y="100" text-anchor="middle" font-size="9"  fill="#7d8590">BaseAnalyzer ABC</text>
 
-      <!-- integrated -->
-      <rect x="430" y="54" width="160" height="34" rx="6" fill="#1c1005" stroke="#9e6a03"/>
-      <text x="510" y="75" text-anchor="middle" font-size="11" fill="#f0883e">analyze_integrated.py</text>
+      <!-- OOP Analyzers -->
+      <rect x="375" y="10"  width="155" height="34" rx="6" fill="#1c1005" stroke="#f0883e"/>
+      <text x="452" y="31" text-anchor="middle" font-size="10" fill="#f0883e">phase_transition.py</text>
+      <rect x="375" y="54"  width="155" height="34" rx="6" fill="#1c1005" stroke="#f0883e"/>
+      <text x="452" y="75" text-anchor="middle" font-size="10" fill="#f0883e">spin_glass.py</text>
+      <rect x="375" y="98"  width="155" height="34" rx="6" fill="#1c1005" stroke="#f0883e"/>
+      <text x="452" y="119" text-anchor="middle" font-size="10" fill="#f0883e">critical_dynamics.py</text>
+
+      <!-- run_pipeline entry -->
+      <rect x="375" y="155" width="155" height="36" rx="6" fill="#1a1a2e" stroke="#58a6ff"/>
+      <text x="452" y="173" text-anchor="middle" font-size="10" fill="#58a6ff">run_pipeline.py</text>
+      <text x="452" y="185" text-anchor="middle" font-size="9"  fill="#7d8590">ANALYZER_REGISTRY dispatch</text>
+
+      <!-- wrappers -->
+      <rect x="580" y="155" width="155" height="36" rx="6" fill="#111828" stroke="#30363d"/>
+      <text x="657" y="173" text-anchor="middle" font-size="10" fill="#7d8590">analyze_*.py</text>
+      <text x="657" y="185" text-anchor="middle" font-size="9"  fill="#7d8590">旧 CLI wrappers</text>
 
       <!-- figures -->
-      <rect x="660" y="30"  width="120" height="34" rx="6" fill="#161b22" stroke="#30363d"/>
-      <text x="720" y="51" text-anchor="middle" font-size="11" fill="#e6edf3">phase_diagram.png</text>
-      <rect x="660" y="74"  width="120" height="34" rx="6" fill="#161b22" stroke="#30363d"/>
-      <text x="720" y="95" text-anchor="middle" font-size="11" fill="#e6edf3">pq_summary.png</text>
-      <rect x="660" y="118" width="120" height="34" rx="6" fill="#161b22" stroke="#30363d"/>
-      <text x="720" y="139" text-anchor="middle" font-size="11" fill="#e6edf3">scaling.png</text>
+      <rect x="740" y="10"  width="130" height="34" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="805" y="31" text-anchor="middle" font-size="11" fill="#e6edf3">phase_diagram.png</text>
+      <rect x="740" y="54"  width="130" height="34" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="805" y="75" text-anchor="middle" font-size="11" fill="#e6edf3">pq_summary.png</text>
+      <rect x="740" y="98"  width="130" height="34" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="805" y="119" text-anchor="middle" font-size="11" fill="#e6edf3">tau_vs_T.png</text>
 
-      <!-- arrows source→analyzers -->
-      <line x1="140" y1="48"  x2="198" y2="27"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
-      <line x1="140" y1="48"  x2="198" y2="71"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
-      <line x1="140" y1="48"  x2="198" y2="115" stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
-      <line x1="140" y1="94"  x2="198" y2="159" stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
-      <!-- analyzers → integrated -->
-      <line x1="360" y1="27"  x2="428" y2="71"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
-      <line x1="360" y1="71"  x2="428" y2="71"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
-      <line x1="360" y1="115" x2="428" y2="71"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
-      <!-- integrated → figures -->
-      <line x1="590" y1="71"  x2="658" y2="47"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
-      <line x1="590" y1="71"  x2="658" y2="91"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
-      <line x1="590" y1="71"  x2="658" y2="135" stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <!-- arrows -->
+      <line x1="140" y1="88"  x2="178" y2="88"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <line x1="325" y1="82"  x2="373" y2="27"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <line x1="325" y1="88"  x2="373" y2="71"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <line x1="325" y1="88"  x2="373" y2="115" stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <line x1="530" y1="27"  x2="738" y2="27"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <line x1="530" y1="71"  x2="738" y2="71"  stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <line x1="530" y1="115" x2="738" y2="115" stroke="#f0883e" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <line x1="530" y1="173" x2="578" y2="173" stroke="#58a6ff" stroke-width="1.2" marker-end="url(#arrow2)"/>
+      <line x1="452" y1="155" x2="452" y2="132" stroke="#58a6ff" stroke-width="1.0" stroke-dasharray="4,3" marker-end="url(#arrow2)"/>
+      <text x="155" y="83" text-anchor="middle" font-size="9" fill="#7d8590">load_all()</text>
     </svg>
   </div>
 
@@ -443,11 +465,11 @@ table.refactor-table tr:hover td { background: #1c2128; }
 <div class="tab-pane" id="tab-2">
 <div id="metrics-container">
   <div class="metrics-grid">
-    <div class="metric-card green"><div class="val">2</div><div class="lbl">CC violations (deferred)</div></div>
-    <div class="metric-card green"><div class="val">0</div><div class="lbl">MI violations</div></div>
-    <div class="metric-card blue"><div class="val">13</div><div class="lbl">tracked modules</div></div>
-    <div class="metric-card blue"><div class="val">3,571</div><div class="lbl">total LOC</div></div>
-    <div class="metric-card green"><div class="val">78%</div><div class="lbl">violation reduction (9→2)</div></div>
+    <div class="metric-card yellow"><div class="val">5</div><div class="lbl">CC violations files (deferred)</div></div>
+    <div class="metric-card yellow"><div class="val">3</div><div class="lbl">MI violations (B ランク: lights_out / spin_glass / critical_dynamics)</div></div>
+    <div class="metric-card blue"><div class="val">25</div><div class="lbl">tracked modules</div></div>
+    <div class="metric-card blue"><div class="val">5,652</div><div class="lbl">total LOC</div></div>
+    <div class="metric-card green"><div class="val">40</div><div class="lbl">pytest passing (2026-05-25)</div></div>
   </div>
 
   <table class="quality-table" id="quality-table">
@@ -473,11 +495,11 @@ table.refactor-table tr:hover td { background: #1c2128; }
 
   <div class="history-summary">
     <div class="summary-card">
-      <div class="arrow"><span class="before">9</span> → <span class="after">2</span></div>
-      <div class="clabel">CC violations (78% 削減)</div>
+      <div class="arrow"><span class="before">9</span> → <span class="after">4</span></div>
+      <div class="clabel">CC violations (56% 削減・新規+2含む)</div>
     </div>
     <div class="summary-card">
-      <div class="arrow"><span class="before">36</span> → <span class="after">8</span></div>
+      <div class="arrow"><span class="before">36</span> → <span class="after">8~12</span></div>
       <div class="clabel">最大 CC (generate_with_hidden_states)</div>
     </div>
     <div class="summary-card">
@@ -485,8 +507,8 @@ table.refactor-table tr:hover td { background: #1c2128; }
       <div class="clabel">リファクタした関数の総数</div>
     </div>
     <div class="summary-card">
-      <div class="arrow"><span class="before">0</span></div>
-      <div class="clabel">MI 違反 (変化なし)</div>
+      <div class="arrow"><span class="before">36</span> → <span class="after">40</span></div>
+      <div class="clabel">pytest passing (2026-05-25)</div>
     </div>
   </div>
 
@@ -658,6 +680,162 @@ table.refactor-table tr:hover td { background: #1c2128; }
     </tbody>
   </table>
 
+  <div class="section-title">🆕 2026-05-25 新規追加ファイル (SPEC-2026-05-25-001 — analysis OOP リファクタリング)</div>
+  <table class="refactor-table">
+    <thead>
+      <tr>
+        <th>ファイル</th>
+        <th>種別</th>
+        <th>LOC</th>
+        <th>CC max</th>
+        <th>概要</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>analysis/base_analyzer.py</td>
+        <td>新規</td>
+        <td>171</td>
+        <td><span class="cc-chip cc-ok">5</span></td>
+        <td>BaseAnalyzer ABC + ConditionData / AnalysisResult — 全 Analyzer の共通 loader / saver 基底</td>
+      </tr>
+      <tr>
+        <td>analysis/io_utils.py</td>
+        <td>新規</td>
+        <td>56</td>
+        <td><span class="cc-chip cc-ok">6</span></td>
+        <td>共有定数 (TS_ALL / TS_PQ) + _cosine / load_condition — 循環依存を断ち切る中継モジュール</td>
+      </tr>
+      <tr>
+        <td>analysis/phase_transition.py</td>
+        <td>新規</td>
+        <td>223</td>
+        <td><span class="cc-chip cc-ok">5</span></td>
+        <td>PhaseTransitionAnalyzer — 相図・T_c 推定 (H-PT 仮説)</td>
+      </tr>
+      <tr>
+        <td>analysis/spin_glass.py</td>
+        <td>新規</td>
+        <td>305</td>
+        <td><span class="cc-chip cc-ok">7</span></td>
+        <td>SpinGlassAnalyzer — P(q) / q_EA / 自己相関 (H-SG 仮説) | MI=14.67 B (numpy 多用のため必然)</td>
+      </tr>
+      <tr>
+        <td>analysis/critical_dynamics.py</td>
+        <td>新規</td>
+        <td>339</td>
+        <td><span class="cc-chip cc-ok">6</span></td>
+        <td>CriticalDynamicsAnalyzer — クリティカルスローイング / τ vs T フィット (H-CD 仮説) | MI=13.87 B</td>
+      </tr>
+      <tr>
+        <td>analysis/run_pipeline.py</td>
+        <td>新規</td>
+        <td>108</td>
+        <td><span class="cc-chip cc-ok">6</span></td>
+        <td>ANALYZER_REGISTRY + run_pipeline() — YAML / argparse 両対応の統合エントリポイント</td>
+      </tr>
+      <tr>
+        <td>analysis/analyze_phase_diagram.py</td>
+        <td>更新 (wrapper化)</td>
+        <td>362 → 53</td>
+        <td><span class="cc-chip cc-ok">5</span></td>
+        <td>旧実装を PhaseTransitionAnalyzer に委譲する薄いラッパーに置換 (後方互換維持)</td>
+      </tr>
+      <tr>
+        <td>analysis/analyze_pq.py</td>
+        <td>更新 (wrapper化)</td>
+        <td>542 → 54</td>
+        <td><span class="cc-chip cc-ok">3</span></td>
+        <td>旧実装を SpinGlassAnalyzer に委譲する薄いラッパーに置換</td>
+      </tr>
+      <tr>
+        <td>analysis/analyze_slowing.py</td>
+        <td>更新 (wrapper化)</td>
+        <td>611 → 51</td>
+        <td><span class="cc-chip cc-ok">5</span></td>
+        <td>旧実装を CriticalDynamicsAnalyzer に委譲する薄いラッパーに置換</td>
+      </tr>
+      <tr>
+        <td>analysis/analyze_integrated.py</td>
+        <td>削除</td>
+        <td>579 → 0</td>
+        <td>—</td>
+        <td>io_utils + run_pipeline に役割を移管し git rm で削除</td>
+      </tr>
+      <tr>
+        <td>tests/test_base_analyzer.py</td>
+        <td>新規</td>
+        <td>64</td>
+        <td><span class="cc-chip cc-warn">15</span></td>
+        <td>BaseAnalyzer / ConditionData / load_condition の 4 テスト (CC=15 は deferred: フィクスチャ構築)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">🆕 2026-05-24 新規追加ファイル (SPEC-2026-05-24-001/002)</div>
+  <table class="refactor-table">
+    <thead>
+      <tr>
+        <th>ファイル</th>
+        <th>種別</th>
+        <th>LOC</th>
+        <th>CC max</th>
+        <th>概要</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>envs/base_env.py</td>
+        <td>新規</td>
+        <td>59</td>
+        <td><span class="cc-chip cc-ok">2</span></td>
+        <td>パズル共通抽象基底 BaseEnv (ABC) — hanoi/lights_out の親クラス</td>
+      </tr>
+      <tr>
+        <td>envs/lights_out_env.py</td>
+        <td>新規</td>
+        <td>268</td>
+        <td><span class="cc-chip cc-bad">17</span></td>
+        <td>Lights Out パズル環境 / GF(2) ソルバー自前実装 / V=d/N²</td>
+      </tr>
+      <tr>
+        <td>envs/hanoi_env.py</td>
+        <td>更新</td>
+        <td>276 → 291</td>
+        <td><span class="cc-chip cc-ok">8</span></td>
+        <td>BaseEnv から import するよう分離。TowerOfHanoiEnv のみに整理</td>
+      </tr>
+      <tr>
+        <td>runners/run_local.py</td>
+        <td>更新</td>
+        <td>700 → 869</td>
+        <td><span class="cc-chip cc-warn">12</span></td>
+        <td>--puzzle 引数追加 / run_experiment_hf env 外部化 / 出力パス puzzle 参照化</td>
+      </tr>
+      <tr>
+        <td>tests/test_base_env.py</td>
+        <td>新規</td>
+        <td>28</td>
+        <td><span class="cc-chip cc-ok">7</span></td>
+        <td>BaseEnv 抽象クラス + make_sub_env テスト</td>
+      </tr>
+      <tr>
+        <td>tests/test_hanoi_env.py</td>
+        <td>新規</td>
+        <td>35</td>
+        <td><span class="cc-chip cc-ok">7</span></td>
+        <td>TowerOfHanoiEnv: min_moves / evaluate_state / extract_moves テスト</td>
+      </tr>
+      <tr>
+        <td>tests/test_lights_out_env.py</td>
+        <td>新規</td>
+        <td>82</td>
+        <td><span class="cc-chip cc-ok">7</span></td>
+        <td>LightsOutEnv: GF(2) ソルバー / V 正規化 / 一意性制約 テスト</td>
+      </tr>
+    </tbody>
+  </table>
+
   <div class="section-title">⚠️ 残存違反（意図的に据え置き）</div>
   <div class="remaining-card">
     <div class="rfile">runners/run.py — query_ollama (CC=15)</div>
@@ -670,6 +848,36 @@ table.refactor-table tr:hover td { background: #1c2128; }
     <div class="rfunc">テストユーティリティ — モデル別チェックリスト形式</div>
     <div class="rreason">据え置き理由: テスト検証スクリプト特有の assertion チェーンで CC が高い。
     分割しても可読性・テスト独立性が下がるだけ。本番コードではない。</div>
+  </div>
+  <div class="remaining-card">
+    <div class="rfile">envs/lights_out_env.py — _solve_affine_system (CC=17), _minimum_weight_solution (CC=10), _gf2_rref (CC=10) | MI=14.95 (B)</div>
+    <div class="rfunc">GF(2) 線形代数ソルバー — 2026-05-24 新規 (SPEC-2026-05-24-001)</div>
+    <div class="rreason">据え置き理由: GF(2) の RREF・アフィン系求解は数学的構造上、分岐を減らす余地がほぼない。
+    ピボット探索・行基本変形・null space 列挙がすべて条件分岐依存。MI=14.95 も numpy 行列演算が多いため必然。</div>
+  </div>
+  <div class="remaining-card">
+    <div class="rfile">runners/run_local.py — generate_with_hidden_states (CC=12)</div>
+    <div class="rfunc">HF Transformers カスタム生成ループ本体</div>
+    <div class="rreason">据え置き理由: --puzzle 対応追加で CC が 9 → 12 に増加。生成ループの分岐（think mode / early stop / hidden state capture）は本質的複雑さ。
+    将来的にさらに複雑化する場合は再設計を検討。</div>
+  </div>
+  <div class="remaining-card">
+    <div class="rfile">analysis/spin_glass.py — MI=14.67 (B ランク) — 2026-05-25 新規</div>
+    <div class="rfunc">P(q) overlap 分布・q_EA・自己相関 計算本体</div>
+    <div class="rreason">据え置き理由: numpy 行列演算（cosine 類似度の全 pair 計算 / autocorr の配列スライシング）が多く MI が低い。
+    lights_out_env.py の GF(2) 演算と同様の構造上の必然。分解しても可読性が下がるだけ。</div>
+  </div>
+  <div class="remaining-card">
+    <div class="rfile">analysis/critical_dynamics.py — MI=13.87 (B ランク) — 2026-05-25 新規</div>
+    <div class="rfunc">クリティカルスローイング τ vs T / scipy curve_fit ラッパー</div>
+    <div class="rreason">据え置き理由: scipy.optimize.curve_fit の呼び出しと numpy 配列演算が主要部分で MI が低い。
+    物理的フィッティング処理の構造上の必然。</div>
+  </div>
+  <div class="remaining-card">
+    <div class="rfile">tests/test_base_analyzer.py — test_load_condition_summary_only (CC=15) — 2026-05-25 新規</div>
+    <div class="rfunc">BaseAnalyzer._load_condition テスト (summary.json + フィクスチャ検証)</div>
+    <div class="rreason">据え置き理由: テストフィクスチャ（tmpdir 作成 + summary.json 書き込み + assertion チェーン）の構造上の複雑さ。
+    本番コードではない。テスト網羅性を優先。</div>
   </div>
 
 </div>
@@ -685,19 +893,40 @@ function switchTab(idx) {
 
 // ════════ Quality table data ════════
 const FILES = [
-  { path:"runners/run.py",                 loc:495, cc_max:15, cc_mean:4.75, mi:45.8, mi_rank:"A", violations:["query_ollama (CC=15)"] },
-  { path:"runners/test_model_arch…py",     loc:608, cc_max:13, cc_mean:6.50, mi:38.5, mi_rank:"A", violations:["print_summary (CC=13)", "run_t3 (CC=12)", "run_t1 (CC=11)", "run_t4 (CC=11)", "run_t5 (CC=10)"] },
-  { path:"analysis/analyze_integrated.py", loc:579, cc_max:9,  cc_mean:4.45, mi:21.1, mi_rank:"A", violations:[] },
-  { path:"analysis/analyze_slowing.py",    loc:611, cc_max:9,  cc_mean:4.20, mi:33.5, mi_rank:"A", violations:[] },
-  { path:"runners/run_local.py",           loc:700, cc_max:9,  cc_mean:3.90, mi:38.9, mi_rank:"A", violations:[] },
-  { path:"tools/measure_quality.py",       loc:375, cc_max:9,  cc_mean:3.50, mi:44.2, mi_rank:"A", violations:[] },
-  { path:"db/sync_one.py",                 loc:116, cc_max:9,  cc_mean:3.20, mi:71.0, mi_rank:"A", violations:[] },
-  { path:"envs/hanoi_env.py",              loc:276, cc_max:8,  cc_mean:2.80, mi:46.8, mi_rank:"A", violations:[] },
-  { path:"analysis/analyze_phase_diagram", loc:362, cc_max:8,  cc_mean:2.60, mi:39.5, mi_rank:"A", violations:[] },
-  { path:"analysis/plot_scaling.py",       loc:156, cc_max:8,  cc_mean:3.20, mi:59.2, mi_rank:"A", violations:[] },
-  { path:"analysis/analyze_pq.py",         loc:542, cc_max:7,  cc_mean:2.50, mi:36.1, mi_rank:"A", violations:[] },
-  { path:"analysis/cosine_sim_phase.py",   loc:135, cc_max:7,  cc_mean:2.40, mi:40.7, mi_rank:"A", violations:[] },
-  { path:"tests/test_early_stop.py",       loc:116, cc_max:3,  cc_mean:1.50, mi:64.4, mi_rank:"A", violations:[] },
+  // runners
+  { path:"runners/run.py",                   loc:590, cc_max:15, cc_mean:4.75, mi:45.8,  mi_rank:"A", violations:["query_ollama (CC=15) — deferred: Ollama ランナー本体"] },
+  { path:"runners/test_model_arch…py",       loc:725, cc_max:13, cc_mean:6.50, mi:38.5,  mi_rank:"A", violations:["print_summary (CC=13)", "run_t3 (CC=12)", "run_t1 (CC=11)", "run_t4 (CC=11)", "run_t5 (CC=10) — deferred: テスト検証スクリプト"] },
+  { path:"runners/run_local.py",             loc:869, cc_max:12, cc_mean:3.44, mi:37.68, mi_rank:"A", violations:["generate_with_hidden_states (CC=12) — deferred: HF生成ループ本体"] },
+  // envs
+  { path:"envs/lights_out_env.py",           loc:268, cc_max:17, cc_mean:3.04, mi:14.95, mi_rank:"B", violations:["_solve_affine_system (CC=17)", "_minimum_weight_solution (CC=10)", "_gf2_rref (CC=10) — deferred: GF(2) 線形代数の構造上必然"] },
+  { path:"envs/hanoi_env.py",                loc:291, cc_max:8,  cc_mean:2.72, mi:45.74, mi_rank:"A", violations:[] },
+  { path:"envs/base_env.py",                 loc:59,  cc_max:2,  cc_mean:1.08, mi:100.0, mi_rank:"A", violations:[] },
+  // analysis — OOP layer (新: 2026-05-25 SPEC-2026-05-25-001)
+  { path:"analysis/critical_dynamics.py",    loc:339, cc_max:6,  cc_mean:4.87, mi:13.87, mi_rank:"B", violations:[] },
+  { path:"analysis/spin_glass.py",           loc:305, cc_max:7,  cc_mean:4.40, mi:14.67, mi_rank:"B", violations:[] },
+  { path:"analysis/phase_transition.py",     loc:223, cc_max:5,  cc_mean:4.83, mi:21.93, mi_rank:"A", violations:[] },
+  { path:"analysis/base_analyzer.py",        loc:171, cc_max:5,  cc_mean:3.73, mi:29.50, mi_rank:"A", violations:[] },
+  { path:"analysis/run_pipeline.py",         loc:108, cc_max:6,  cc_mean:3.80, mi:47.12, mi_rank:"A", violations:[] },
+  { path:"analysis/io_utils.py",             loc:56,  cc_max:6,  cc_mean:4.50, mi:74.30, mi_rank:"A", violations:[] },
+  // analysis — wrappers & utilities
+  { path:"analysis/stagnation_diagnostic.py",loc:522, cc_max:10, cc_mean:4.63, mi:30.2,  mi_rank:"A", violations:[] },
+  { path:"analysis/pq_phase_classifier.py",  loc:521, cc_max:30, cc_mean:5.18, mi:28.1,  mi_rank:"A", violations:["classify_from_moments (CC=30) — deferred: 複合判定ロジック"] },
+  { path:"analysis/cosine_sim_phase.py",     loc:171, cc_max:7,  cc_mean:2.40, mi:40.68, mi_rank:"A", violations:[] },
+  { path:"analysis/pq_metrics.py",           loc:171, cc_max:5,  cc_mean:3.63, mi:36.1,  mi_rank:"A", violations:[] },
+  { path:"analysis/plot_scaling.py",         loc:186, cc_max:8,  cc_mean:3.20, mi:59.19, mi_rank:"A", violations:[] },
+  { path:"analysis/analyze_phase_diagram.py",loc:53,  cc_max:5,  cc_mean:3.00, mi:52.73, mi_rank:"A", violations:[] },
+  { path:"analysis/analyze_pq.py",           loc:54,  cc_max:3,  cc_mean:2.00, mi:55.46, mi_rank:"A", violations:[] },
+  { path:"analysis/analyze_slowing.py",      loc:51,  cc_max:5,  cc_mean:3.00, mi:53.82, mi_rank:"A", violations:[] },
+  // db / tools
+  { path:"tools/measure_quality.py",         loc:456, cc_max:9,  cc_mean:3.50, mi:44.20, mi_rank:"A", violations:[] },
+  { path:"db/sync_one.py",                   loc:140, cc_max:9,  cc_mean:3.20, mi:71.05, mi_rank:"A", violations:[] },
+  // tests
+  { path:"tests/test_base_analyzer.py",      loc:64,  cc_max:15, cc_mean:3.67, mi:46.12, mi_rank:"A", violations:["test_load_condition_summary_only (CC=15) — deferred: テストフィクスチャ構築の assertion チェーン"] },
+  { path:"tests/test_pq_phase_classifier.py",loc:187, cc_max:7,  cc_mean:3.09, mi:38.5,  mi_rank:"A", violations:[] },
+  { path:"tests/test_lights_out_env.py",     loc:82,  cc_max:7,  cc_mean:2.86, mi:52.0,  mi_rank:"A", violations:[] },
+  { path:"tests/test_base_env.py",           loc:28,  cc_max:7,  cc_mean:3.67, mi:58.0,  mi_rank:"A", violations:[] },
+  { path:"tests/test_hanoi_env.py",          loc:35,  cc_max:7,  cc_mean:3.75, mi:56.0,  mi_rank:"A", violations:[] },
+  { path:"tests/test_early_stop.py",         loc:141, cc_max:3,  cc_mean:1.50, mi:64.4,  mi_rank:"A", violations:[] },
 ];
 
 function ccChip(v) {
@@ -742,24 +971,32 @@ window._graphInited = false;
 
 const NODES = [
   // runners
-  { id:"run_local",    label:"run_local.py",           group:"runners",  loc:700, cc:9,  desc:"HF実験ランナー (NF4量子化・隠れ状態キャプチャ)" },
+  { id:"run_local",    label:"run_local.py",           group:"runners",  loc:869, cc:12, desc:"HF実験ランナー (NF4量子化・隠れ状態キャプチャ・--puzzle選択)" },
   { id:"run",          label:"run.py",                 group:"runners",  loc:495, cc:15, desc:"早期終了ライブラリ + Ollamaランナー" },
-  { id:"test_arch",    label:"test_model_arch.py",     group:"runners",  loc:608, cc:13, desc:"新モデル追加時の事前検証スクリプト" },
-  // analysis
-  { id:"integrated",   label:"analyze_integrated.py",  group:"analysis", loc:579, cc:9,  desc:"full_sweep + collapse_phase の統合相図" },
-  { id:"phase_diag",   label:"analyze_phase_diagram.py",group:"analysis",loc:362, cc:8,  desc:"相図 (accuracy + early_stop 内訳)" },
-  { id:"pq",           label:"analyze_pq.py",          group:"analysis", loc:542, cc:7,  desc:"P(q) 分布・q_EA・自己相関" },
-  { id:"slowing",      label:"analyze_slowing.py",     group:"analysis", loc:611, cc:9,  desc:"クリティカルスローイング・フィッティング" },
-  { id:"cosine",       label:"cosine_sim_phase.py",    group:"analysis", loc:135, cc:7,  desc:"隠れ状態ベクトルのコサイン類似度 (SG vs PM)" },
-  { id:"scaling",      label:"plot_scaling.py",        group:"analysis", loc:156, cc:8,  desc:"スケーリング則 Tc(N) プロット" },
-  // envs
-  { id:"hanoi",        label:"hanoi_env.py",           group:"envs",     loc:276, cc:8,  desc:"Tower of Hanoi env + evaluate_state()" },
+  { id:"test_arch",    label:"test_model_arch.py",     group:"runners",  loc:725, cc:13, desc:"新モデル追加時の事前検証スクリプト" },
+  // analysis — OOP 3層アーキテクチャ (新: 2026-05-25 SPEC-2026-05-25-001)
+  { id:"base_analyzer",  label:"base_analyzer.py",        group:"analysis", loc:171, cc:5,  desc:"BaseAnalyzer ABC + ConditionData / AnalysisResult — 全 analyzer の共通基底" },
+  { id:"io_utils",       label:"io_utils.py",             group:"analysis", loc:56,  cc:6,  desc:"共有定数 (TS_ALL / TS_PQ) + load_condition / _cosine" },
+  { id:"phase_transition",label:"phase_transition.py",    group:"analysis", loc:223, cc:5,  desc:"PhaseTransitionAnalyzer — 相図・T_c 推定" },
+  { id:"spin_glass",     label:"spin_glass.py",           group:"analysis", loc:305, cc:7,  desc:"SpinGlassAnalyzer — P(q) / q_EA / 自己相関" },
+  { id:"critical_dynamics",label:"critical_dynamics.py",  group:"analysis", loc:339, cc:6,  desc:"CriticalDynamicsAnalyzer — クリティカルスローイング" },
+  { id:"run_pipeline",   label:"run_pipeline.py",         group:"analysis", loc:108, cc:6,  desc:"ANALYZER_REGISTRY + run_pipeline() — YAML/argparse 統合エントリポイント" },
+  // analysis — backward-compat wrappers & utilities
+  { id:"phase_diag",   label:"analyze_phase_diagram.py",group:"analysis",loc:53,  cc:5,  desc:"相図 wrapper → PhaseTransitionAnalyzer に委譲" },
+  { id:"pq",           label:"analyze_pq.py",          group:"analysis", loc:54,  cc:3,  desc:"P(q) wrapper → SpinGlassAnalyzer に委譲" },
+  { id:"slowing",      label:"analyze_slowing.py",     group:"analysis", loc:51,  cc:5,  desc:"臨界減速 wrapper → CriticalDynamicsAnalyzer に委譲" },
+  { id:"cosine",       label:"cosine_sim_phase.py",    group:"analysis", loc:171, cc:7,  desc:"隠れ状態ベクトルのコサイン類似度 (SG vs PM)" },
+  { id:"scaling",      label:"plot_scaling.py",        group:"analysis", loc:186, cc:8,  desc:"スケーリング則 Tc(N) プロット" },
+  // envs (新: 2026-05-24)
+  { id:"base_env",     label:"base_env.py",            group:"envs",     loc:59,  cc:2,  desc:"パズル共通抽象基底 BaseEnv (ABC) — SPEC-2026-05-24-001" },
+  { id:"hanoi",        label:"hanoi_env.py",           group:"envs",     loc:291, cc:8,  desc:"Tower of Hanoi env + evaluate_state() — BaseEnv サブクラス" },
+  { id:"lights_out",   label:"lights_out_env.py",      group:"envs",     loc:268, cc:17, desc:"Lights Out env / GF(2) ソルバー自前実装 / V=d/N² — SPEC-2026-05-24-001" },
   // db
   { id:"sync_one",     label:"db/sync_one.py",         group:"db",       loc:116, cc:9,  desc:"meta.json → PostgreSQL 同期 (psycopg2)" },
   // tools
   { id:"quality",      label:"measure_quality.py",     group:"tools",    loc:375, cc:9,  desc:"radon CC/MI 計測 + CI exit code" },
-  // tests
-  { id:"tests",        label:"test_early_stop.py",     group:"tests",    loc:116, cc:3,  desc:"アルゴリズム D/E 単体テスト (pytest)" },
+  // tests (40 tests total 2026-05-25)
+  { id:"tests",        label:"tests/ (40 tests)",      group:"tests",    loc:537, cc:15, desc:"全テスト: test_early_stop / test_base_env / test_hanoi_env / test_lights_out_env / test_pq_phase_classifier / test_base_analyzer" },
   // external
   { id:"transformers", label:"transformers",            group:"external", loc:0,   cc:0,  desc:"HuggingFace Transformers (model load / generate)" },
   { id:"torch",        label:"torch",                  group:"external", loc:0,   cc:0,  desc:"PyTorch (CUDA tensors / inference)" },
@@ -772,13 +1009,30 @@ const NODES = [
 ];
 
 const LINKS = [
-  // internal
+  // internal — envs hierarchy (新: 2026-05-24)
+  { source:"hanoi",      target:"base_env",     type:"import" },
+  { source:"lights_out", target:"base_env",     type:"import" },
+  { source:"run_local",  target:"base_env",     type:"import" },
+  { source:"test_arch",  target:"base_env",     type:"import" },
+  // internal — runners
   { source:"run_local",  target:"run",          type:"import" },
   { source:"run_local",  target:"hanoi",        type:"import" },
+  { source:"run_local",  target:"lights_out",   type:"import" },
   { source:"tests",      target:"run",          type:"import" },
-  { source:"integrated", target:"phase_diag",   type:"calls"  },
-  { source:"integrated", target:"pq",           type:"calls"  },
-  { source:"integrated", target:"slowing",      type:"calls"  },
+  { source:"tests",      target:"hanoi",        type:"import" },
+  { source:"tests",      target:"lights_out",   type:"import" },
+  // analysis — OOP 継承チェーン (新: 2026-05-25)
+  { source:"phase_transition",    target:"base_analyzer",   type:"import" },
+  { source:"spin_glass",          target:"base_analyzer",   type:"import" },
+  { source:"critical_dynamics",   target:"base_analyzer",   type:"import" },
+  { source:"run_pipeline",        target:"phase_transition", type:"import" },
+  { source:"run_pipeline",        target:"spin_glass",       type:"import" },
+  { source:"run_pipeline",        target:"critical_dynamics",type:"import" },
+  { source:"run_pipeline",        target:"base_analyzer",   type:"import" },
+  { source:"phase_diag",          target:"phase_transition", type:"import" },
+  { source:"pq",                  target:"spin_glass",       type:"import" },
+  { source:"slowing",             target:"critical_dynamics",type:"import" },
+  { source:"tests",               target:"base_analyzer",   type:"import" },
   // runners → external
   { source:"run_local",  target:"transformers", type:"import" },
   { source:"run_local",  target:"torch",        type:"import" },
@@ -786,18 +1040,20 @@ const LINKS = [
   { source:"run_local",  target:"numpy",        type:"import" },
   { source:"test_arch",  target:"transformers", type:"import" },
   { source:"test_arch",  target:"torch",        type:"import" },
-  // analysis → external
-  { source:"integrated", target:"numpy",        type:"import" },
-  { source:"integrated", target:"scipy",        type:"import" },
-  { source:"integrated", target:"matplotlib",   type:"import" },
-  { source:"phase_diag", target:"numpy",        type:"import" },
-  { source:"phase_diag", target:"matplotlib",   type:"import" },
-  { source:"pq",         target:"numpy",        type:"import" },
-  { source:"pq",         target:"scipy",        type:"import" },
-  { source:"pq",         target:"matplotlib",   type:"import" },
-  { source:"slowing",    target:"numpy",        type:"import" },
-  { source:"slowing",    target:"scipy",        type:"import" },
-  { source:"slowing",    target:"matplotlib",   type:"import" },
+  // envs → external
+  { source:"lights_out", target:"numpy",        type:"import" },
+  { source:"hanoi",      target:"numpy",        type:"import" },
+  // analysis (OOP) → external
+  { source:"base_analyzer",      target:"numpy",        type:"import" },
+  { source:"phase_transition",   target:"numpy",        type:"import" },
+  { source:"phase_transition",   target:"matplotlib",   type:"import" },
+  { source:"spin_glass",         target:"numpy",        type:"import" },
+  { source:"spin_glass",         target:"scipy",        type:"import" },
+  { source:"spin_glass",         target:"matplotlib",   type:"import" },
+  { source:"critical_dynamics",  target:"numpy",        type:"import" },
+  { source:"critical_dynamics",  target:"scipy",        type:"import" },
+  { source:"critical_dynamics",  target:"matplotlib",   type:"import" },
+  // analysis (wrappers) → external (minimal, main deps proxied via OOP classes)
   { source:"cosine",     target:"numpy",        type:"import" },
   { source:"scaling",    target:"numpy",        type:"import" },
   { source:"scaling",    target:"matplotlib",   type:"import" },
