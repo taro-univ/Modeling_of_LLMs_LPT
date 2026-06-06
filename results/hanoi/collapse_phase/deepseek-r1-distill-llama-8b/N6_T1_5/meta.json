@@ -1,0 +1,7 @@
+{
+  "environment": "hanoi",
+  "model": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
+  "N": 6,
+  "temperature": 1.5,
+  "sweep_type": "collapse_phase"
+}

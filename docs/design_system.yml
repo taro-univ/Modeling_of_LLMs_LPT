@@ -1,0 +1,461 @@
+# ============================================================
+# Design System — Modeling of LLMs via Statistical Physics
+# ============================================================
+# presentation-agent が参照する唯一の権威ファイル。
+#
+# 構成:
+#   PART 1  ビジュアルデザイン方針  (design_draft.yml から抽出・整理)
+#   PART 2  研究固有定義            (物理記号・変数・可視化)
+#   PART 3  生成設定                (スライド構成テンプレート・pandoc)
+#
+# 更新ルール:
+#   - 新しい物理記号を使う前に PART 2 notation / variable_mapping を先に更新する
+#   - 配色・余白ポリシーを変更したら reference_pptx も合わせて確認する
+#   - physics-agent に記号の整合性チェックを依頼すること
+#
+# version: 1.1
+# last_updated: 2026-05-25
+# ============================================================
+
+
+# ============================================================
+# PART 1  ビジュアルデザイン方針
+# ============================================================
+
+direction:
+  essence:
+    - "知的で端正"
+    - "余白を活かす"
+    - "情報を図解で整理する"
+    - "落ち着いた信頼感を優先する"
+    - "装飾より構造を見せる"
+    - "研究内容を視覚的にわかりやすく分節する"
+
+  avoid:
+    - "広告的な派手さ"
+    - "過剰な装飾"
+    - "多色使い"
+    - "文字の詰め込み"
+    - "立体的な図形"
+    - "ポップすぎるアイコン"
+    - "強いグラデーションの多用"
+
+# ------------------------------------------------------------
+# タイポグラフィ
+# ------------------------------------------------------------
+typography:
+  # 環境・ツールに応じて先頭から使えるものを選ぶ
+  recommended_fonts:
+    japanese:
+      - "Noto Sans JP"
+      - "BIZ UDPGothic"
+      - "Yu Gothic"
+      - "Hiragino Sans"
+    latin:
+      - "Inter"
+      - "Helvetica Neue"
+      - "Arial"
+      - "Aptos"
+    math:
+      - "Latin Modern Math"
+
+  weight_policy:
+    title:   "bold"
+    heading: "semibold"     # bold との混用禁止
+    body:    "regular"
+    caption: "regular"
+
+  size_pt:
+    slide_title:   32
+    section_title: 28
+    heading:       22
+    body:          18
+    caption:       14
+    code:          14
+    footnote:      12
+
+  hierarchy_policy:
+    title:
+      role: "スライドの主張を短く強く示す"
+      treatment:
+        - "大きく配置する"
+        - "太めにする"
+        - "周囲に十分な余白を取る"
+    body:
+      role: "主張を補足する説明"
+      treatment:
+        - "短い文を中心にする"
+        - "段落を長くしすぎない"
+        - "図の理解を補助する量に抑える"
+    label:
+      role: "図中の意味を明確にする"
+      treatment:
+        - "短くする"
+        - "視線の流れを妨げない"
+        - "必要な箇所だけ強調する"
+    note:
+      role: "注釈・出典・補足条件"
+      treatment:
+        - "小さく控えめにする"
+        - "下部または端に配置する"
+        - "本文より視覚的優先度を下げる"
+
+# ------------------------------------------------------------
+# テキスト密度
+# ------------------------------------------------------------
+text_density:
+  overall: "low_to_medium"
+  density_control:
+    title:          "short"       # 1行以内
+    body:           "concise"     # 箇条書き3〜5行まで
+    diagram_labels: "very_short"  # 3〜5語
+    captions:       "minimal"     # 1文以内
+  rules:
+    - "1スライド1メッセージを基本にする"
+    - "詳細説明は口頭または補足資料に委ねる"
+    - "数式スライドは式と1行の説明だけでよい"
+
+# ------------------------------------------------------------
+# 余白・レイアウト
+# ------------------------------------------------------------
+whitespace_and_balance:
+  layout_feel:
+    outer_margin:  "wide"
+    section_gap:   "wide"
+    element_gap:   "moderate_to_wide"
+    alignment:     "strict"
+    reading_flow:  "clear"
+
+  balance_policy:
+    text:
+      role:     "意味を伝える"
+      priority: "必要最小限"
+    shapes:
+      role:     "情報を区切り、関係を見せる"
+      priority: "高"
+    whitespace:
+      role:     "重要度と読み順を作る"
+      priority: "高"
+
+# ------------------------------------------------------------
+# 図形・ダイアグラムスタイル
+# ------------------------------------------------------------
+diagram:
+  essence:
+    - "線は細く、形は単純にする"
+    - "角丸・円・線・矢印を中心に構成する"
+    - "図は複雑な装飾ではなく、構造理解のために使う"
+    - "アイコンは線画ベースで控えめにする"
+    - "強調対象だけ色面や濃色で目立たせる"
+    - "図中の文字は短くする"
+
+  # この研究で実際に登場する図形パターンのみ定義
+  types:
+    linear_flow:
+      description: "解析ステップや変化の流れを横方向に示す図"
+      style:
+        - "丸またはシンプルなボックス"
+        - "短いラベル"
+        - "細い矢印"
+        - "淡い塗り（blue.pale または neutral_fill.pale_gray）"
+
+    organization_chart:
+      description: "階層・依存関係をボックスと線で整理する図（エージェント構成図など）"
+      style:
+        - "角丸ボックス"
+        - "細い接続線"
+        - "白背景"
+        - "blue.primary の枠線または見出し"
+
+    positioning_matrix:
+      description: "2軸で相図・比較を示す図（SG/PM/Ordered の相図など）"
+      style:
+        - "4象限または連続グラデーション"
+        - "薄い背景"
+        - "強調領域のみ濃色"
+        - "軸ラベルは短く"
+
+    logic_panel:
+      description: "計算式・因果・仮説構造を整理する図"
+      style:
+        - "囲み枠"
+        - "大きな数式または要点"
+        - "矢印や記号で関係を示す"
+        - "注釈は小さく配置"
+
+    venn_or_cluster:
+      description: "複数要素の重なりや関係性を示す図（SG的クラスタリングなど）"
+      style:
+        - "円形"
+        - "青系の濃淡"
+        - "重なりで関係を表現"
+        - "ラベルは簡潔にする"
+
+    toc_layout:
+      description: "中間報告の構成・現在位置を示す目次スライド"
+      style:
+        - "大きな番号"
+        - "横罫線"
+        - "未選択項目は text.muted で表示"
+        - "現在項目だけ blue.primary で強調"
+
+  icon_policy:
+    style:       "simple_line_icon"
+    detail_level: "low"
+    role:         "補助的"
+    avoid:
+      - "装飾的すぎるアイコン"
+      - "複雑なイラスト"
+      - "立体アイコン"
+
+  line_policy:
+    weight: "thin"
+    style:  "straight_or_orthogonal"
+    avoid:
+      - "線の交差"
+      - "太すぎる矢印"
+      - "装飾的な矢印"
+
+# ------------------------------------------------------------
+# 配色 — ライトテーマ（白/薄グレー + 青アクセント）
+# ------------------------------------------------------------
+color:
+  palette:
+    background:
+      white:      "#FFFFFF"
+      off_white:  "#F7F8FA"
+      light_gray: "#F1F3F5"
+
+    text:
+      primary:   "#2F3437"    # 本文
+      secondary: "#5C6368"    # 補足
+      muted:     "#8A9299"    # キャプション・注釈
+      inverse:   "#FFFFFF"    # 色面上のテキスト
+
+    blue:
+      deep:    "#123E8C"      # 最強調（タイトル・見出し）
+      primary: "#2456A6"      # 主アクセント
+      vivid:   "#1047D8"      # ボタン的な強調
+      soft:    "#DDE7F7"      # 薄い背景色面
+      pale:    "#EEF3FB"      # 最も薄い背景
+
+    cyan:
+      primary:   "#12B8C8"
+      secondary: "#22A7D8"
+      soft:      "#DDF6F8"
+
+    line:
+      light:  "#D8DEE6"
+      medium: "#B8C0CA"
+      dark:   "#6F7A86"
+
+    neutral_fill:
+      pale_gray:      "#F4F5F7"
+      card_gray:      "#EEF1F4"
+      muted_blue_gray: "#D7DFEA"
+
+  usage_policy:
+    - "背景は white または off_white を基本にする"
+    - "強調には blue.primary または blue.deep を使う"
+    - "cyan は限定的に使う（補助アクセント）"
+    - "補足情報は text.muted または neutral_fill で弱める"
+    - "1スライド内の主役色は1〜2色に抑える"
+
+
+# ============================================================
+# PART 2  研究固有定義
+# ============================================================
+
+# ------------------------------------------------------------
+# データ可視化（研究固有の色マッピング）
+# ------------------------------------------------------------
+data_visualization:
+  # N（ディスク数）ごとの scatter 色
+  n_colors:
+    N2: "#1f77b4"
+    N3: "#ff7f0e"
+    N4: "#2ca02c"
+    N5: "#d62728"
+    N6: "#9467bd"
+
+  # 層ごとの色（layer_top/mid/low）
+  layer_colors:
+    layer_top: "#2456A6"    # blue.primary
+    layer_mid: "#f0883e"    # オレンジ
+    layer_low: "#3fb950"    # グリーン
+
+  # 相（phase）の色
+  phase_colors:
+    ordered: "#3fb950"      # 緑：秩序相 (accuracy 高)
+    sg:      "#f0883e"      # オレンジ：スピングラス相
+    pm:      "#8A9299"      # グレー：常磁性相 (accuracy 低)
+
+  scatter:
+    marker_size: 40
+    alpha: 0.7
+
+  heatmap:
+    colormap: "viridis"
+    annotation: true
+
+  line_plot:
+    linewidth: 1.5
+    grid_alpha: 0.3
+    grid_color: "#D8DEE6"   # line.light
+
+# ------------------------------------------------------------
+# 数式スタイルポリシー
+# ------------------------------------------------------------
+math:
+  engine:       "omml"        # pandoc 経由で PowerPoint ネイティブ数式
+  display_mode: "block"       # 重要な式はブロック（センタリング）
+  inline_mode:  "inline"      # 変数参照はインライン
+  equation_numbering: true    # 重要な式には番号付け（定義式・主要結果）
+  layout:       "center_aligned"
+  notation_source: "docs/design_system.yml の notation セクションのみ使用"
+  rules:
+    - "コード変数を数式中で直接使わない（accuracy ではなく $m$）"
+    - "同じ物理量を複数の表記で書かない（混用禁止）"
+    - "新記号を導入する前に notation セクションに追記する"
+
+# ------------------------------------------------------------
+# 物理記号の正規表記（唯一の権威）
+#
+# 追加ルール:
+#   - LaTeX 文字列を記述（$ $ は含まない）
+#   - 新記号はここに追記してから資料で使う
+#   - physics-agent が整合性を保証する
+# ------------------------------------------------------------
+notation:
+  # 基本パラメータ
+  temperature:          "T"
+  critical_temperature: "T_c"
+  disk_count:           "N"
+  accuracy:             "m"
+
+  # スピングラス秩序変数
+  ea_order_parameter:   "q_{EA}"
+  overlap_ab:           "q_{ab}"
+  overlap_distribution: "P(q)"
+  mean_overlap:         "\\langle q \\rangle"
+  variance_overlap:     "\\mathrm{Var}(q)"
+
+  # 隠れ状態・ベクトル
+  hidden_state:         "\\mathbf{h}"
+  hidden_state_trial_a: "\\mathbf{h}^{(a)}"
+  hidden_state_mean:    "\\bar{\\mathbf{h}}"
+  hidden_dim:           "d"
+
+  # Hamiltonian・エネルギー
+  hamiltonian:          "\\mathcal{H}"
+  free_energy:          "F"
+  potential:            "V"
+
+  # レプリカ添字（混用禁止）
+  replica_indices:      "a, b"
+  site_index:           "i"
+  trial_index:          "\\mu"
+
+  # P(q) 統計量
+  bimodality_bc:        "\\mathrm{BC}"
+  dip_statistic:        "D"
+  dip_pvalue:           "p_{\\mathrm{dip}}"
+
+  # Hopfield 模型
+  hopfield_pattern:     "\\boldsymbol{\\xi}^{\\mu}"
+  hopfield_capacity:    "\\alpha"
+  min_moves:            "K(N) = 2^N - 1"
+
+  # スケーリング
+  critical_exponent:    "\\nu"
+  scaling_exponent:     "\\alpha_s"
+
+  # 制御
+  control_force:        "\\mathbf{f}"
+
+# ------------------------------------------------------------
+# コード変数 → LaTeX 記号 対応表
+# （記号定義スライドの自動生成に使用）
+# ------------------------------------------------------------
+variable_mapping:
+  temperature:        {symbol: "$T$",                          desc: "生成温度（熱浴温度・ノイズ強度）"}
+  N:                  {symbol: "$N$",                          desc: "ディスク数（系のサイズ・エネルギー障壁高さ）"}
+  accuracy:           {symbol: "$m$",                          desc: "秩序変数（試行平均正解率）"}
+  num_moves:          {symbol: "$n_{\\text{moves}}$",          desc: "生成した手数"}
+  q_ea:               {symbol: "$q_{EA}$",                     desc: "Edwards-Anderson 秩序変数 $= \\sqrt{\\langle q^2 \\rangle}$"}
+  q_mean:             {symbol: "$\\langle q \\rangle$",        desc: "重複 $q$ の平均"}
+  q_var:              {symbol: "$\\mathrm{Var}(q)$",           desc: "重複 $q$ の分散"}
+  q_bimodality_bc:    {symbol: "$\\mathrm{BC}$",               desc: "Sarle の bimodality coefficient"}
+  q_dip_pval:         {symbol: "$p_{\\mathrm{dip}}$",          desc: "Hartigan dip 検定の $p$ 値（双峰性の検定）"}
+  layer_top:          {symbol: "$h_{\\text{top}}$",            desc: "最終層（depth 100%）の隠れ状態"}
+  layer_mid:          {symbol: "$h_{\\text{mid}}$",            desc: "中間層（depth 50%）の隠れ状態"}
+  layer_low:          {symbol: "$h_{\\text{low}}$",            desc: "浅い層（depth 25%）の隠れ状態"}
+  goal_reached:       {symbol: "Ordered",                      desc: "秩序相（正解到達）"}
+  move_loop_repeat:   {symbol: "SG",                           desc: "スピングラス相（ループ停滞）"}
+  no_move_catchall:   {symbol: "PM",                           desc: "常磁性相（手が出ない）"}
+  move_ceiling:       {symbol: "PM",                           desc: "常磁性相（手数上限）"}
+
+
+# ============================================================
+# PART 3  生成設定
+# ============================================================
+
+# ------------------------------------------------------------
+# スライド構成テンプレート
+# ------------------------------------------------------------
+report_templates:
+
+  progress:
+    title: "中間報告"
+    max_slides: 20
+    sections:
+      - {id: title,          title: "タイトル",         required: true}
+      - {id: overview,       title: "研究概要",         required: true,  note: "最終ゴール（制御モデル）を3行で。今日の内容を箇条書き。"}
+      - {id: background,     title: "背景・動機",       required: true,  slides: 2}
+      - {id: theory,         title: "理論枠組み",       required: true,  slides: 2,  physics_review: true}
+      - {id: prior_work,     title: "先行研究",         required: true,  slides: 1,  note: "定性的な位置付けのみ。novelty を明示。"}
+      - {id: hypothesis,     title: "仮説",             required: true,  slides: 1,  note: "H-SG, H-PT 等を status 付きで列挙"}
+      - {id: puzzle,         title: "実験パズル設計",   required: true,  slides: 1}
+      - {id: methods,        title: "手法",             required: true,  slides: 2,  physics_review: true}
+      - {id: setup,          title: "実験設定",         required: true,  slides: 1}
+      - {id: results,        title: "結果",             required: true,  slides: 3,  auto_figures: true}
+      - {id: discussion,     title: "考察",             required: true,  slides: 2}
+      - {id: future,         title: "今後の方針",       required: true,  slides: 1,  note: "todo.md 上位3件 + 締切（2026-06-30）"}
+      - {id: notation_table, title: "記号定義表",       required: true,  slides: 1,  auto_generate: true}
+
+  experiment_report:
+    title: "実験レポート"
+    max_slides: 10
+    sections:
+      - {id: title,           title: "タイトル",             required: true,  note: "SPEC ID・実験名・実施日"}
+      - {id: objective,       title: "目的・仮説",           required: true,  slides: 1}
+      - {id: methods,         title: "手法・データ",         required: true,  slides: 2,  physics_review: true}
+      - {id: results_quant,   title: "結果（定量）",         required: true,  slides: 2,  auto_figures: true}
+      - {id: results_interp,  title: "結果（物理的解釈）",   required: true,  slides: 1}
+      - {id: discussion,      title: "考察",                 required: true,  slides: 1}
+      - {id: notation_table,  title: "記号定義表",           required: true,  slides: 1,  auto_generate: true}
+
+# ------------------------------------------------------------
+# pandoc 変換設定
+# ------------------------------------------------------------
+pandoc:
+  from: "markdown+tex_math_dollars+pipe_tables"
+  to: "pptx"
+  math_engine: "omml"
+  reference_doc: "/tmp/reference.pptx"
+  extra_args:
+    - "--slide-level=2"
+    - "--dpi=150"
+
+# ------------------------------------------------------------
+# reference.pptx 生成設定（python-pptx で自動生成）
+# ------------------------------------------------------------
+reference_pptx:
+  slide_width_emu:   9144000    # 16:9
+  slide_height_emu:  5143500    # 16:9
+  background_color:  "FFFFFF"   # white
+  title_font_bold:   true
+  title_font_color:  "123E8C"   # blue.deep
+  body_font_color:   "2F3437"   # text.primary
+  heading_font_color: "2456A6"  # blue.primary
+  accent_color:      "2456A6"   # blue.primary
