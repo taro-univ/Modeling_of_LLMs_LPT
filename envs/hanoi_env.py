@@ -20,6 +20,18 @@ class TowerOfHanoiEnv(BaseEnv):
 
     LAMBDA_DIST = 1.0
     LAMBDA_PENALTY = 0.5
+    SYSTEM_HINT = (
+        "You are an expert at the Tower of Hanoi puzzle. "
+        "Always apply the recursive strategy: to move N disks from peg X to peg Z, "
+        "(1) move the top N-1 disks from X to the intermediate peg Y, "
+        "(2) move disk N from X to Z, "
+        "(3) move the N-1 disks from Y to Z. "
+        "Identify the correct intermediate peg before making any move."
+    )
+    MOVE_RE = re.compile(
+        r'Move\s+(\d+)\s+from\s+([ABC])\s+to\s+([ABC])',
+        re.IGNORECASE,
+    )
 
     def __init__(self, N: int) -> None:
         if N < 1:
@@ -90,6 +102,10 @@ class TowerOfHanoiEnv(BaseEnv):
             f"Output ONLY the moves, one per line. Stop immediately after the final move. Begin:\n"
         )
 
+    def get_system_hint(self) -> str:
+        """ハノイ固有の再帰戦略ヒントを返す。"""
+        return self.SYSTEM_HINT
+
     def get_prompt_from_state(self, state: dict) -> str:
         """任意の中間状態を起点に LLM へ与えるプロンプトを生成して返す。"""
         state_str = self._state_to_str(state)
@@ -112,11 +128,16 @@ class TowerOfHanoiEnv(BaseEnv):
 
     def extract_moves_from_text(self, text: str) -> list:
         """LLM テキストから "Move <disk> from <peg> to <peg>" 形式の手を抽出する。"""
-        matches = re.findall(
-            r'Move\s+(\d+)\s+from\s+([ABC])\s+to\s+([ABC])',
-            text, re.IGNORECASE,
-        )
+        matches = self.MOVE_RE.findall(text)
         return [f"Move {d} from {s.upper()} to {t.upper()}" for d, s, t in matches]
+
+    def extract_moves_with_position(self, text: str) -> list[tuple[str, int]]:
+        """手の正規化文字列と出現開始位置を返す。"""
+        return [
+            (f"Move {d} from {s.upper()} to {t.upper()}", match.start())
+            for match in self.MOVE_RE.finditer(text)
+            for d, s, t in [match.groups()]
+        ]
 
     def evaluate_state(self, current_moves: list) -> float:
         """

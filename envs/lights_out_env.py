@@ -16,6 +16,12 @@ class LightsOutEnv(BaseEnv):
 
     LAMBDA_DIST = 1.0
     MAX_GENERATION_ATTEMPTS = 1000
+    SYSTEM_HINT = (
+        "You are an expert at Lights Out. Each cell needs to be toggled at most once; "
+        "the order does not matter. Determine the set of cells to toggle that turns "
+        "all lights off (this is a GF(2) linear system)."
+    )
+    MOVE_RE = re.compile(r"Toggle\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)", re.IGNORECASE)
 
     def __init__(
         self,
@@ -78,6 +84,9 @@ class LightsOutEnv(BaseEnv):
             "Output ONLY the moves. Begin:\n"
         )
 
+    def get_system_hint(self) -> str:
+        return self.SYSTEM_HINT
+
     def evaluate_state(self, current_moves: list) -> float:
         state = self._simulate(current_moves)
         d = self._min_moves_from_state(state)
@@ -90,8 +99,15 @@ class LightsOutEnv(BaseEnv):
         return self._solution_to_moves(self._initial_solution)
 
     def extract_moves_from_text(self, text: str) -> list[str]:
-        matches = re.findall(r"Toggle\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)", text, re.IGNORECASE)
+        matches = self.MOVE_RE.findall(text)
         return [f"Toggle ({int(i)},{int(j)})" for i, j in matches]
+
+    def extract_moves_with_position(self, text: str) -> list[tuple[str, int]]:
+        return [
+            (f"Toggle ({int(i)},{int(j)})", match.start())
+            for match in self.MOVE_RE.finditer(text)
+            for i, j in [match.groups()]
+        ]
 
     def _generate_initial_state(self, seed: Optional[int]) -> np.ndarray:
         rng = np.random.default_rng(seed)

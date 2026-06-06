@@ -9,6 +9,7 @@ Algorithm D（no_move_ratio 閾値変更）と Algorithm E（stagnation_after_mo
 """
 
 import pytest
+from envs.lights_out_env import LightsOutEnv
 from runners.run import check_early_stop, EarlyStopConfig
 
 
@@ -91,6 +92,40 @@ class TestAlgorithmD:
         )
         assert old_result is None
         assert new_result == "no_move_catchall"
+
+    def test_d6_lights_out_toggle_prevents_no_move_catchall(self):
+        """D-6: Lights Out の Toggle は env 委譲で手として数える。"""
+        cfg = _d_only_cfg(no_move_ratio=0.25)
+        env = LightsOutEnv(N=3, seed=42)
+        text = "A" * 3600 + "\nToggle (0,0)\n"
+
+        legacy_result = check_early_stop(text, num_predict=4096, min_moves=7, cfg=cfg)
+        delegated_result = check_early_stop(
+            text,
+            num_predict=4096,
+            min_moves=env.min_moves,
+            cfg=cfg,
+            env=env,
+        )
+
+        assert legacy_result == "no_move_catchall"
+        assert delegated_result is None
+
+    def test_d7_lights_out_still_fires_when_no_toggle_exists(self):
+        """D-7: env 委譲後も Toggle なしなら no_move_catchall は維持する。"""
+        cfg = _d_only_cfg(no_move_ratio=0.25)
+        env = LightsOutEnv(N=3, seed=42)
+        text = "A" * 3600
+
+        result = check_early_stop(
+            text,
+            num_predict=4096,
+            min_moves=env.min_moves,
+            cfg=cfg,
+            env=env,
+        )
+
+        assert result == "no_move_catchall"
 
 
 # ===========================================================================

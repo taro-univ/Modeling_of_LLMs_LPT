@@ -37,6 +37,27 @@ def test_lights_out_extract_moves_and_state_to_key():
     assert env.state_to_key(np.eye(3, dtype=np.int8)) == (1, 0, 0, 0, 1, 0, 0, 0, 1)
 
 
+def test_lights_out_count_moves_and_positions():
+    env = LightsOutEnv(N=3, seed=2)
+    text = "thinking\nToggle (0,0)\nmore text\nTOGGLE (2, 1)\nToggle (02, 01)"
+
+    assert env.count_moves(text) == 3
+    assert env.extract_moves_with_position(text) == [
+        ("Toggle (0,0)", text.index("Toggle (0,0)")),
+        ("Toggle (2,1)", text.index("TOGGLE (2, 1)")),
+        ("Toggle (2,1)", text.index("Toggle (02, 01)")),
+    ]
+
+
+def test_lights_out_system_hint_is_puzzle_specific():
+    env = LightsOutEnv(N=3, seed=2)
+    hint = env.get_system_hint()
+
+    assert "Lights Out" in hint
+    assert "GF(2)" in hint
+    assert "Tower of Hanoi" not in hint
+
+
 def test_lights_out_adjacency_shape_and_center_toggle():
     env = LightsOutEnv(N=3, seed=3)
     matrix = env._build_adjacency_matrix()

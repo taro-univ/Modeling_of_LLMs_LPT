@@ -82,23 +82,11 @@ def model_id_to_slug(model_id: str) -> str:
 # Few-shot プロンプト構築
 # ===========================================================================
 
-# 再帰戦略ヒント: N=2 で A→B（中間ペグ）を正しく選ばせるための一般原則。
-# 答えを直接与えず、再帰的思考の枠組みを与えることで汎化性を保つ。
-SYSTEM_HINT = (
-    "You are an expert at the Tower of Hanoi puzzle. "
-    "Always apply the recursive strategy: to move N disks from peg X to peg Z, "
-    "(1) move the top N-1 disks from X to the intermediate peg Y, "
-    "(2) move disk N from X to Z, "
-    "(3) move the N-1 disks from Y to Z. "
-    "Identify the correct intermediate peg before making any move."
-)
-
-
 def build_few_shot_messages(env: BaseEnv, n_shot: int) -> list[dict]:
     """
     システムヒント + マルチターン few-shot メッセージリストを構築する。
 
-    先頭に再帰戦略の system メッセージを置き、N-n_shot〜N-1 の正解例を
+    先頭に env 固有の system メッセージを置き、N-n_shot〜N-1 の正解例を
     User→Assistant ターンで提示してから本番問題を末尾に追加する。
 
     N=2: N=1 の例 1 つ → 中間ペグ選択の習得を狙う
@@ -112,7 +100,7 @@ def build_few_shot_messages(env: BaseEnv, n_shot: int) -> list[dict]:
     Returns:
         messages リスト（system → few-shot turns → 本番 User メッセージ）。
     """
-    messages: list[dict] = [{"role": "system", "content": SYSTEM_HINT}]
+    messages: list[dict] = [{"role": "system", "content": env.get_system_hint()}]
 
     example_ns = list(range(max(1, env.N - n_shot), env.N))
     for ex_n in example_ns:
@@ -233,7 +221,7 @@ def _prepare_input_ids(
         messages = build_few_shot_messages(env, n_shot)
     else:
         messages = [
-            {"role": "system", "content": SYSTEM_HINT},
+            {"role": "system", "content": env.get_system_hint()},
             {"role": "user",   "content": prompt},
         ]
 
@@ -279,7 +267,7 @@ def _sample_next_token(logits: torch.Tensor, temperature: float) -> int:
 def _capture_new_move_hidden_states(
     outputs,
     capture_layers: dict[str, int],
-    current_moves_full: list,
+    current_move_texts: list[str],
     prev_move_count: int,
     step: int,
     hs_buffer: dict[str, list[np.ndarray]],
@@ -291,28 +279,40 @@ def _capture_new_move_hidden_states(
     Returns:
         current_move_count（新しい prev_move_count として使う）。
     """
-    current_move_count = len(current_moves_full)
+    current_move_count = len(current_move_texts)
     for mv_idx in range(prev_move_count, current_move_count):
         for layer_key, layer_idx in capture_layers.items():
             hs_tensor = outputs.hidden_states[layer_idx][0, -1, :]
             hs_buffer[layer_key].append(hs_tensor.float().cpu().numpy())
         move_steps_list.append(step)
-        disk, src, dst = current_moves_full[mv_idx]
-        move_texts_list.append(f"Move {disk} from {src} to {dst}")
+        move_texts_list.append(current_move_texts[mv_idx])
     return current_move_count
 
 
+def _parse_hanoi_move_tuple(move_text: str) -> Optional[tuple[str, str, str]]:
+    """Return (disk, src, dst) for Hanoi move text, or None for other puzzles."""
+    match = _MOVE_RE_WITH_DISK.search(move_text)
+    if not match:
+        return None
+    disk, src, dst = match.groups()
+    return disk, src.upper(), dst.upper()
+
+
 def _is_disk_loop_confirmed(
-    current_moves_full: list,
+    current_move_texts: list[str],
     cfg: EarlyStopConfig,
 ) -> bool:
     """ディスク番号込みでループを再検証する。
 
     loop_window と loop_min_count を使って disk_loop と reverse_loop の OR を返す。
     """
-    if len(current_moves_full) < cfg.loop_window:
+    parsed_moves = [
+        parsed for move_text in current_move_texts
+        if (parsed := _parse_hanoi_move_tuple(move_text)) is not None
+    ]
+    if len(parsed_moves) < cfg.loop_window:
         return False
-    recent = current_moves_full[-cfg.loop_window:]
+    recent = parsed_moves[-cfg.loop_window:]
     disk_loop = any(
         recent.count(mv) >= cfg.loop_min_count for mv in set(recent)
     )
@@ -330,15 +330,23 @@ def _check_early_stop_with_disk_verify(
     num_predict: int,
     min_moves: int,
     early_stop_cfg: EarlyStopConfig,
-    current_moves_full: list,
+    current_move_texts: list[str],
+    env: BaseEnv,
 ) -> Optional[str]:
     """check_early_stop を呼び、move_loop 系は disk 番号込みで再検証する。
 
     誤検知（disk 番号が違う）の場合は None を返す。
     """
-    reason = check_early_stop(accumulated_text, num_predict, min_moves, early_stop_cfg)
+    reason = check_early_stop(
+        accumulated_text,
+        num_predict,
+        min_moves,
+        early_stop_cfg,
+        env=env,
+        moves=current_move_texts,
+    )
     if reason in ("move_loop_repeat", "move_loop_reverse"):
-        if not _is_disk_loop_confirmed(current_moves_full, early_stop_cfg):
+        if not _is_disk_loop_confirmed(current_move_texts, early_stop_cfg):
             return None  # 誤検知: ディスクが違うので無視
     return reason
 
@@ -377,7 +385,7 @@ def _finalize_hidden_states(
 def _handle_new_moves(
     outputs,
     capture_layers: dict[str, int],
-    current_moves_full: list,
+    current_move_texts: list[str],
     prev_move_count: int,
     step: int,
     hs_buffer: dict[str, list[np.ndarray]],
@@ -393,7 +401,7 @@ def _handle_new_moves(
         (new_prev_move_count, stop_reason_or_None)
     """
     new_prev_move_count = _capture_new_move_hidden_states(
-        outputs, capture_layers, current_moves_full,
+        outputs, capture_layers, current_move_texts,
         prev_move_count, step, hs_buffer, move_steps_list, move_texts_list,
     )
     if disable_goal_stop:
@@ -501,13 +509,14 @@ def generate_with_hidden_states(
         # BPE サブワード境界のズレを防ぐため、全トークンを一括デコード
         accumulated_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
 
-        # Move 検出: ディスク番号込みで抽出（hidden state キャプチャ & move_texts 用）
-        current_moves_full = _MOVE_RE_WITH_DISK.findall(accumulated_text)  # (disk, src, dst)
+        # Move 検出: env 固有の抽出器で手と出現位置を取得する
+        current_moves_with_position = env.extract_moves_with_position(accumulated_text)
+        current_move_texts = [move for move, _ in current_moves_with_position]
 
-        if len(current_moves_full) > prev_move_count:
+        if len(current_move_texts) > prev_move_count:
             last_move_step = step  # Algorithm E: 最後の move 検出ステップを更新
             prev_move_count, goal_stop = _handle_new_moves(
-                outputs, capture_layers, current_moves_full,
+                outputs, capture_layers, current_move_texts,
                 prev_move_count, step, hs_buffer, move_steps_list, move_texts_list,
                 env, accumulated_text, disable_goal_stop,
             )
@@ -532,7 +541,12 @@ def generate_with_hidden_states(
         # Algorithm C (move_loop) のみディスク番号込みの3-tuple で再判定し誤爆を防ぐ
         if _should_check_early_stop(early_stop_cfg, accumulated_text):
             reason = _check_early_stop_with_disk_verify(
-                accumulated_text, num_predict, min_moves, early_stop_cfg, current_moves_full,
+                accumulated_text,
+                num_predict,
+                min_moves,
+                early_stop_cfg,
+                current_move_texts,
+                env,
             )
             if reason:
                 stop_reason = reason

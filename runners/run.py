@@ -24,6 +24,7 @@ from typing import Optional
 
 import requests
 
+from envs.base_env import BaseEnv
 from envs.hanoi_env import TowerOfHanoiEnv
 
 
@@ -197,12 +198,29 @@ def _check_think_budget(text: str, num_predict: int, cfg: EarlyStopConfig) -> Op
     return None
 
 
-def _check_no_move(text: str, num_predict: int, cfg: EarlyStopConfig) -> Optional[str]:
+def _extract_loop_moves(text: str) -> list[tuple[str, str]]:
+    """Return Hanoi (src, dst) tuples for legacy Algorithm C loop detection."""
+    return _MOVE_RE.findall(text)
+
+
+def _count_moves(text: str, env: Optional[BaseEnv]) -> int:
+    """Count moves through env when available, falling back to legacy Hanoi regex."""
+    if env is not None:
+        return env.count_moves(text)
+    return len(_MOVE_RE.findall(text))
+
+
+def _check_no_move(
+    text: str,
+    num_predict: int,
+    cfg: EarlyStopConfig,
+    n_moves: int,
+) -> Optional[str]:
     """Algorithm D: 一定テキスト量で手が 0 本なら "no_move_catchall" を返す。"""
     if not cfg.enable_no_move:
         return None
     if len(text) / 3.5 > num_predict * cfg.no_move_ratio:
-        if len(_MOVE_RE.findall(text)) == 0:
+        if n_moves == 0:
             return "no_move_catchall"
     return None
 
@@ -237,6 +255,8 @@ def check_early_stop(
     num_predict: int,
     min_moves: int,
     cfg: EarlyStopConfig,
+    env: Optional[BaseEnv] = None,
+    moves: Optional[list] = None,
 ) -> Optional[str]:
     """
     ストリーミング中の累積テキストに対して早期終了条件を評価する。
@@ -251,6 +271,10 @@ def check_early_stop(
         この N に対する最短手数（2^N - 1）。
     cfg : EarlyStopConfig
         早期終了パラメータ。
+    env : BaseEnv or None
+        パズル固有の手数カウントに使用する環境。None なら従来のハノイ正規表現。
+    moves : list or None
+        呼び出し側で抽出済みの手リスト。指定時は D/B の手数に使用する。
 
     Returns
     -------
@@ -264,12 +288,12 @@ def check_early_stop(
     """
     if reason := _check_think_budget(text, num_predict, cfg):
         return reason
-    if reason := _check_no_move(text, num_predict, cfg):
+    move_count = len(moves) if moves is not None else _count_moves(text, env)
+    if reason := _check_no_move(text, num_predict, cfg, move_count):
         return reason
-    moves = _MOVE_RE.findall(text)
-    if reason := _check_move_ceiling(len(moves), min_moves, cfg):
+    if reason := _check_move_ceiling(move_count, min_moves, cfg):
         return reason
-    return _check_move_loop(moves, cfg)
+    return _check_move_loop(_extract_loop_moves(text), cfg)
 
 
 # ===========================================================================
@@ -283,6 +307,7 @@ def query_ollama(
     num_predict: int,
     min_moves: int,
     early_stop_cfg: Optional[EarlyStopConfig] = None,
+    env: Optional[BaseEnv] = None,
     timeout: int = 600,
 ) -> tuple[str, int, int, Optional[str]]:
     """
@@ -305,6 +330,8 @@ def query_ollama(
         この N に対する最短手数（早期終了の閾値計算に使用）。
     early_stop_cfg : EarlyStopConfig or None
         None の場合は早期終了を無効化（従来の非ストリーミング動作と同等）。
+    env : BaseEnv or None
+        パズル固有の手数カウントに使用する環境。
     timeout : int
         リクエストタイムアウト秒数。
 
@@ -347,7 +374,7 @@ def query_ollama(
 
                 # Algorithm E: last_move_chunk を更新（毎チャンク、軽量）
                 if early_stop_cfg is not None and early_stop_cfg.enable_stagnation:
-                    n_moves = len(_MOVE_RE.findall(accumulated))
+                    n_moves = _count_moves(accumulated, env)
                     if n_moves > prev_n_moves:
                         last_move_chunk = chunk_count
                         prev_n_moves    = n_moves
@@ -361,7 +388,7 @@ def query_ollama(
                 # 早期終了チェック（50 文字おきに評価 → オーバーヘッド最小化）
                 if early_stop_cfg is not None and len(accumulated) % 50 < 5:
                     reason = check_early_stop(
-                        accumulated, num_predict, min_moves, early_stop_cfg
+                        accumulated, num_predict, min_moves, early_stop_cfg, env=env
                     )
                     if reason:
                         stop_reason = reason
@@ -458,6 +485,7 @@ def run_experiment(
             num_predict   = num_predict_,
             min_moves     = env.min_moves,
             early_stop_cfg= early_stop_cfg,
+            env           = env,
         )
         elapsed = time.time() - t_start
 
