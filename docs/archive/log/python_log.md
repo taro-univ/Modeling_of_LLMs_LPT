@@ -256,3 +256,108 @@
 ## 2026-05-22 12:39:13
 - **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/isotropy.py
 
+## 2026-05-24 22:29:08
+- **File**: /tmp/scan_transcripts.py
+
+## 2026-05-24 22:29:45
+- **File**: /tmp/scan_docker.py
+
+## 2026-05-24 23:37:47
+- **File**: /home/shona/Modeling_of_LLMs_LPT/envs/lights_out_env.py
+
+## 2026-05-24 23:55:11
+- **File**: /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
+
+## 2026-05-24 23:55:14
+- **File**: /home/shona/Modeling_of_LLMs_LPT/runners/test_model_architecture.py
+
+## 2026-05-25 07:58:18
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_phase_diagram.py
+
+## 2026-05-25 07:58:22
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_phase_diagram.py
+
+## 2026-05-25 07:58:26
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_phase_diagram.py
+
+## 2026-05-25 08:50:56
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/base_analyzer.py
+
+## 2026-05-25 08:50:58
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/spin_glass.py
+
+## 2026-05-25 08:51:01
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/run_pipeline.py
+
+## 2026-05-25 08:51:19
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/io_utils.py
+
+## 2026-05-25 08:51:25
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/phase_transition.py
+
+## 2026-05-25 08:51:29
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/phase_transition.py
+
+## 2026-05-25 08:51:34
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_phase_diagram.py
+
+## 2026-05-25 08:51:38
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_pq.py
+
+## 2026-05-25 08:51:41
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_slowing.py
+
+## 2026-05-25 08:51:45
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_slowing.py
+
+## 2026-05-25 08:51:49
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/analyze_integrated.py
+
+## 2026-05-25 08:51:53
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/run_pipeline.py
+
+## 2026-05-25 08:51:57
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/run_pipeline.py
+
+## 2026-05-25 08:52:00
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/run_pipeline.py
+
+## 2026-05-25 08:52:05
+- **File**: /home/shona/Modeling_of_LLMs_LPT/analysis/critical_dynamics.py
+
+## 2026-05-25 09:32:00
+- **File**: /tmp/script_pq_predict.py
+
+## 2026-05-25 09:35:03
+- **File**: /tmp/script_pq_predict.py
+
+## 2026-05-25 12:25:45
+- **File**: /tmp/script_gen_reference_pptx.py
+
+## 2026-05-25 12:30:00
+- **File**: /tmp/script_build_pptx.py
+
+## 2026-05-25 12:30:14
+- **File**: /tmp/script_verify_pptx.py
+
+## 2026-05-25 22:47:22
+- **File**: /tmp/script_collect_rates.py
+
+## 2026-05-25 22:52:51
+- **File**: /tmp/script_boltzmann_preflight.py
+
+## 2026-05-25 22:56:45
+- **File**: /tmp/script_sigmoid_fit.py
+
+## 2026-05-25 22:57:02
+- **File**: /tmp/script_sigmoid_fit.py
+
+## 2026-05-26 11:43:17
+- **File**: /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+
+## 2026-05-26 11:43:21
+- **File**: /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+
+## 2026-05-26 11:43:25
+- **File**: /home/shona/Modeling_of_LLMs_LPT/runners/run_local.py
+

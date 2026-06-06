@@ -592,3 +592,496 @@ grep -E "TS_STR|TEMPS_STR|T_VALUES" /home/shona/Modeling_of_LLMs_LPT/runners/scr
 cat /home/shona/Modeling_of_LLMs_LPT/run_sweep_llama8b.sh
 ```
 
+## 2026-05-24 22:25:44
+
+```bash
+python3 -c "
+import numpy as np
+
+# GF(2) ガウス消去の N=3 での実用性確認
+# 3x3 Lights Out の隣接行列 (9x9) を構築してランク確認
+N = 3
+n = N * N  # 9
+A = np.zeros((n, n), dtype=np.int8)
+for r in range(N):
+    for c in range(N):
+        idx = r * N + c
+        A[idx, idx] = 1  # 自身
+        for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+            nr, nc = r+dr, c+dc
+            if 0 <= nr < N and 0 <= nc < N:
+                A[idx, nr*N+nc] = 1
+
+# GF(2) でのランク（純 numpy mod 2 ガウス消去）
+def gf2_rank_and_solve(A, b=None):
+    M = A.astype(np.int8).copy()
+    n_rows, n_cols = M.shape
+    if b is not None:
+        M = np.hstack([M, b.reshape(-1,1)])
+    pivot_cols = []
+    row = 0
+    for col in range(n_cols):
+        # ピボット行を探す
+        pivot = None
+        for r in range(row, n_rows):
+            if M[r, col] == 1:
+                pivot = r
+                break
+        if pivot is None:
+            continue
+        M[[row, pivot]] = M[[pivot, row]]
+        pivot_cols.append(col)
+        for r in range(n_rows):
+            if r != row and M[r, col] == 1:
+                M[r] = (M[r] ^ M[row])
+        row += 1
+    
+    rank = len(pivot_cols)
+    # 解の存在チェック（b があるとき）
+    if b is not None:
+        for r in range(rank, n_rows):
+            if M[r, n_cols] == 1:
+                return None, rank  # 解なし
+        # 解ベクトル
+        x = np.zeros(n_cols, dtype=np.int8)
+        for i, col in enumerate(pivot_cols):
+            x[col] = M[i, n_cols]
+        return x, rank
+    return None, rank
+
+_, rank = gf2_rank_and_solve(A)
+print(f'N=3 adjacency matrix rank: {rank} / {n} (full rank = {n})')
+
+# N=5 の場合
+N5 = 5
+n5 = N5 * N5
+A5 = np.zeros((n5, n5), dtype=np.int8)
+for r in range(N5):
+    for c in range(N5):
+        idx = r * N5 + c
+        A5[idx, idx] = 1
+        for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+            nr, nc = r+dr, c+dc
+            if 0 <= nr < N5 and 0 <= nc < N5:
+                A5[idx, nr*N5+nc] = 1
+_, rank5 = gf2_rank_and_solve(A5)
+print(f'N=5 adjacency matrix rank: {rank5} / {n5}')
+print('N=5 は full rank NOT (rank < 25):', rank5 < 25)
+
+import time
+start = time.time()
+for _ in range(1000):
+    gf2_rank_and_solve(A5.copy())
+print(f'N=5 GF(2) solve 1000回: {(time.time()-start)*1000:.1f}ms 合計')
+"
+
+```
+
+## 2026-05-24 22:26:03
+
+```bash
+python3 -c "
+import numpy as np
+
+# N=5 は rank 欠損あり → 解が一意でない初期配置が存在する
+# N=4 の確認
+for N in [2,3,4,5]:
+    n = N * N
+    A = np.zeros((n, n), dtype=np.int8)
+    for r in range(N):
+        for c in range(N):
+            idx = r * N + c
+            A[idx, idx] = 1
+            for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+                nr, nc = r+dr, c+dc
+                if 0 <= nr < N and 0 <= nc < N:
+                    A[idx, nr*N+nc] = 1
+    
+    def gf2_rank(M):
+        M = M.copy()
+        n_rows, n_cols = M.shape
+        row = 0
+        for col in range(n_cols):
+            pivot = None
+            for r in range(row, n_rows):
+                if M[r, col] == 1:
+                    pivot = r
+                    break
+            if pivot is None:
+                continue
+            M[[row, pivot]] = M[[pivot, row]]
+            for r in range(n_rows):
+                if r != row and M[r, col] == 1:
+                    M[r] = (M[r] ^ M[row])
+            row += 1
+        return row
+    
+    r = gf2_rank(A)
+    print(f'N={N}: rank={r}/{n}, null_dim={n-r}, unique_solutions={r==n}')
+"
+
+```
+
+## 2026-05-24 22:26:31
+
+```bash
+python3 -c "
+import numpy as np
+
+# N=4, N=5 では全ての初期配置が一意解を持つとは限らない
+# 方法 B（逆算）: 一意解が保証される N と保証されない N の扱いを確認
+
+# N=4 の解の一意性: rank=12, null_dim=4
+# つまり kernel dim=4 → 任意の解から 2^4=16 個の解が存在する可能性
+# 解が唯一か否かは b が image(A) に含まれているかに加えて、
+# null_dim=0 のときのみ全ての b に対して唯一解が保証される
+
+# 方法 B の正確な理解:
+# x をランダムに選んで b = A*x (mod 2) を作れば、
+# 解は少なくとも x が存在する（b が image(A) の元なので）
+# BUT null_dim > 0 の場合、null(A) の任意ベクトル z を足した x+z も解になる
+# → 唯一解にはならない
+
+# つまり方法 B でも N=4,5 では唯一解が保証されない
+print('方法B では null_dim=0 でないかぎり唯一解不保証')
+print()
+
+# 解が唯一であるためには: rank = n（full rank）が必要
+# N=2: full rank → 全ての b に唯一解 → 方法 A/B どちらでも唯一解保証
+# N=3: full rank → 同上
+# N=4: rank=12/16 → 一意解なし（null_dim=4）
+# N=5: rank=23/25 → 一意解なし（null_dim=2）
+
+# ただし: N=4,5 でも特定の b に対しては解が唯一になる場合もある
+# b ∈ image(A) かつ b が full rank system の場合は唯一解
+# より正確には: A'x = b' （拡大行列で判定）
+# 一意解の条件: rank(A) == rank([A|b]) かつ rank(A) == n
+
+# N=4,5 での一意解保証方法:
+# → 「解が唯一である b」はどれか？
+# b が image(A) に含まれている場合に解は存在するが、一意にはならない
+# null(A) が非自明なので必ず複数解が存在する
+
+# 研究の制約「解は一意」を満たすには N ∈ {2,3} のみ使用するか、
+# N=4,5 では制約緩和が必要
+
+print('研究の制約「一意解」を满たす N:')
+for N in [2,3,4,5]:
+    n = N*N
+    A = np.zeros((n,n), dtype=np.int8)
+    for r in range(N):
+        for c in range(N):
+            idx = r*N+c
+            A[idx,idx] = 1
+            for dr,dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+                nr,nc=r+dr,c+dc
+                if 0<=nr<N and 0<=nc<N:
+                    A[idx,nr*N+nc] = 1
+    M=A.copy()
+    nr,nc=M.shape
+    row=0
+    for col in range(nc):
+        piv=next((r for r in range(row,nr) if M[r,col]==1),None)
+        if piv is None: continue
+        M[[row,piv]]=M[[piv,row]]
+        for r in range(nr):
+            if r!=row and M[r,col]==1: M[r]^=M[row]
+        row+=1
+    rank=row
+    print(f'  N={N}: rank={rank}/{n}, 一意解保証={rank==n}')
+"
+
+```
+
+## 2026-05-24 22:26:54
+
+```bash
+python3 -c "
+import numpy as np
+
+# N=4,5 での一意解探索の可能性を再調査
+# null_dim > 0 でも「解がちょうど 1 つ」になる b は存在しうるか？
+# → null(A) が非自明なら、解が存在すれば必ず 2^(null_dim) 個の解が存在
+# → N=4 では 2^4=16 個、N=5 では 2^2=4 個の解が必ず存在
+# → 研究の「一意解」制約を満たす N は 2 と 3 のみ
+
+# N=3 でのランダム初期配置テスト
+N = 3
+n = N * N
+A3 = np.zeros((n, n), dtype=np.int8)
+for r in range(N):
+    for c in range(N):
+        idx = r * N + c
+        A3[idx, idx] = 1
+        for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+            nr, nc = r+dr, c+dc
+            if 0 <= nr < N and 0 <= nc < N:
+                A3[idx, nr*N+nc] = 1
+
+def gf2_solve(A, b):
+    n = A.shape[0]
+    M = np.hstack([A.astype(np.int8).copy(), b.reshape(-1,1)])
+    pivot_cols = []
+    row = 0
+    for col in range(n):
+        piv = next((r for r in range(row, n) if M[r,col]==1), None)
+        if piv is None: continue
+        M[[row,piv]] = M[[piv,row]]
+        pivot_cols.append(col)
+        for r in range(n):
+            if r != row and M[r,col]==1: M[r] ^= M[row]
+        row += 1
+    rank = len(pivot_cols)
+    for r in range(rank, n):
+        if M[r, n] == 1: return None  # 解なし
+    x = np.zeros(n, dtype=np.int8)
+    for i, col in enumerate(pivot_cols):
+        x[col] = M[i, n]
+    return x
+
+# 全 2^9 通りの b でテスト（N=3 は full rank なので全てに唯一解）
+rng = np.random.default_rng(42)
+b = rng.integers(0, 2, size=9, dtype=np.int8)
+x = gf2_solve(A3, b)
+print(f'N=3 ランダム b の解: {x}')
+# 検証
+check = A3 @ x % 2
+print(f'A*x mod 2 == b: {np.all(check == b)}')
+
+# ハミング重み（min_moves）
+print(f'min_moves (hamming weight): {np.sum(x)}')
+
+# _min_moves_from_state のパフォーマンス
+import time
+states = [rng.integers(0,2,(3,3),dtype=np.int8) for _ in range(100)]
+start = time.time()
+for s in states:
+    b_test = s.flatten()
+    gf2_solve(A3, b_test)
+print(f'N=3 _min_moves_from_state 100回: {(time.time()-start)*1000:.2f}ms')
+"
+
+```
+
+## 2026-05-24 22:27:40
+
+```bash
+python3 -c "
+import numpy as np
+import time
+
+# _min_moves_from_state キャッシュの効果確認
+# N=3: 状態空間は 2^9=512 通り → 全状態辞書キャッシュが有効
+# N=5: 状態空間は 2^25=33M 通り → 全状態キャッシュは非現実的
+
+# 実際の evaluate_state 呼び出しパターン:
+# - trials=25, N=3: 最大 100手/試行 x 25試行 = 2500回
+# - 同じ状態への再訪問は多い（LLM がループする場合）
+# → lru_cache または dict キャッシュが有効
+
+N = 3
+n = N*N
+A = np.zeros((n,n), dtype=np.int8)
+for r in range(N):
+    for c in range(N):
+        idx = r*N+c
+        A[idx,idx] = 1
+        for dr,dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+            nr,nc = r+dr, c+dc
+            if 0<=nr<N and 0<=nc<N:
+                A[idx,nr*N+nc]=1
+
+def gf2_solve(A, b):
+    M = np.hstack([A.copy(), b.reshape(-1,1)])
+    n = A.shape[0]
+    pivot_cols = []
+    row = 0
+    for col in range(n):
+        piv = next((r for r in range(row, n) if M[r,col]==1), None)
+        if piv is None: continue
+        M[[row,piv]] = M[[piv,row]]
+        pivot_cols.append(col)
+        for r in range(n):
+            if r!=row and M[r,col]==1: M[r] ^= M[row]
+        row += 1
+    rank = len(pivot_cols)
+    for r in range(rank, n):
+        if M[r, n] == 1: return None
+    x = np.zeros(n, dtype=np.int8)
+    for i, col in enumerate(pivot_cols):
+        x[col] = M[i, n]
+    return x
+
+# キャッシュなし
+rng = np.random.default_rng(42)
+states = [rng.integers(0,2,(N,N),dtype=np.int8) for _ in range(2500)]
+start = time.time()
+for s in states:
+    sol = gf2_solve(A, s.flatten())
+    _ = int(np.sum(sol)) if sol is not None else 999
+t_no_cache = (time.time()-start)*1000
+print(f'キャッシュなし 2500回: {t_no_cache:.1f}ms')
+
+# dict キャッシュあり
+cache = {}
+start = time.time()
+for s in states:
+    key = tuple(s.flatten().tolist())
+    if key not in cache:
+        sol = gf2_solve(A, s.flatten())
+        cache[key] = int(np.sum(sol)) if sol is not None else 999
+    _ = cache[key]
+t_cache = (time.time()-start)*1000
+print(f'dict キャッシュあり 2500回: {t_cache:.1f}ms')
+print(f'キャッシュ効果: {t_no_cache/t_cache:.1f}x')
+print(f'ユニーク状態数: {len(cache)}/2500')
+"
+
+```
+
+## 2026-05-24 23:50:56
+
+```bash
+grep -n "sweep_type\|full_sweep\|puzzle" /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_full_sweep.sh 2>/dev/null | head -20
+```
+
+## 2026-05-25 08:08:23
+
+```bash
+grep -r "analyze_integrated" /home/shona/Modeling_of_LLMs_LPT --include="*.py" --include="*.sh" --include="*.md" -l 2>/dev/null | head -30
+```
+
+## 2026-05-25 08:08:43
+
+```bash
+grep -r "analyze_integrated\|from analysis.analyze_integrated" /home/shona/Modeling_of_LLMs_LPT --include="*.sh" --include="*.md" 2>/dev/null | grep -v "__pycache__" | grep -v "specs/draft/SPEC-2026-05-25-001" | head -20
+```
+
+## 2026-05-25 09:00:37
+
+```bash
+grep -rn "analyze_integrated" --include="*.py" --include="*.md" --include="*.sh" /home/shona/Modeling_of_LLMs_LPT/ 2>/dev/null | grep -v ".pyc" | grep -v "__pycache__"
+```
+
+## 2026-05-25 09:22:43
+
+```bash
+cd /home/shona/Modeling_of_LLMs_LPT
+# npz の中身確認（キー・形状）
+python3 -c "
+import numpy as np
+from pathlib import Path
+p = sorted(Path('results/hanoi/full_sweep/deepseek-r1-distill-llama-8b/N2_T0_5').glob('trial_*_hidden.npz'))[0]
+d = np.load(p, allow_pickle=True)
+print('keys:', list(d.files))
+for k in d.files:
+    arr = d[k]
+    print(f'  {k}: shape={arr.shape}, dtype={arr.dtype}')
+"
+echo "---"
+# 各 N の試行数
+for N in 2 3 4 5; do
+  count=$(find results/hanoi/full_sweep/deepseek-r1-distill-llama-8b/ -path "*/N${N}_*/trial_*_hidden.npz" 2>/dev/null | wc -l)
+  cells=$(find results/hanoi/full_sweep/deepseek-r1-distill-llama-8b/ -name "summary.json" | grep "/N${N}_" | wc -l)
+  echo "N=$N: ${cells} cells, ${count} npz files"
+done
+```
+
+## 2026-05-25 15:59:07
+
+```bash
+cat runners/scripts/run_collapse_phase_sweep.sh 2>/dev/null | head -80
+```
+
+## 2026-05-25 16:00:20
+
+```bash
+docker compose exec hanoi-minimal bash runners/scripts/run_collapse_phase_sweep.sh \
+    --models "deepseek-ai/DeepSeek-R1-Distill-Llama-8B" \
+    --ns "3 4 5 6" \
+    --ts "1.1 1.2 1.3 1.4 1.5 1.8 2.0 2.5 3.0" \
+    --trials 30 \
+    --dry-run
+```
+
+## 2026-05-26 11:34:13
+
+```bash
+# Check the collapse_phase sweep temperatures to know the full range
+cat /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_collapse_phase_sweep.sh | grep -E "TEMPS|NS|temps|ns" | head -20
+```
+
+## 2026-05-26 11:34:17
+
+```bash
+grep "TS_STR\|TEMPS" /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_collapse_phase_sweep.sh | head -5
+```
+
+## 2026-05-26 11:42:23
+
+```bash
+cat /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_full_sweep.sh | head -80
+```
+
+## 2026-05-26 11:42:26
+
+```bash
+sed -n '80,160p' /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_full_sweep.sh
+```
+
+## 2026-05-26 11:42:49
+
+```bash
+sed -n '155,200p' /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_full_sweep.sh
+```
+
+## 2026-05-26 11:43:37
+
+```bash
+cat /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_full_sweep.sh | wc -l
+```
+
+## 2026-05-26 11:43:39
+
+```bash
+sed -n '160,265p' /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_full_sweep.sh
+```
+
+## 2026-05-26 11:44:24
+
+```bash
+chmod +x /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_lights_out_sweep.sh
+
+# dry-run で動作確認
+bash runners/scripts/run_lights_out_sweep.sh --dry-run
+```
+
+## 2026-05-26 11:44:34
+
+```bash
+git add runners/run_local.py runners/scripts/run_lights_out_sweep.sh && git diff --staged --stat
+```
+
+## 2026-05-26 11:47:37
+
+```bash
+grep "TS_STR\|NS_STR\|TRIALS\|MODELS_STR" /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_collapse_phase_sweep.sh | head -10
+```
+
+## 2026-05-26 11:48:25
+
+```bash
+chmod +x /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_lights_out_collapse_sweep.sh
+
+# 両スクリプトを dry-run で確認
+bash runners/scripts/run_lights_out_sweep.sh --dry-run 2>&1 | head -15
+echo "---"
+bash runners/scripts/run_lights_out_collapse_sweep.sh --dry-run 2>&1 | head -15
+```
+
+## 2026-05-26 16:37:43
+
+```bash
+cat /home/shona/Modeling_of_LLMs_LPT/runners/scripts/run_collapse_phase_sweep.sh 2>/dev/null | head -60
+```
+
