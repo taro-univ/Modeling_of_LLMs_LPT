@@ -1,0 +1,8 @@
+{
+  "environment": "frog_jump",
+  "model": "Qwen/Qwen3-14B",
+  "N": 2,
+  "temperature": 0.2,
+  "sweep_type": "frog_probe_v2",
+  "system_hint": "default"
+}
