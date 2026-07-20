@@ -1,0 +1,78 @@
+# CLAUDE.md
+
+LLM の「推論崩壊」をパズル環境で誘発し、統計物理の相転移として解析するリポジトリ。
+
+## 協働方針（最優先・既定動作を上書き）
+
+- **コードは原則 user が手書きする。** ゼロから書く部分は、Claude が CLI 上に
+  **お手本コード＋解説**を提示し、user がそれを写経する。Claude が勝手に実装ファイルを
+  編集・作成しない。
+- **委任してよいもの**: 仕様・設計メモの作成・整理、既存コードの応用で済む定型作業、
+  コードレビュー、設計・アイデア出し。
+- お手本を出すときは「何を・なぜ」を必ず添える。長大な一括生成より、写経しやすい粒度で示す。
+- **現行のファイルのみを参照する。** git 履歴・削除済みファイル・過去の経緯を参照しない。
+  また「過去は参照しません」等の言及・表示もしない。
+- インターン先の coding 環境に揃える方針。指示にない勝手な変更・追加をしない。
+
+## 実行（HuggingFace 中心）
+
+リポジトリルートから実行する（`envs` / `runners` をパッケージ import するため）。
+
+コマンドは `python3`（この環境に `python` エイリアスは無い）。HF 実行には `torch` /
+`transformers` / `bitsandbytes` と GPU が必要（`requirements.txt`）。
+
+```bash
+# ローカル実験（HF Transformers, NF4 4bit）。Move 出力位置で隠れ状態を保存
+python3 runners/run_local.py --N 3
+python3 runners/run_local.py --N 5 --trials 10 --model-id deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
+python3 runners/run_local.py --N 5 --no-early-stop --device cuda:0 --output-dir results/...
+```
+
+主な引数: `--N`（円盤数, 必須）, `--trials`, `--model-id`, `--device`(default `cuda:0`),
+`--num_predict`, `--output`(JSON), `--output-dir`(隠れ状態 npz), `--no-save-hidden`,
+`--no-early-stop`, `--no-loop-detection`, `--es-*`（早期終了パラメータ）, `--seed`。
+
+参考: `runners/run.py` は Ollama API 版（`OLLAMA_BASE_URL`、`--model`）。run_local.py は
+そこから `EarlyStopConfig` / `calc_*` / `check_early_stop` を流用する。
+
+## 解析
+
+現行の仮説は `docs/research_state/hypotheses.md`（`hanoi_entropy_complexity_slides.md` から再構築）を正本とする。
+SPEC番号・EXP番号・4-regime・SG/PM等の旧ナンバリング仮説とその解析器は廃止済み。
+
+```bash
+python3 analysis/plot_hanoi_nt_collapse.py \
+  --input-dir results/hanoi/full_sweep --input-dir results/hanoi/collapse_phase
+```
+
+`summary.json` から N-T 平面の accuracy と collapse mode（move_loop / no_move 等）を直接集計する。
+BaseAnalyzer 的な共通化フレームワークは持たない — 1スクリプト1目的。
+
+## テスト
+
+```bash
+python3 -m pytest tests/        # 単体テスト（tests/ 配下, 50 件）
+python3 -m pytest tests/test_hanoi_env.py -q
+```
+
+`tests/` を明示する。ルート直下で `pytest` を走らせると、ランナーである
+`runners/test_model_architecture.py`（`test_` 始まりだが torch 依存のスクリプト）を
+収集してしまい、torch 未導入だと収集エラーになる。
+
+## ディレクトリ構成
+
+| パス | 役割 |
+|---|---|
+| `envs/` | パズル環境。`base_env.py`(`BaseEnv` 抽象基底) / `hanoi_env.py` / `lights_out_env.py` |
+| `runners/` | 実験ドライバ。`run_local.py`(HF) / `run.py`(Ollama) / `scripts/`(スイープ shell) |
+| `analysis/` | N-T 平面の集計・可視化スクリプト（1スクリプト1目的、共通基底クラスなし） |
+| `results/` | 実験・解析の出力 |
+| `docs/research_state/` | 仮説・観測事実・実験台帳・todo の正本（`hypotheses.md` / `results_summary.md` / `experiment_register.md` / `todo.md`） |
+| `tests/` | pytest |
+| `archive/` | 旧ドキュメント・ログ（参照用、原則触らない） |
+
+## 規約
+
+- 新しいパズルは `BaseEnv` を継承し、進捗指標 `evaluate_state`（V(x)）と
+  `goal_reached` / `extract_moves_from_text` / `solve` 等を実装する。
+- docstring・コメントは日本語、NumPy スタイル（既存コードに合わせる）。
