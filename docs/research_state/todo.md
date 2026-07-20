@@ -18,13 +18,21 @@
 
 ## 次の実験・実装タスク
 
-- [ ] `plot_hanoi_nt_collapse.py` の出力CSVから $w_N$（遷移幅）と $C_{\rm eff}=-\log P_{\rm success}$ を
-      $N$ ごとに算出する追加スクリプトを設計する（BaseAnalyzer非依存、単純スクリプトとして）。
-- [ ] $w_N$ の定義を、qwen3-14b で観測された非単調な $P_{\rm success}(N,\lambda)$（`results_summary.md`）
-      にどう対応させるか決める（単調減少を仮定した元の定義のままでは破綻する）。
-- [ ] `run_local.py` / `run.py` が $S_{\rm visit}$（訪問状態エントロピー）・$S_{\rm trap}$（失敗終端状態の
-      多様性）・$F$（凍結度）を後段で計算するのに十分なデータを出力しているか確認する。
-      不足があればお手本コードとして提示する。
+- [x] `plot_hanoi_nt_collapse.py` の出力CSVから $w_N$（遷移幅）と $C_{\rm eff}=-\log P_{\rm success}$ を
+      $N$ ごとに算出する `analysis/measure_wn_ceff.py` を作成（BaseAnalyzer非依存、単純スクリプト）。
+      $C_{\rm eff}$ は問題なく動作。$w_N$ は qwen3-8b/14b の全Nでほぼ`non_monotonic`判定になり、
+      元の定義がデータ形状に合わないことが判明（`results_summary.md` 参照）。
+- [ ] $w_N$ の定義を再設計する。`non_monotonic`判定の3原因（① T域内で0.5を一度も跨がない、②閾値付近の
+      サンプリングノイズ、③本物の非単調）を区別できる形にする。案:
+      - $\epsilon=0.1/0.9$ 境界の要件を外し、$T_{1/2}$ の存在だけで簡易版 $w_N$ を出す
+      - 交差点の振れ幅（accuracy の変化量）でノイズ由来(②)と本物(③)を閾値分離する
+      - ①（平坦）は $w_N$ 対象外として明示的に除外する
+- [ ] measure_wn_ceff.py にテストを書く（現状テストなし）。
+- [x] `run_local.py` / `run.py` が $S_{\rm visit}$・$S_{\rm trap}$・$F$ に足るデータを出しているか確認した。
+      `run_local.py`(HF)は npz の `move_texts` を再生すれば3指標とも計算可能（`results_summary.md` 参照、
+      12,250試行で忠実性を実データ検証済み）。`run.py`(Ollama)は手順を保存しておらず対象外。
+- [ ] 上記の再生ロジック（npz `move_texts` → `envs/hanoi_env.py` で状態列再構築）を使って
+      $S_{\rm visit}$ / $S_{\rm trap}$ / $F$ を計算する新規スクリプトを設計する（BaseAnalyzer非依存）。
 - [ ] qwen3-14b の N=4 (T≈1.45–1.55) / N=5 (T≈1.3–2.2) の高温回復を、trial数を増やして再現性確認する。
 - [ ] Frog Jump を `hypotheses.md` の測度計画に接続するか、対象外として明示するかを決める
       （現状 `experiment_register.md` に書いた通り未接続）。
