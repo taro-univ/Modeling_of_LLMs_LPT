@@ -1,0 +1,21 @@
+{
+  "environment": "pancake",
+  "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+  "N": 3,
+  "temperature": 0.6,
+  "num_predict": 8192,
+  "sweep_type": "pancake_hidden_sweep",
+  "instance_id": "N3_seed1_mm3_success_token8_noes",
+  "instance_seed": 1,
+  "sample_seed": null,
+  "initial_state": [
+    1,
+    3,
+    2
+  ],
+  "min_moves": 3,
+  "trials": 1,
+  "capture_timing": "token:8",
+  "capture_mode": "relative",
+  "hidden_dtype": "float16"
+}

@@ -1,6 +1,10 @@
 # CLAUDE.md
 
-LLM の「推論崩壊」をパズル環境で誘発し、統計物理の相転移として解析するリポジトリ。
+LLM の「推論崩壊」をパズル環境で誘発し、統計物理・複雑系の観点から解析するリポジトリ。
+2026年9月末発表に向けた当面の研究計画は
+`docs/research_state/roadmap_2026_09_conference.md` を参照する。
+研究ノート運用とセッション開始フローは
+`docs/research_state/research_note_workflow.md` を参照する。
 
 ## 協働方針（最優先・既定動作を上書き）
 
@@ -38,6 +42,10 @@ python3 runners/run_local.py --N 5 --no-early-stop --device cuda:0 --output-dir 
 ## 解析
 
 現行の仮説は `docs/research_state/hypotheses.md`（`hanoi_entropy_complexity_slides.md` から再構築）を正本とする。
+9月末発表向けの hidden-state dynamics 研究計画は
+`docs/research_state/roadmap_2026_09_conference.md` を参照する。
+日々の研究ノート運用とセッション開始/終了フローは
+`docs/research_state/research_note_workflow.md` を参照する。
 SPEC番号・EXP番号・4-regime・SG/PM等の旧ナンバリング仮説とその解析器は廃止済み。
 
 ```bash
@@ -67,7 +75,7 @@ python3 -m pytest tests/test_hanoi_env.py -q
 | `runners/` | 実験ドライバ。`run_local.py`(HF) / `run.py`(Ollama) / `scripts/`(スイープ shell) |
 | `analysis/` | N-T 平面の集計・可視化スクリプト（1スクリプト1目的、共通基底クラスなし） |
 | `results/` | 実験・解析の出力 |
-| `docs/research_state/` | 仮説・観測事実・実験台帳・todo の正本（`hypotheses.md` / `results_summary.md` / `experiment_register.md` / `todo.md`） |
+| `docs/research_state/` | 仮説・観測事実・実験台帳・todo・9月末発表ロードマップ・研究ノート運用の正本（`hypotheses.md` / `results_summary.md` / `experiment_register.md` / `todo.md` / `roadmap_2026_09_conference.md` / `research_note_workflow.md`） |
 | `tests/` | pytest |
 | `archive/` | 旧ドキュメント・ログ（参照用、原則触らない） |
 

@@ -14,20 +14,33 @@ Move 出力位置で隠れ状態ベクトルを選択的に保存する。
 from __future__ import annotations
 
 import argparse
+import ast
 import json
+import random
 import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+try:
+    import torch
+except ImportError:  # Model-free helpers and tests do not require torch.
+    torch = None  # type: ignore[assignment]
+
+try:
+    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+except ImportError:  # Keep parser/schema helpers usable without transformers.
+    AutoModelForCausalLM = Any  # type: ignore[misc,assignment]
+    AutoTokenizer = Any  # type: ignore[misc,assignment]
+    BitsAndBytesConfig = None  # type: ignore[assignment]
 
 from envs.base_env import BaseEnv
 from envs.hanoi_env import TowerOfHanoiEnv
 from envs.lights_out_env import LightsOutEnv
+from envs.pancake_env import PancakeSortingEnv
 from runners.run import (
     EarlyStopConfig,
     calc_default_trials,
@@ -55,6 +68,47 @@ class ModelProfile:
     think_mode:      str   # "prefill" | "chat_template" | "none"
     think_open_tag:  str = "<think>"
     think_close_tag: str = "</think>"
+
+
+@dataclass(frozen=True)
+class CaptureTiming:
+    """Hidden-state capture cadence."""
+
+    mode: str
+    stride: Optional[int]
+
+    def __post_init__(self) -> None:
+        valid_move = self.mode == "move" and self.stride is None
+        valid_token = (
+            self.mode == "token"
+            and isinstance(self.stride, int)
+            and self.stride > 0
+        )
+        if not (valid_move or valid_token):
+            raise ValueError("invalid capture timing configuration")
+
+    def __str__(self) -> str:
+        if self.mode == "move":
+            return "move"
+        if self.stride == 1:
+            return "token"
+        return f"token:{self.stride}"
+
+
+def parse_capture_timing(value: str) -> CaptureTiming:
+    """Parse move, token, or token:<positive stride> capture timing."""
+    if value == "move":
+        return CaptureTiming(mode="move", stride=None)
+    if value == "token":
+        return CaptureTiming(mode="token", stride=1)
+    match = re.fullmatch(r"token:(\d+)", value)
+    if match:
+        stride = int(match.group(1))
+        if stride > 0:
+            return CaptureTiming(mode="token", stride=stride)
+    raise ValueError(
+        "capture timing must be 'move', 'token', or 'token:<positive integer>'"
+    )
 
 
 def resolve_model_profile(model_id: str) -> ModelProfile:
@@ -114,12 +168,20 @@ def build_few_shot_messages(env: BaseEnv, n_shot: int) -> list[dict]:
     messages.append({"role": "user", "content": env.get_prompt()})
     return messages
 
-def make_capture_layers(num_hidden_layers: int) -> dict[str, int]:
-    """層数に依存しない相対深度でキャプチャ層を決定する。
+def make_capture_layers(num_hidden_layers: int, mode: str = "relative") -> dict[str, int]:
+    """層数に依存しないキャプチャ層を決定する。
 
-    負インデックスで返す。hidden_states タプルは (embedding + N transformer) の
-    N+1 要素なので、abs(idx) <= num_hidden_layers が有効範囲。
+    hidden_states タプルは (embedding + N transformer) の N+1 要素。
+    mode="relative" は従来どおり 25%, 50%, 100% 深度の3点を負インデックスで返す。
+    mode="all" は embedding を除く全 transformer 層通過後を正インデックスで返す。
     """
+    if mode == "all":
+        return {
+            f"layer_{layer_idx:03d}": layer_idx
+            for layer_idx in range(1, num_hidden_layers + 1)
+        }
+    if mode != "relative":
+        raise ValueError(f"unsupported capture layer mode: {mode}")
     return {
         "layer_top":  -1,                              # 100% 深度（最終層）
         "layer_mid":  -(num_hidden_layers // 2),       #  50% 深度
@@ -149,6 +211,11 @@ def load_model_and_tokenizer(
     Returns:
         (model, tokenizer) のタプル。
     """
+    if torch is None or BitsAndBytesConfig is None:
+        raise RuntimeError(
+            "run_local generation requires torch and transformers to be installed"
+        )
+
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
@@ -186,10 +253,17 @@ class GenerationResult:
     total_tokens: int
     reasoning_tokens: int
     early_stop: Optional[str]
-    # Move 位置ごとの隠れ状態: {layer_key: np.ndarray of shape (num_moves, hidden_size)}
+    # Legacy in-memory view retained for architecture diagnostics; never saved as NPZ keys.
     hidden_states: dict[str, np.ndarray]
+    hidden_tensor: np.ndarray
+    token_ids: np.ndarray
+    token_positions: np.ndarray
+    token_source: np.ndarray
+    is_think_token: np.ndarray
+    layer_ids: np.ndarray
     move_steps: np.ndarray    # shape: (num_moves,) — 何ステップ目で検出されたか
     move_texts: list[str]     # 検出された手の文字列リスト
+    capture_meta: dict
 
 
 def _estimate_reasoning_tokens_with_profile(
@@ -217,6 +291,18 @@ def _prepare_input_ids(
 
     `.to(device)` は呼び出し側で行う。
     """
+    formatted = format_prompt_text(tokenizer, prompt, env, n_shot, profile)
+    return tokenizer(formatted, return_tensors="pt").input_ids
+
+
+def format_prompt_text(
+    tokenizer: AutoTokenizer,
+    prompt: str,
+    env: BaseEnv,
+    n_shot: int,
+    profile: ModelProfile,
+) -> str:
+    """Return the exact chat-template text fed to the tokenizer."""
     if n_shot > 0:
         messages = build_few_shot_messages(env, n_shot)
     else:
@@ -239,7 +325,7 @@ def _prepare_input_ids(
             # DeepSeek-R1 系: <think> をプリフィルして推論モードを強制起動する
             formatted += profile.think_open_tag + "\n"
 
-    return tokenizer(formatted, return_tensors="pt").input_ids
+    return formatted
 
 
 def _apply_repetition_penalty(
@@ -264,29 +350,73 @@ def _sample_next_token(logits: torch.Tensor, temperature: float) -> int:
     return int(torch.multinomial(probs, num_samples=1).item())
 
 
-def _capture_new_move_hidden_states(
+def _capture_hidden_matrix(
     outputs,
     capture_layers: dict[str, int],
-    current_move_texts: list[str],
-    prev_move_count: int,
-    step: int,
-    hs_buffer: dict[str, list[np.ndarray]],
-    move_steps_list: list[int],
-    move_texts_list: list[str],
-) -> int:
-    """prev_move_count 以降の新しい Move について hidden state をキャプチャする。
+    hidden_dtype: str,
+) -> np.ndarray:
+    """Capture the last-position state as one [L, D] CPU matrix."""
+    layers = [
+        outputs.hidden_states[layer_idx][0, -1, :]
+        .float()
+        .cpu()
+        .numpy()
+        .astype(hidden_dtype, copy=False)
+        for layer_idx in capture_layers.values()
+    ]
+    return np.stack(layers, axis=0)
 
-    Returns:
-        current_move_count（新しい prev_move_count として使う）。
-    """
-    current_move_count = len(current_move_texts)
-    for mv_idx in range(prev_move_count, current_move_count):
-        for layer_key, layer_idx in capture_layers.items():
-            hs_tensor = outputs.hidden_states[layer_idx][0, -1, :]
-            hs_buffer[layer_key].append(hs_tensor.float().cpu().numpy())
-        move_steps_list.append(step)
-        move_texts_list.append(current_move_texts[mv_idx])
-    return current_move_count
+
+def _capture_prompt_hidden(
+    outputs,
+    capture_layers: dict[str, int],
+    hidden_dtype: str,
+) -> np.ndarray:
+    """Capture every prefill prompt position as one [P, L, D] tensor."""
+    layers = [
+        outputs.hidden_states[layer_idx][0, :, :]
+        .float()
+        .cpu()
+        .numpy()
+        .astype(hidden_dtype, copy=False)
+        for layer_idx in capture_layers.values()
+    ]
+    return np.stack(layers, axis=1)
+
+
+def _time_axis_metadata(capture_timing: CaptureTiming) -> dict:
+    """Return metadata needed to interpret hidden rows as time samples."""
+    if capture_timing.mode == "token":
+        return {
+            "time_axis": "captured_token_rows",
+            "row_index_unit": "hidden_row",
+            "token_position_unit": "prompt_plus_generated_token_index",
+            "prompt_stride": 1,
+            "generated_stride": capture_timing.stride,
+            "dt_token_source": "successive_token_positions_difference",
+            "hidden_token_alignment": "hidden_row_i_matches_token_positions_i",
+        }
+    return {
+        "time_axis": "captured_move_rows",
+        "row_index_unit": "hidden_row",
+        "token_position_unit": None,
+        "prompt_stride": None,
+        "generated_stride": None,
+        "dt_token_source": None,
+        "hidden_token_alignment": None,
+    }
+
+
+def _set_sample_seed(sample_seed: Optional[int]) -> None:
+    """Seed host and torch RNGs for reproducible sampling when requested."""
+    if sample_seed is None:
+        return
+    random.seed(sample_seed)
+    np.random.seed(sample_seed)
+    if torch is not None:
+        torch.manual_seed(sample_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(sample_seed)
 
 
 def _parse_hanoi_move_tuple(move_text: str) -> Optional[tuple[str, str, str]]:
@@ -351,44 +481,23 @@ def _check_early_stop_with_disk_verify(
     return reason
 
 
-def _finalize_hidden_states(
-    hs_buffer: dict[str, list[np.ndarray]],
+def _empty_hidden_tensor(
     capture_layers: dict[str, int],
-    move_steps_list: list[int],
-    move_texts_list: list[str],
-    step: int,
-    generated_ids: list[int],
-    last_outputs,
     hidden_size: int,
-) -> dict[str, np.ndarray]:
-    """hidden state バッファを ndarray に変換して返す。
-
-    move が 1 本も取れなかった場合（fallback）は last_outputs の最終トークンを記録し、
-    move_steps_list / move_texts_list に "__fallback__" を in-place で追記する。
-    """
-    if not move_steps_list and generated_ids and last_outputs is not None:
-        for layer_key, layer_idx in capture_layers.items():
-            hs_tensor = last_outputs.hidden_states[layer_idx][0, -1, :]
-            hs_buffer[layer_key].append(hs_tensor.float().cpu().numpy())
-        move_steps_list.append(step)
-        move_texts_list.append("__fallback__")
-
-    hidden_states_np: dict[str, np.ndarray] = {}
-    for layer_key in capture_layers:
-        if hs_buffer[layer_key]:
-            hidden_states_np[layer_key] = np.stack(hs_buffer[layer_key], axis=0)
-        else:
-            hidden_states_np[layer_key] = np.empty((0, hidden_size), dtype=np.float32)
-    return hidden_states_np
+    hidden_dtype: str,
+) -> np.ndarray:
+    return np.empty((0, len(capture_layers), hidden_size), dtype=hidden_dtype)
 
 
 def _handle_new_moves(
     outputs,
     capture_layers: dict[str, int],
+    capture_timing: CaptureTiming,
+    hidden_dtype: str,
     current_move_texts: list[str],
     prev_move_count: int,
     step: int,
-    hs_buffer: dict[str, list[np.ndarray]],
+    move_hidden_buffer: list[np.ndarray],
     move_steps_list: list[int],
     move_texts_list: list[str],
     env: BaseEnv,
@@ -400,16 +509,89 @@ def _handle_new_moves(
     Returns:
         (new_prev_move_count, stop_reason_or_None)
     """
-    new_prev_move_count = _capture_new_move_hidden_states(
-        outputs, capture_layers, current_move_texts,
-        prev_move_count, step, hs_buffer, move_steps_list, move_texts_list,
-    )
+    new_prev_move_count = len(current_move_texts)
+    for mv_idx in range(prev_move_count, new_prev_move_count):
+        if capture_timing.mode == "move":
+            move_hidden_buffer.append(
+                _capture_hidden_matrix(outputs, capture_layers, hidden_dtype)
+            )
+        move_steps_list.append(step)
+        move_texts_list.append(current_move_texts[mv_idx])
     if disable_goal_stop:
         return new_prev_move_count, None
-    extracted = env.extract_moves_from_text(accumulated_text)
+    extracted = env.extract_scored_moves_from_text(accumulated_text)
     if env.goal_reached(extracted):
         return new_prev_move_count, "goal_reached"
     return new_prev_move_count, None
+
+
+def _tokenize_tag(tokenizer: AutoTokenizer, tag: str) -> list[int]:
+    """Best-effort tag tokenization that tolerates tensor/list tokenizer outputs."""
+    encoded = tokenizer(tag, add_special_tokens=False).input_ids
+    if hasattr(encoded, "tolist"):
+        encoded = encoded.tolist()
+    if encoded and isinstance(encoded[0], list):
+        encoded = encoded[0]
+    return [int(token_id) for token_id in encoded]
+
+
+def _find_subsequence(
+    values: list[int],
+    needle: list[int],
+    start: int = 0,
+) -> Optional[int]:
+    if not needle:
+        return None
+    limit = len(values) - len(needle) + 1
+    for idx in range(start, max(start, limit)):
+        if values[idx:idx + len(needle)] == needle:
+            return idx
+    return None
+
+
+def _infer_think_labels(
+    tokenizer: AutoTokenizer,
+    profile: ModelProfile,
+    prompt_ids: list[int],
+    generated_ids: list[int],
+    captured_positions: np.ndarray,
+) -> tuple[np.ndarray, Optional[int], Optional[int]]:
+    """Infer think labels from tag token subsequences without making capture fail."""
+    labels = np.zeros(captured_positions.shape, dtype=np.bool_)
+    if profile.think_mode == "none":
+        return labels, None, None
+
+    all_ids = prompt_ids + generated_ids
+    try:
+        open_ids = _tokenize_tag(tokenizer, profile.think_open_tag)
+        close_ids = _tokenize_tag(tokenizer, profile.think_close_tag)
+        open_positions: list[int] = []
+        search_from = 0
+        while True:
+            found = _find_subsequence(all_ids, open_ids, search_from)
+            if found is None:
+                break
+            open_positions.append(found)
+            search_from = found + 1
+
+        if open_positions:
+            open_at = open_positions[-1]
+            think_start = open_at + len(open_ids)
+        elif profile.think_mode == "prefill":
+            # The runner appends the opening tag to the prompt in this profile.
+            think_start = len(prompt_ids)
+        else:
+            return labels, None, None
+
+        close_at = _find_subsequence(all_ids, close_ids, think_start)
+        think_end = close_at if close_at is not None else len(all_ids)
+        labels = (
+            (captured_positions >= think_start)
+            & (captured_positions < think_end)
+        )
+        return labels.astype(np.bool_, copy=False), think_start, think_end
+    except Exception:
+        return labels, None, None
 
 
 def _build_reasoning_text(accumulated_text: str, profile: ModelProfile) -> str:
@@ -441,12 +623,17 @@ def generate_with_hidden_states(
     profile: ModelProfile = None,             # type: ignore[assignment]  実質必須
     capture_layers: dict[str, int] = None,    # type: ignore[assignment]  実質必須
     disable_goal_stop: bool = False,
+    capture_timing: CaptureTiming = CaptureTiming(mode="move", stride=None),
+    capture_mode: str = "relative",
+    hidden_dtype: str = "float16",
+    hidden_compression: str = "npz_compressed",
+    model_id: Optional[str] = None,
+    puzzle: Optional[str] = None,
 ) -> GenerationResult:
     """
     トークンを 1 つずつ生成するカスタムループ。
 
-    KV キャッシュを引き継ぐことで速度は model.generate() とほぼ同等。
-    Move 文字列が完成した直後のステップで hidden_states を CPU に転送し保存する。
+    KV キャッシュを引き継ぎ、move または token cadence で hidden state を保存する。
 
     Args:
         model: ロード済みモデル。
@@ -462,18 +649,33 @@ def generate_with_hidden_states(
     Returns:
         GenerationResult インスタンス。
     """
+    if torch is None:
+        raise RuntimeError("generation requires torch to be installed")
+    if profile is None or capture_layers is None:
+        raise ValueError("profile and capture_layers are required")
+    if hidden_dtype not in ("float16", "float32"):
+        raise ValueError("hidden_dtype must be 'float16' or 'float32'")
+
     device = next(model.parameters()).device
 
     input_ids = _prepare_input_ids(tokenizer, prompt, env, n_shot, profile).to(device)
+    prompt_ids = [
+        int(token_id)
+        for token_id in input_ids[0].detach().cpu().tolist()
+    ]
+    prompt_token_count = len(prompt_ids)
 
     # 生成トークンを蓄積するバッファ
     generated_ids: list[int] = []
     accumulated_text = ""
     past_key_values = None
     stop_reason: Optional[str] = None
-    last_outputs = None
 
-    hs_buffer: dict[str, list[np.ndarray]] = {k: [] for k in capture_layers}
+    token_hidden_chunks: list[np.ndarray] = []
+    captured_token_ids: list[int] = []
+    captured_token_positions: list[int] = []
+    captured_token_source: list[str] = []
+    move_hidden_buffer: list[np.ndarray] = []
     move_steps_list: list[int] = []
     move_texts_list: list[str] = []
 
@@ -486,6 +688,20 @@ def generate_with_hidden_states(
 
     # for が 0 回の場合の step 未定義を防ぐ
     step = -1
+    if capture_timing.mode == "token" and num_predict == 0:
+        with torch.no_grad():
+            prompt_outputs = model(
+                input_ids=input_ids,
+                use_cache=True,
+                output_hidden_states=True,
+            )
+        token_hidden_chunks.append(
+            _capture_prompt_hidden(prompt_outputs, capture_layers, hidden_dtype)
+        )
+        captured_token_ids.extend(prompt_ids)
+        captured_token_positions.extend(range(prompt_token_count))
+        captured_token_source.extend(["prompt"] * prompt_token_count)
+
     for step in range(num_predict):
         with torch.no_grad():
             outputs = model(
@@ -495,6 +711,15 @@ def generate_with_hidden_states(
                 output_hidden_states=True,
             )
 
+        if capture_timing.mode == "token" and step == 0:
+            # Prompt states come from the full prefill pass and are never strided.
+            token_hidden_chunks.append(
+                _capture_prompt_hidden(outputs, capture_layers, hidden_dtype)
+            )
+            captured_token_ids.extend(prompt_ids)
+            captured_token_positions.extend(range(prompt_token_count))
+            captured_token_source.extend(["prompt"] * prompt_token_count)
+
         logits = outputs.logits[0, -1, :].float()
         _apply_repetition_penalty(logits, generated_ids, repetition_penalty)
         next_token_id = _sample_next_token(logits, temperature)
@@ -502,6 +727,20 @@ def generate_with_hidden_states(
         # EOS チェック
         if next_token_id == tokenizer.eos_token_id:
             break
+
+        if (
+            capture_timing.mode == "token"
+            and step % capture_timing.stride == 0  # type: ignore[operator]
+        ):
+            # This is the context state whose logits sampled next_token_id.
+            token_hidden_chunks.append(
+                _capture_hidden_matrix(
+                    outputs, capture_layers, hidden_dtype
+                )[np.newaxis, ...]
+            )
+            captured_token_ids.append(next_token_id)
+            captured_token_positions.append(prompt_token_count + step)
+            captured_token_source.append("generated")
 
         generated_ids.append(next_token_id)
         past_key_values = outputs.past_key_values
@@ -516,8 +755,9 @@ def generate_with_hidden_states(
         if len(current_move_texts) > prev_move_count:
             last_move_step = step  # Algorithm E: 最後の move 検出ステップを更新
             prev_move_count, goal_stop = _handle_new_moves(
-                outputs, capture_layers, current_move_texts,
-                prev_move_count, step, hs_buffer, move_steps_list, move_texts_list,
+                outputs, capture_layers, capture_timing, hidden_dtype,
+                current_move_texts, prev_move_count, step, move_hidden_buffer,
+                move_steps_list, move_texts_list,
                 env, accumulated_text, disable_goal_stop,
             )
             if goal_stop:
@@ -526,7 +766,6 @@ def generate_with_hidden_states(
 
         # 次ステップの入力は今生成したトークンのみ（KV キャッシュを活用）
         current_input_ids = torch.tensor([[next_token_id]], device=device)
-        last_outputs = outputs  # フォールバック用に最終ステップの出力を保持
 
         # Algorithm E: Stagnation After Move（毎トークン・軽量チェック）
         # move を ≥1 本出した後、stagnation_ratio × num_predict トークン手が止まれば打ち切る
@@ -557,10 +796,78 @@ def generate_with_hidden_states(
         _build_reasoning_text(accumulated_text, profile), total_tokens, profile
     )
 
-    hidden_states_np = _finalize_hidden_states(
-        hs_buffer, capture_layers, move_steps_list, move_texts_list,
-        step, generated_ids, last_outputs, model.config.hidden_size,
+    if capture_timing.mode == "token":
+        hidden_tensor = (
+            np.concatenate(token_hidden_chunks, axis=0)
+            if token_hidden_chunks
+            else _empty_hidden_tensor(
+                capture_layers, model.config.hidden_size, hidden_dtype
+            )
+        )
+        token_ids_np = np.asarray(captured_token_ids, dtype=np.int32)
+        token_positions_np = np.asarray(captured_token_positions, dtype=np.int32)
+        token_source_np = np.asarray(captured_token_source, dtype=np.str_)
+    else:
+        hidden_tensor = (
+            np.stack(move_hidden_buffer, axis=0)
+            if move_hidden_buffer
+            else _empty_hidden_tensor(
+                capture_layers, model.config.hidden_size, hidden_dtype
+            )
+        )
+        token_ids_np = np.asarray(generated_ids, dtype=np.int32)
+        token_positions_np = np.empty((0,), dtype=np.int32)
+        token_source_np = np.empty((0,), dtype=np.str_)
+
+    is_think_token, think_start_token, think_end_token = _infer_think_labels(
+        tokenizer,
+        profile,
+        prompt_ids,
+        generated_ids,
+        token_positions_np,
     )
+    layer_ids = np.asarray(list(capture_layers.values()), dtype=np.int32)
+
+    # Retain the old in-memory layer view for diagnostics, but persistence uses
+    # hidden_tensor exclusively.
+    hidden_states_np = {
+        layer_name: hidden_tensor[:, layer_offset, :]
+        for layer_offset, layer_name in enumerate(capture_layers)
+    }
+    resolved_model_id = str(
+        model_id
+        or getattr(model.config, "_name_or_path", None)
+        or getattr(model.config, "name_or_path", None)
+        or model.__class__.__name__
+    )
+    tokenizer_name = str(getattr(tokenizer, "name_or_path", resolved_model_id))
+    capture_meta = {
+        "schema_version": 1,
+        "capture_timing": capture_timing.mode,
+        "capture_stride": capture_timing.stride,
+        "capture_layers": capture_mode,
+        "hidden_dtype": hidden_dtype,
+        "hidden_shape": list(hidden_tensor.shape),
+        "model_id": resolved_model_id,
+        "model_slug": model_id_to_slug(resolved_model_id),
+        "tokenizer_name": tokenizer_name,
+        "puzzle": puzzle or env.__class__.__name__,
+        "N": env.N,
+        "temperature": temperature,
+        "num_predict": num_predict,
+        "early_stop": stop_reason,
+        "n_shot": n_shot,
+        "repetition_penalty": repetition_penalty,
+        "think_mode": profile.think_mode,
+        "think_start_token": think_start_token,
+        "think_end_token": think_end_token,
+        "prompt_token_count": prompt_token_count,
+        "generated_token_count": total_tokens,
+        "file_format": "npz",
+        "compression": hidden_compression,
+        "generated_hidden_semantics": "context_state_used_to_sample_token",
+        **_time_axis_metadata(capture_timing),
+    }
 
     return GenerationResult(
         text=accumulated_text,
@@ -568,14 +875,91 @@ def generate_with_hidden_states(
         reasoning_tokens=reasoning_tokens,
         early_stop=stop_reason,
         hidden_states=hidden_states_np,
+        hidden_tensor=hidden_tensor,
+        token_ids=token_ids_np,
+        token_positions=token_positions_np,
+        token_source=token_source_np,
+        is_think_token=is_think_token,
+        layer_ids=layer_ids,
         move_steps=np.array(move_steps_list, dtype=np.int32),
         move_texts=move_texts_list,
+        capture_meta=capture_meta,
     )
 
 
 # ===========================================================================
 # 実験ループ
 # ===========================================================================
+
+def save_hidden_npz(
+    path: Path,
+    result: GenerationResult,
+    capture_timing: CaptureTiming,
+    compression: str = "npz_compressed",
+) -> None:
+    """Save a GenerationResult using the unified schema for its timing mode."""
+    if compression not in ("none", "npz_compressed"):
+        raise ValueError("compression must be 'none' or 'npz_compressed'")
+
+    meta = dict(result.capture_meta)
+    meta["hidden_shape"] = list(result.hidden_tensor.shape)
+    meta["compression"] = compression
+    meta.update(_time_axis_metadata(capture_timing))
+    common = {
+        "hidden": result.hidden_tensor,
+        "layer_ids": result.layer_ids,
+        "move_steps": result.move_steps,
+        "move_texts": np.asarray(result.move_texts, dtype=np.str_),
+        "capture_meta": np.asarray(
+            json.dumps(meta, ensure_ascii=False, sort_keys=True),
+            dtype=np.str_,
+        ),
+        "generated_text": np.asarray(result.text, dtype=np.str_),
+        "token_ids": result.token_ids,
+    }
+    if capture_timing.mode == "token":
+        payload = {
+            **common,
+            "token_positions": result.token_positions,
+            "token_source": result.token_source,
+            "is_think_token": result.is_think_token,
+        }
+    elif capture_timing.mode == "move":
+        payload = common
+    else:
+        raise ValueError(f"unsupported capture timing mode: {capture_timing.mode}")
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    save = np.savez if compression == "none" else np.savez_compressed
+    save(path, **payload)
+
+
+def _capture_timing_filename_part(capture_timing: CaptureTiming) -> str:
+    if capture_timing.mode == "move":
+        return "move"
+    if capture_timing.stride == 1:
+        return "token"
+    return f"token_{capture_timing.stride}"
+
+
+def _puzzle_name(env: BaseEnv) -> str:
+    if isinstance(env, TowerOfHanoiEnv):
+        return "hanoi"
+    if isinstance(env, LightsOutEnv):
+        return "lights_out"
+    if isinstance(env, PancakeSortingEnv):
+        return "pancake"
+    return env.__class__.__name__
+
+
+def _state_for_json(state: Any) -> Any:
+    """Return a JSON-friendly representation of a puzzle state."""
+    if isinstance(state, np.ndarray):
+        return state.tolist()
+    if isinstance(state, tuple):
+        return list(state)
+    return state
+
 
 def run_experiment_hf(
     env: BaseEnv,
@@ -589,9 +973,18 @@ def run_experiment_hf(
     output_dir: Optional[Path] = None,
     temperature: float = 0.6,
     repetition_penalty: float = 1.1,
-    n_shot: int = 2,
+    n_shot: int = 0,
     profile: Optional[ModelProfile] = None,
     capture_layers: Optional[dict[str, int]] = None,
+    capture_timing: CaptureTiming = CaptureTiming(mode="move", stride=None),
+    capture_mode: str = "relative",
+    hidden_dtype: str = "float16",
+    hidden_compression: str = "npz_compressed",
+    seed: Optional[int] = None,
+    instance_id: Optional[str] = None,
+    instance_seed: Optional[int] = None,
+    sample_seed: Optional[int] = None,
+    save_text_artifacts: bool = False,
 ) -> list[dict]:
     """
     指定されたパズル環境で trials 回の推論を実行し、結果リストを返す。
@@ -604,7 +997,7 @@ def run_experiment_hf(
         tokenizer: トークナイザー。
         num_predict: 最大出力トークン数。None なら calc_num_predict(N) を使用。
         early_stop_cfg: 早期終了設定。None なら無効。
-        output_dir: npz 保存先ディレクトリ。None なら保存しない。
+        output_dir: 実験出力ディレクトリ。hidden は配下の hidden/ に保存する。
 
     Returns:
         各試行の結果辞書のリスト。
@@ -612,8 +1005,11 @@ def run_experiment_hf(
     results: list[dict] = []
     num_predict_ = num_predict if num_predict is not None else calc_num_predict(N)
 
+    hidden_dir: Optional[Path] = None
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
+        hidden_dir = output_dir / "hidden"
+        hidden_dir.mkdir(parents=True, exist_ok=True)
 
     es_label = "有効" if early_stop_cfg is not None else "無効"
     print(f"\n{'='*60}")
@@ -626,7 +1022,24 @@ def run_experiment_hf(
 
     for trial in range(1, trials + 1):
         print(f"--- Trial {trial}/{trials} ---")
+        trial_sample_seed = (
+            sample_seed + trial - 1
+            if sample_seed is not None
+            else None
+        )
+        _set_sample_seed(trial_sample_seed)
         prompt = env.get_prompt()
+        artifact_dir: Optional[Path] = None
+        if output_dir is not None and save_text_artifacts:
+            artifact_dir = output_dir / "artifacts" / f"trial_{trial:03d}"
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            formatted_prompt = format_prompt_text(
+                tokenizer, prompt, env, n_shot, profile
+            )
+            (artifact_dir / "prompt.txt").write_text(prompt, encoding="utf-8")
+            (artifact_dir / "formatted_prompt.txt").write_text(
+                formatted_prompt, encoding="utf-8"
+            )
 
         t_start = time.time()
         result_gen = generate_with_hidden_states(
@@ -642,10 +1055,17 @@ def run_experiment_hf(
             n_shot=n_shot,
             profile=profile,
             capture_layers=capture_layers,
+            capture_timing=capture_timing,
+            capture_mode=capture_mode,
+            hidden_dtype=hidden_dtype,
+            hidden_compression=hidden_compression,
+            model_id=model_id,
+            puzzle=_puzzle_name(env),
         )
         elapsed = time.time() - t_start
 
-        moves = env.extract_moves_from_text(result_gen.text)
+        moves_all_mentions = env.extract_moves_from_text(result_gen.text)
+        moves = env.extract_scored_moves_from_text(result_gen.text)
         accuracy = 1 if env.goal_reached(moves) else 0
         v_score = env.evaluate_state(moves)
 
@@ -653,18 +1073,40 @@ def run_experiment_hf(
             "trial":            trial,
             "accuracy":         accuracy,
             "N":                N,
+            "initial_state":     _state_for_json(env.initial_state),
+            "goal_state":        _state_for_json(env.goal_state),
+            "min_moves":         env.min_moves,
+            "instance_id":       instance_id,
+            "instance_seed":     instance_seed,
+            "sample_seed":       trial_sample_seed,
             "temperature":      temperature,
             "total_tokens":     result_gen.total_tokens,
             "reasoning_tokens": result_gen.reasoning_tokens,
             "num_predict":      num_predict_,
             "num_moves":        len(moves),
             "moves_extracted":  len(moves),
+            "moves_all_mentions": moves_all_mentions,
+            "num_moves_all_mentions": len(moves_all_mentions),
+            "goal_reached_all_mentions": 1 if env.goal_reached(moves_all_mentions) else 0,
             "moves_captured":   int(result_gen.move_steps.shape[0]),
             "v_score":          v_score,
             "elapsed_sec":      round(elapsed, 2),
             "early_stop":       result_gen.early_stop,
         }
+        if artifact_dir is not None:
+            result["artifact_dir"] = str(artifact_dir)
         results.append(result)
+        result_gen.capture_meta.update({
+            "trial": trial,
+            "early_stop": result_gen.early_stop,
+            "accuracy": accuracy,
+            "seed": seed,
+            "initial_state": _state_for_json(env.initial_state),
+            "min_moves": env.min_moves,
+            "instance_id": instance_id,
+            "instance_seed": instance_seed,
+            "sample_seed": trial_sample_seed,
+        })
 
         status = "PASS" if accuracy else "FAIL"
         es_info = f"  es={result_gen.early_stop}" if result_gen.early_stop else ""
@@ -676,15 +1118,32 @@ def run_experiment_hf(
               f"time={elapsed:.1f}s{es_info}")
 
         # 隠れ状態を npz 形式で保存
-        if output_dir is not None:
-            npz_path = output_dir / f"trial_{trial:03d}_hidden.npz"
-            np.savez(
+        if hidden_dir is not None:
+            timing_part = _capture_timing_filename_part(capture_timing)
+            npz_path = hidden_dir / (
+                f"trial_{trial:03d}_hidden_{timing_part}_"
+                f"{capture_mode}_{hidden_dtype}.npz"
+            )
+            save_hidden_npz(
                 npz_path,
-                **result_gen.hidden_states,
-                move_steps=result_gen.move_steps,
-                move_texts=np.array(result_gen.move_texts, dtype=object),
+                result_gen,
+                capture_timing,
+                compression=hidden_compression,
             )
             print(f"  [SAVE] {npz_path}")
+        if artifact_dir is not None:
+            (artifact_dir / "generated.txt").write_text(
+                result_gen.text, encoding="utf-8"
+            )
+            debug_payload = {
+                **result,
+                "generated_text": result_gen.text,
+                "moves_final": moves,
+            }
+            (artifact_dir / "debug.json").write_text(
+                json.dumps(debug_payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
 
     return results
 
@@ -742,6 +1201,32 @@ def parse_args() -> argparse.Namespace:
                         help="隠れ状態 npz の保存先ディレクトリ（省略時は自動生成）")
     parser.add_argument("--no-save-hidden", action="store_true",
                         help="隠れ状態の npz を保存しない")
+    parser.add_argument(
+        "--capture-timing",
+        type=parse_capture_timing,
+        default=CaptureTiming(mode="move", stride=None),
+        metavar="{move,token,token:<stride>}",
+        help="hidden state の保存タイミング (default: move)",
+    )
+    parser.add_argument(
+        "--capture-mode",
+        type=str,
+        default="relative",
+        choices=["relative", "all"],
+        help="hidden state の保存層。relative=25/50/100%%の3点、all=全Transformer層",
+    )
+    parser.add_argument(
+        "--hidden-dtype",
+        choices=["float16", "float32"],
+        default="float16",
+        help="保存する hidden state の dtype (default: float16)",
+    )
+    parser.add_argument(
+        "--hidden-compression",
+        choices=["none", "npz_compressed"],
+        default="npz_compressed",
+        help="NPZ 圧縮方式 (default: npz_compressed)",
+    )
     parser.add_argument("--no-early-stop",      action="store_true",
                         help="早期終了アルゴリズムを無効化する")
     parser.add_argument("--no-loop-detection",  action="store_true",
@@ -753,26 +1238,62 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--es-loop-window", type=int,   default=6)
     parser.add_argument("--es-loop-count",  type=int,   default=2)
     parser.add_argument("--seed",           type=int,   default=None,
-                        help="env 初期状態の乱数シード（Lights Out で盤面を固定する場合に使用）")
+                        help="env 初期状態の乱数シード（Lights Out / Pancake で使用）")
+    parser.add_argument(
+        "--sample-seed",
+        type=int,
+        default=None,
+        help="生成 sampling の乱数シード。複数 trial では sample_seed + trial - 1 を使う",
+    )
+    parser.add_argument(
+        "--initial-state",
+        type=parse_initial_state,
+        default=None,
+        help='Pancake の固定初期状態。例: "1,2,5,4,3" または "[1,2,5,4,3]"',
+    )
+    parser.add_argument(
+        "--instance-id",
+        type=str,
+        default=None,
+        help="固定問題インスタンスの ID（Pancake hidden capture metadata 用）",
+    )
     parser.add_argument("--temperature",         type=float, default=0.6,
                         help="サンプリング温度 (default: 0.6)")
     parser.add_argument("--repetition-penalty",  type=float, default=1.1,
                         help="繰り返しペナルティ ρ (default: 1.1, 1.0 で無効)")
-    parser.add_argument("--n-shot",              type=int,   default=1,
-                        help="few-shot 例の数 (default: 1, 0 で無効)")
+    parser.add_argument("--n-shot",              type=int,   default=0,
+                        help="few-shot 例の数 (default: 0, 外部補助なし)")
     parser.add_argument("--sweep-type",          type=str,   default="hf",
                         help="実験種別ラベル（DB の sweep_type カラムに対応）")
     parser.add_argument(
         "--puzzle",
         type=str,
         default="hanoi",
-        choices=["hanoi", "lights_out"],
+        choices=["hanoi", "lights_out", "pancake"],
         help="パズル種を選択（デフォルト: hanoi）",
     )
     args = parser.parse_args()
-    if args.puzzle != "lights_out" and args.seed is not None:
-        parser.error("--seed is only supported with --puzzle lights_out")
+    if args.puzzle not in ("lights_out", "pancake") and args.seed is not None:
+        parser.error("--seed is only supported with --puzzle lights_out or pancake")
+    if args.initial_state is not None and args.puzzle != "pancake":
+        parser.error("--initial-state is only supported with --puzzle pancake")
+    if args.instance_id is not None and args.puzzle != "pancake":
+        parser.error("--instance-id is only supported with --puzzle pancake")
     return args
+
+
+def parse_initial_state(value: str) -> tuple[int, ...]:
+    """Parse a Pancake permutation from CLI text."""
+    text = value.strip()
+    if not text.startswith(("[", "(")):
+        text = f"[{text}]"
+    parsed = ast.literal_eval(text)
+    if not isinstance(parsed, (list, tuple)):
+        raise argparse.ArgumentTypeError("--initial-state must be a list/tuple of integers")
+    try:
+        return tuple(int(item) for item in parsed)
+    except (TypeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError("--initial-state entries must be integers") from exc
 
 
 def _build_early_stop_cfg(args) -> Optional[EarlyStopConfig]:
@@ -827,6 +1348,8 @@ def _write_meta_json(summary_path: Optional[Path], args) -> None:
         "N":           args.N,
         "temperature": args.temperature,
         "sweep_type":  args.sweep_type,
+        "seed":        args.seed,
+        "sample_seed": args.sample_seed,
     }
     meta_path = meta_dir / "meta.json"
     with open(meta_path, "w", encoding="utf-8") as f:
@@ -840,13 +1363,16 @@ def main() -> None:
     puzzle_factories = {
         "hanoi": TowerOfHanoiEnv,
         "lights_out": LightsOutEnv,
+        "pancake": PancakeSortingEnv,
     }
     env_factory = puzzle_factories[args.puzzle]
-    env = (
-        env_factory(args.N, seed=args.seed)
-        if args.puzzle == "lights_out"
-        else env_factory(args.N)
-    )
+    if args.puzzle == "pancake":
+        env = env_factory(args.N, seed=args.seed, initial_state=args.initial_state)
+    elif args.puzzle == "lights_out":
+        env = env_factory(args.N, seed=args.seed)
+    else:
+        env = env_factory(args.N)
+    instance_seed = args.seed if args.puzzle == "pancake" else None
 
     trials         = args.trials if args.trials is not None else calc_default_trials(args.N)
     early_stop_cfg = _build_early_stop_cfg(args)
@@ -861,7 +1387,12 @@ def main() -> None:
     model, tokenizer = load_model_and_tokenizer(args.model_id, args.device)
 
     # モデルの層数から CAPTURE_LAYERS を動的に決定する
-    capture_layers = make_capture_layers(model.config.num_hidden_layers)
+    capture_layers = make_capture_layers(
+        model.config.num_hidden_layers,
+        mode=args.capture_mode,
+    )
+    print(f"[INFO] capture_mode: {args.capture_mode}")
+    print(f"[INFO] capture_timing: {args.capture_timing}")
     print(f"[INFO] capture_layers: {capture_layers}")
 
     results = run_experiment_hf(
@@ -879,6 +1410,14 @@ def main() -> None:
         n_shot=args.n_shot,
         profile=profile,
         capture_layers=capture_layers,
+        capture_timing=args.capture_timing,
+        capture_mode=args.capture_mode,
+        hidden_dtype=args.hidden_dtype,
+        hidden_compression=args.hidden_compression,
+        seed=args.seed,
+        instance_id=args.instance_id,
+        instance_seed=instance_seed,
+        sample_seed=args.sample_seed,
     )
 
     print_summary(results, args.N)

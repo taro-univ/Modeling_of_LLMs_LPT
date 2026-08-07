@@ -3,6 +3,7 @@ import pytest
 from envs.base_env import BaseEnv
 from envs.hanoi_env import TowerOfHanoiEnv
 from envs.lights_out_env import LightsOutEnv
+from envs.pancake_env import PancakeSortingEnv
 
 
 def test_base_env_is_abstract():
@@ -13,11 +14,13 @@ def test_base_env_is_abstract():
 def test_concrete_envs_are_base_env_subclasses():
     assert issubclass(TowerOfHanoiEnv, BaseEnv)
     assert issubclass(LightsOutEnv, BaseEnv)
+    assert issubclass(PancakeSortingEnv, BaseEnv)
 
 
 def test_make_sub_env_returns_same_puzzle_type_and_base_env():
     hanoi = TowerOfHanoiEnv(3).make_sub_env(2)
     lights = LightsOutEnv(3, seed=42).make_sub_env(3)
+    pancake = PancakeSortingEnv(4, seed=42).make_sub_env(3)
 
     assert isinstance(hanoi, TowerOfHanoiEnv)
     assert isinstance(hanoi, BaseEnv)
@@ -26,3 +29,7 @@ def test_make_sub_env_returns_same_puzzle_type_and_base_env():
     assert isinstance(lights, LightsOutEnv)
     assert isinstance(lights, BaseEnv)
     assert lights.min_moves > 0
+
+    assert isinstance(pancake, PancakeSortingEnv)
+    assert isinstance(pancake, BaseEnv)
+    assert pancake.min_moves > 0

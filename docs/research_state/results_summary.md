@@ -29,6 +29,62 @@
 - 上記 n=30 / n=25 という試行数が、この非単調な振る舞いを結論づけるのに十分かは要検討
   （再現性の追加検証は `todo.md` 参照）。
 
+## Pancake T*=0.6 / min_moves 層化 debug sweep（DeepSeek-R1-Distill-Qwen-14B）
+
+- T* は Pancake debug sweep の作業温度として `T=0.6` に固定した。
+- `configs/pancake_instances/N3-5_T0_6_minmoves_stratified_v1.json` の 18 instances は完了済み。
+  出力先: `results/debug_prompt/pancake/minmoves_stratified/deepseek-r1-distill-qwen-14b/`
+- 既存の N 別集計:
+  - N=3: 3 runs, final_accuracy=1.00, search_goal=1.00
+  - N=4: 6 runs, final_accuracy=0.83, search_goal=0.83
+  - N=5: 9 runs, final_accuracy=0.44, search_goal=0.67, length_stop=0.11
+- `N x min_moves` 層別集計:
+
+| N | min_moves | runs | final_accuracy | search_goal | length_stop | loop_trap | mean repeated_state_ratio |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 3 | 3 | 3 | 1.00 | 1.00 | 0.00 | 1.00 | 0.838 |
+| 4 | 3 | 3 | 0.67 | 1.00 | 0.00 | 1.00 | 0.499 |
+| 4 | 4 | 3 | 1.00 | 0.67 | 0.00 | 1.00 | 0.514 |
+| 5 | 3 | 3 | 0.67 | 0.67 | 0.00 | 0.67 | 0.419 |
+| 5 | 4 | 3 | 0.33 | 0.67 | 0.33 | 1.00 | 0.407 |
+| 5 | 5 | 3 | 0.33 | 0.67 | 0.00 | 1.00 | 0.464 |
+
+- 観測上の主な読み:
+  - 同じ `min_moves=3` でも N=3 -> N=4/5 で final_accuracy が落ち、状態空間/表現長の N 効果が見える。
+  - N=5 内では `min_moves=3` から 4/5 で final_accuracy が 0.67 -> 0.33 に落ち、計画長効果も見える。
+  - `goal_reached_all_mentions` が final_accuracy より高いセルがあり、探索中に到達した後、最終回答で崩れるケースが
+    hidden capture pilot の有力対象。
+  - `loop_trap` は閾値 0.3 の repeated-state 比率でほぼ全セルに立つため、今後は「成功したが長く往復する」
+    ケースと「到達後に崩れる」ケースを分けて扱う必要がある。
+
+## Pancake hidden success probe（N=3, min_moves=3, token:8）
+
+- 取得済み:
+  `results/pancake/hidden_success_probe/deepseek-r1-distill-qwen-14b/N3_seed1_mm3_success_token8_noes_T0_6/`
+- 条件: N=3, initial_state=`[1,3,2]`, min_moves=3, T=0.6, `capture_timing=token:8`,
+  `capture_mode=relative`, `hidden_dtype=float16`, `--no-early-stop`。
+- 結果: `accuracy=1`, final moves=`Flip 2; Flip 3; Flip 2`, `generated_token_count=782`,
+  hidden shape=`[358,3,5120]`（relative 3 layers）。
+- join 出力:
+  `results/analysis/pancake_hidden_events/deepseek-r1-distill-qwen-14b/N3_seed1_mm3_success_token8_noes_T0_6/trial_001_events.json`
+  は `join_ok=true`, `outcome_label=success_final`。
+- 初期解析:
+  `figures/pancake_hidden_success_probe/N3_seed1_mm3_success_token8_noes_T0_6/`
+  に top-layer PCA と move-event CSV を保存した。generated 区間 top-layer PCA の寄与率は
+  PC1=0.246, PC2=0.126。
+- 層×token 格子解析:
+  `figures/pancake_hidden_success_probe/N3_seed1_mm3_success_token8_noes_T0_6/layer_token_dynamics/`
+  と `docs/research_state/pancake_hidden_dynamics_n3_success.md`。generated 区間だけに限定し、
+  layer は low->mid->top = `[-36,-24,-1]` として解析した。
+- 次元削減の判断:
+  layer-token grid 全体は 40 PCA components で説明分散 0.409 のみなので、時間発展式推定には不適。
+  層別 PCA なら 40 components で low=0.803, mid=0.774, top=0.872 だが、90%保持には
+  low=56, mid=62, top=47 components が必要。
+- 注意:
+  token:8 stride のため、14 move mentions のうち hidden row に対応したのは12件。final answer 末尾の
+  2 moves は生成末尾にあり、次の stride row が無いため unmapped。final move 単位を厳密に見るなら
+  token:1 追加取得が必要。
+
 ## $C_{\rm eff}$ / $w_N$ 算出結果（`analysis/measure_wn_ceff.py`、qwen3-8b, qwen3-14b）
 
 - **$C_{\rm eff}=-\log P_{\rm success}$ は問題なく計算できる。** qwen3-14b N=4 では、リバイバル点

@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "description": "N=3-5 T=0.6 min_moves-stratified Pancake instances",
+  "temperature": 0.6,
+  "num_predict": 8192,
+  "instances": [
+    {
+      "instance_id": "N3_seed1_mm3",
+      "N": 3,
+      "seed": 1,
+      "initial_state": [1, 3, 2],
+      "min_moves": 3,
+      "notes": "N=3 has only one state at min_moves=3; repeated as separate trials"
+    },
+    {
+      "instance_id": "N3_seed2_mm3",
+      "N": 3,
+      "seed": 2,
+      "initial_state": [1, 3, 2],
+      "min_moves": 3,
+      "notes": "same fixed state as N3_seed1_mm3"
+    },
+    {
+      "instance_id": "N3_seed3_mm3",
+      "N": 3,
+      "seed": 3,
+      "initial_state": [1, 3, 2],
+      "min_moves": 3,
+      "notes": "same fixed state as N3_seed1_mm3"
+    },
+    {
+      "instance_id": "N4_seed3_mm3",
+      "N": 4,
+      "seed": 3,
+      "initial_state": [1, 2, 4, 3],
+      "min_moves": 3
+    },
+    {
+      "instance_id": "N4_seed4_mm3",
+      "N": 4,
+      "seed": 4,
+      "initial_state": [2, 1, 4, 3],
+      "min_moves": 3
+    },
+    {
+      "instance_id": "N4_seed5_mm3",
+      "N": 4,
+      "seed": 5,
+      "initial_state": [4, 1, 3, 2],
+      "min_moves": 3
+    },
+    {
+      "instance_id": "N4_seed1_mm4",
+      "N": 4,
+      "seed": 1,
+      "initial_state": [2, 4, 1, 3],
+      "min_moves": 4
+    },
+    {
+      "instance_id": "N4_seed2_mm4",
+      "N": 4,
+      "seed": 2,
+      "initial_state": [4, 2, 3, 1],
+      "min_moves": 4
+    },
+    {
+      "instance_id": "N4_seed8_mm4",
+      "N": 4,
+      "seed": 8,
+      "initial_state": [3, 1, 4, 2],
+      "min_moves": 4
+    },
+    {
+      "instance_id": "N5_seed1_mm3",
+      "N": 5,
+      "seed": 1,
+      "initial_state": [1, 2, 5, 4, 3],
+      "min_moves": 3,
+      "notes": "existing exploratory seed"
+    },
+    {
+      "instance_id": "N5_seed2_mm3",
+      "N": 5,
+      "seed": 2,
+      "initial_state": [2, 4, 3, 1, 5],
+      "min_moves": 3
+    },
+    {
+      "instance_id": "N5_seed3_mm3",
+      "N": 5,
+      "seed": 3,
+      "initial_state": [5, 4, 2, 1, 3],
+      "min_moves": 3
+    },
+    {
+      "instance_id": "N5_seed9_mm4",
+      "N": 5,
+      "seed": 9,
+      "initial_state": [2, 5, 3, 4, 1],
+      "min_moves": 4
+    },
+    {
+      "instance_id": "N5_seed12_mm4",
+      "N": 5,
+      "seed": 12,
+      "initial_state": [3, 1, 2, 5, 4],
+      "min_moves": 4
+    },
+    {
+      "instance_id": "N5_seed13_mm4",
+      "N": 5,
+      "seed": 13,
+      "initial_state": [4, 3, 1, 5, 2],
+      "min_moves": 4
+    },
+    {
+      "instance_id": "N5_seed5_mm5",
+      "N": 5,
+      "seed": 5,
+      "initial_state": [1, 5, 3, 4, 2],
+      "min_moves": 5
+    },
+    {
+      "instance_id": "N5_seed23_mm5",
+      "N": 5,
+      "seed": 23,
+      "initial_state": [3, 1, 5, 4, 2],
+      "min_moves": 5
+    },
+    {
+      "instance_id": "N5_seed24_mm5",
+      "N": 5,
+      "seed": 24,
+      "initial_state": [2, 4, 3, 5, 1],
+      "min_moves": 5
+    }
+  ]
+}

@@ -23,6 +23,18 @@ SPEC番号・EXP番号による実験管理は廃止した。かわりに「何�
 
 Frog Jump は `hypotheses.md` の測度計画にまだ接続されていない。現状は生データの置き場のみ。
 
+## Pancake Sorting — debug / hidden-state 準備
+
+| 内容 | モデル | 条件 | 出力先 |
+|---|---|---|---|
+| T* 決定用 debug sweep | deepseek-r1-distill-qwen-14b | N=3/4, T=0.0/0.3/0.6/0.9/1.0, num_predict=4096 | `results/debug_prompt/pancake/deepseek-r1-distill-qwen-14b/` |
+| N=5 exploratory debug sweep | deepseek-r1-distill-qwen-14b | N=5, T=0.6, seeds 1-5, num_predict=4096/8192 | `results/debug_prompt/pancake/deepseek-r1-distill-qwen-14b/` |
+| min_moves 層化 debug sweep | deepseek-r1-distill-qwen-14b | N=3-5, T=0.6, num_predict=8192, 18 fixed instances | `results/debug_prompt/pancake/minmoves_stratified/deepseek-r1-distill-qwen-14b/` |
+
+層化 sweep の正式な instances file は
+`configs/pancake_instances/N3-5_T0_6_minmoves_stratified_v1.json`。集計結果は
+`docs/research_state/results_summary.md` の Pancake セクション参照。
+
 ## 台帳への追記ルール
 
 - 新しい sweep を実行したら、内容・モデル・N/T range・出力先の1行をこの表に追加する。

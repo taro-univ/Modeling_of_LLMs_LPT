@@ -50,6 +50,14 @@ class BaseEnv(ABC):
     def extract_moves_from_text(self, text: str) -> list:
         """Extract puzzle moves from model output text."""
 
+    def extract_final_moves_from_text(self, text: str) -> list:
+        """Extract moves from the final answer region used for grading."""
+        return self.extract_moves_from_text(text)
+
+    def extract_scored_moves_from_text(self, text: str) -> list:
+        """Extract moves that should be used for accuracy and V(x)."""
+        return self.extract_final_moves_from_text(text)
+
     def count_moves(self, text: str) -> int:
         """Return the number of puzzle moves in model output text."""
         return len(self.extract_moves_from_text(text))

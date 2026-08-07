@@ -1,0 +1,369 @@
+\documentclass[a4paper,11pt]{ltjsarticle}
+
+\usepackage[margin=23mm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+
+\definecolor{ink}{HTML}{1F2933}
+\definecolor{accent}{HTML}{2F5D62}
+\definecolor{soft}{HTML}{EEF6F4}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=accent,
+  urlcolor=accent,
+  citecolor=accent
+}
+
+\setlist[itemize]{leftmargin=1.5em,itemsep=0.25em,topsep=0.25em}
+\setlength{\parindent}{1em}
+\setlength{\parskip}{0.2em}
+
+\theoremstyle{definition}
+\newtheorem{definition}{定義}[section]
+\newtheorem{example}{例}[section]
+
+\theoremstyle{plain}
+\newtheorem{proposition}{命題}[section]
+\newtheorem{theorem}{定理}[section]
+
+\theoremstyle{remark}
+\newtheorem*{remark}{注意}
+
+\newcommand{\HN}{H_N}
+\newcommand{\V}{\mathrm{V}}
+\newcommand{\E}{\mathrm{E}}
+\newcommand{\tree}{\tau}
+\newcommand{\dd}{\mathrm{d}}
+
+\title{\vspace{-1.2cm}
+{\Large\color{accent}Hanoi graph 入門}\\[0.4em]
+{\huge サイズ・状態数・最短解長・全域木エントロピー}\\[0.4em]
+{\large 明日の発表のための短い教科書}}
+\author{}
+\date{}
+
+\begin{document}
+\color{ink}
+\maketitle
+\vspace{-1.0cm}
+
+\begin{center}
+\begin{minipage}{0.86\linewidth}
+\small
+本ノートは，Hanoi graph のうち発表で扱う最初の部分だけをまとめる。
+中心に置く量は，円盤数 \(N\)，状態数 \(3^N\)，標準問題の最短解長
+\(2^N-1\)，および Zhang--Wu--Li--Comellas による全域木数と
+全域木エントロピー
+\[
+  h=\frac{1}{4}\log 15
+\]
+である。記述は Wikipedia の Hanoi graph 項目と
+Zhang et al. の論文に沿う。
+\end{minipage}
+\end{center}
+
+\section{Hanoi graph とは何か}
+
+Tower of Hanoi の各配置をひとつの点とみなし，合法手で移れる配置どうしを線で結ぶ。
+このようにして得られる無向グラフが Hanoi graph である。
+
+\begin{definition}[Hanoi graph]
+\(k\) 本の杭と \(N\) 枚の円盤からなる Tower of Hanoi を考える。
+各頂点は，それぞれの円盤がどの杭にあるかを表す状態である。
+ふたつの頂点を結ぶ辺は，一手の合法移動で互いに移れることを表す。
+このグラフを
+\[
+  H_k^N
+\]
+と書く。特に，古典的な3本杭の場合を
+\[
+  \HN := H_3^N
+\]
+と書く。
+\end{definition}
+
+ここで重要なのは，状態を「円盤の並び」としてではなく，
+「各円盤がどの杭にいるか」という情報として記述できることである。
+円盤の大小関係により，各杭の上では自動的に小さい円盤が上，大きい円盤が下になる。
+したがって，各円盤について選択肢は杭の数だけでよい。
+
+\begin{proposition}[状態数]
+\(k\) 本杭・\(N\) 円盤の Hanoi graph は
+\[
+  |V(H_k^N)|=k^N
+\]
+個の頂点を持つ。特に3本杭では
+\[
+  |V(\HN)|=3^N.
+\]
+\end{proposition}
+
+\begin{proof}
+各円盤は \(k\) 本の杭のどれかに置かれている。
+円盤は \(N\) 枚あるので，状態は長さ \(N\) の列
+\[
+  (a_1,a_2,\ldots,a_N), \qquad a_i\in\{1,\ldots,k\}
+\]
+として表せる。よって状態数は \(k^N\) である。
+\end{proof}
+
+\begin{example}[小さい \(N\) の状態数]
+3本杭の場合，
+\[
+  N=1:\ 3,\qquad
+  N=2:\ 9,\qquad
+  N=3:\ 27,\qquad
+  N=4:\ 81.
+\]
+円盤が1枚増えるごとに状態数は3倍になる。
+\end{example}
+
+\section{辺と自己相似構造}
+
+Hanoi graph は単に状態を並べたグラフではなく，きれいな再帰構造を持つ。
+最大の円盤がどの杭にあるかで状態を分類すると，
+\(\HN\) は \(H_{N-1}\) の3個のコピーから作られる。
+
+\begin{proposition}[3本杭の場合の辺数]
+3本杭 Hanoi graph \(\HN\) の辺数は
+\[
+  |E(\HN)|=\frac{3(3^N-1)}{2}
+\]
+である。
+\end{proposition}
+
+\begin{proof}
+Wikipedia の Hanoi graph 項目では，一般の \(k\) 本杭について
+\[
+  |E(H_k^N)|
+  =
+  \frac{1}{2}\binom{k}{2}\left(k^N-(k-2)^N\right)
+\]
+と与えられている。ここで \(k=3\) とおくと，
+\[
+  |E(\HN)|
+  =
+  \frac{1}{2}\binom{3}{2}(3^N-1^N)
+  =
+  \frac{3(3^N-1)}{2}.
+\]
+\end{proof}
+
+\begin{remark}
+3本杭では，多くの内部状態は次数3を持つ。一方，すべての円盤が同じ杭に積まれている
+3つの角の状態では，動かせる手は2通りである。グラフ全体としては，
+三角形を再帰的に3分割していく Sierpiński triangle に似た形を持つ。
+\end{remark}
+
+\section{標準問題の最短解長}
+
+標準的な Tower of Hanoi では，すべての円盤がある杭に積まれた状態から，
+別の杭へすべて移す。Hanoi graph で見ると，これは三角形の角から別の角への
+最短路を求める問題である。
+
+\begin{theorem}[標準解長]
+3本杭・\(N\) 円盤の標準 Tower of Hanoi の最短手数は
+\[
+  L^*(N)=2^N-1
+\]
+である。Wikipedia の Hanoi graph 項目では，3本杭 Hanoi graph の直径も
+この値であると述べられている。
+\end{theorem}
+
+\begin{proof}[再帰による説明]
+最大円盤を出発杭から目的杭へ動かすには，その上にある \(N-1\) 枚をいったん
+補助杭へ移しておく必要がある。そのために少なくとも \(L^*(N-1)\) 手が必要である。
+次に最大円盤を1手で目的杭へ移す。最後に，補助杭にある \(N-1\) 枚を目的杭へ
+移すために再び \(L^*(N-1)\) 手が必要である。したがって
+\[
+  L^*(N)=2L^*(N-1)+1,\qquad L^*(1)=1.
+\]
+この漸化式を解くと
+\[
+  L^*(N)=2^N-1
+\]
+を得る。
+\end{proof}
+
+ここで，状態数 \(3^N\) と最短解長 \(2^N-1\) は異なる指数増大である。
+状態空間は3倍ずつ広がるが，標準問題の最短路はおよそ2倍ずつ長くなる。
+この違いは，発表で強調すると理解しやすい。
+
+\begin{center}
+\begin{tabular}{rrrr}
+\toprule
+\(N\) & \(|V(\HN)|=3^N\) & \(L^*(N)=2^N-1\) & \(|E(\HN)|\) \\
+\midrule
+1 & 3 & 1 & 3 \\
+2 & 9 & 3 & 12 \\
+3 & 27 & 7 & 39 \\
+4 & 81 & 15 & 120 \\
+5 & 243 & 31 & 363 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{全域木: グラフ全体の接続構造を数える}
+
+次に Zhang, Wu, Li, Comellas の論文
+\textit{The number and degree distribution of spanning trees in the Tower of Hanoi graph}
+の主結果を見る。ここで扱うのは，解法の数ではなく，Hanoi graph の上に張れる
+全域木の数である。
+
+\begin{definition}[全域木]
+有限連結グラフ \(G=(V,E)\) の全域木とは，すべての頂点を含み，かつ閉路を持たない
+連結部分グラフである。全域木数を \(\tau(G)\) と書く。
+\end{definition}
+
+全域木は，グラフ全体を「枝だけで，しかし全頂点をつないだ」構造である。
+Hanoi graph の全域木数は，状態空間そのものの大きさとは別の，
+接続構造の多様性を表す。
+
+\begin{theorem}[Zhang et al. の全域木数公式]
+\(N\) 円盤の3本杭 Hanoi graph \(\HN\) の全域木数を
+\[
+  s_N := \tau(\HN)
+\]
+とする。このとき
+\[
+  s_N
+  =
+  3^{\frac{1}{4}3^N+\frac{1}{2}N-\frac{1}{4}}
+  5^{\frac{1}{4}3^N-\frac{1}{2}N-\frac{1}{4}}.
+\]
+\end{theorem}
+
+この式は，Hanoi graph の再帰構造から得られる。
+論文では，単に全域木だけを直接数えるのではなく，いくつかの種類の全域部分グラフの
+個数の間に漸化式を立て，それを解くことで閉じた形の公式を導いている。
+
+\begin{example}[小さい \(N\) での確認]
+公式から，
+\[
+\begin{aligned}
+s_1
+&=
+3^{\frac{3}{4}+\frac{1}{2}-\frac{1}{4}}
+5^{\frac{3}{4}-\frac{1}{2}-\frac{1}{4}}
+=3,\\
+s_2
+&=
+3^{\frac{9}{4}+1-\frac{1}{4}}
+5^{\frac{9}{4}-1-\frac{1}{4}}
+=3^3\cdot 5=135.
+\end{aligned}
+\]
+\(H_1\) は三角形なので，全域木は3本の辺から1本を除く3通りであり，
+\(s_1=3\) と一致する。
+\end{example}
+
+\section{全域木エントロピー}
+
+全域木数 \(s_N\) は非常に速く増える。
+その増え方を頂点数あたりで正規化したものが，全域木エントロピーである。
+
+\begin{definition}[全域木エントロピー]
+\[
+  h
+  =
+  \lim_{N\to\infty}
+  \frac{\log s_N}{|V(\HN)|}
+  =
+  \lim_{N\to\infty}
+  \frac{\log s_N}{3^N}.
+\]
+\end{definition}
+
+\begin{theorem}[Hanoi graph の全域木エントロピー]
+Zhang et al. の公式から，
+\[
+  h
+  =
+  \frac{1}{4}\log 15
+  \approx 0.677.
+\]
+\end{theorem}
+
+\begin{proof}
+全域木数公式の対数を取ると，
+\[
+\begin{aligned}
+\log s_N
+&=
+\left(\frac{1}{4}3^N+\frac{1}{2}N-\frac{1}{4}\right)\log 3\\
+&\quad+
+\left(\frac{1}{4}3^N-\frac{1}{2}N-\frac{1}{4}\right)\log 5.
+\end{aligned}
+\]
+これを \(3^N\) で割ると，
+\[
+\frac{\log s_N}{3^N}
+=
+\frac{1}{4}(\log 3+\log 5)
++ \frac{N}{2\cdot 3^N}(\log 3-\log 5)
+- \frac{1}{4\cdot 3^N}(\log 3+\log 5).
+\]
+\(N/3^N\to 0\) かつ \(1/3^N\to0\) なので，
+\[
+  h
+  =
+  \frac{1}{4}(\log 3+\log 5)
+  =
+  \frac{1}{4}\log 15.
+\]
+\end{proof}
+
+この結果は，次のように読むとよい。
+\[
+  \log s_N \sim h\,3^N,
+  \qquad
+  s_N \sim \exp(h\,3^N).
+\]
+つまり，頂点数 \(3^N\) を基準にすれば，全域木数は通常の指数増大である。
+一方で，円盤数 \(N\) を基準に見ると，指数の中にさらに \(3^N\) が現れる。
+このため，Hanoi graph の接続構造の多様性は，円盤数に対して非常に急激に増える。
+
+\section{発表での言い方}
+
+\begin{itemize}
+\item Hanoi graph \(\HN\) は，3本杭・\(N\) 円盤 Tower of Hanoi の全状態を頂点にしたグラフである。
+\item 各円盤が3本の杭のどこにあるかを選ぶので，状態数は
+\[
+  |V(\HN)|=3^N.
+\]
+\item 標準問題の最短解長は
+\[
+  L^*(N)=2^N-1.
+\]
+状態空間の増え方 \(3^N\) と，最短解長の増え方 \(2^N\) は別物である。
+\item Zhang et al. は \(\HN\) の全域木数を厳密に求めた。
+\[
+  s_N
+  =
+  3^{\frac{1}{4}3^N+\frac{1}{2}N-\frac{1}{4}}
+  5^{\frac{1}{4}3^N-\frac{1}{2}N-\frac{1}{4}}.
+\]
+\item その結果，全域木エントロピーは
+\[
+  h=\lim_{N\to\infty}\frac{\log s_N}{3^N}
+  =\frac{1}{4}\log 15
+  \approx0.677.
+\]
+\end{itemize}
+
+\section*{参考文献}
+
+\begin{enumerate}[leftmargin=1.7em]
+\item Wikipedia, ``Hanoi graph.'' \\
+\url{https://en.wikipedia.org/wiki/Hanoi_graph}
+\item Zhongzhi Zhang, Shunqi Wu, Mingyun Li, Francesc Comellas,
+``The number and degree distribution of spanning trees in the Tower of Hanoi graph,''
+\textit{Theoretical Computer Science} 609, 443--455, 2016. arXiv:1510.07949.\\
+\url{https://arxiv.org/abs/1510.07949}
+\end{enumerate}
+
+\end{document}

@@ -1,0 +1,288 @@
+\documentclass[a4paper,11pt]{ltjsarticle}
+
+\usepackage[margin=23mm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+
+\definecolor{ink}{HTML}{1F2933}
+\definecolor{accent}{HTML}{6B4F9A}
+\definecolor{soft}{HTML}{F4F1FA}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=accent,
+  urlcolor=accent,
+  citecolor=accent
+}
+
+\setlist[itemize]{leftmargin=1.5em,itemsep=0.22em,topsep=0.25em}
+\setlength{\parindent}{1em}
+\setlength{\parskip}{0.18em}
+
+\theoremstyle{definition}
+\newtheorem{definition}{定義}[section]
+\newtheorem{example}{例}[section]
+
+\theoremstyle{plain}
+\newtheorem{proposition}{命題}[section]
+\newtheorem{theorem}{定理}[section]
+
+\theoremstyle{remark}
+\newtheorem*{remark}{注意}
+
+\newcommand{\softmax}{\operatorname{softmax}}
+\newcommand{\lse}{\operatorname{lse}}
+\newcommand{\Att}{\operatorname{Att}}
+
+\title{\vspace{-1.1cm}
+{\Large\color{accent}Memory and Temperature}\\[0.35em]
+{\huge Hopfield Networks と Temperature Sampling}\\[0.35em]
+{\large Hanoi 実験を読むための短い教科書}}
+\author{}
+\date{}
+
+\begin{document}
+\color{ink}
+\maketitle
+\vspace{-0.9cm}
+
+\begin{center}
+\begin{minipage}{0.88\linewidth}
+\small
+本ノートは，Ramsauer et al. の
+\textit{Hopfield Networks is All You Need}
+と，Wu--Mirhoseini--Tambe の
+\textit{On the Role of Temperature Sampling in Test-Time Scaling}
+を，発表で使う範囲に絞って整理する。
+前者は Transformer attention を連想記憶の検索として見る理論を与え，
+後者は test-time scaling をサンプル数だけでなく温度方向にも広げる。
+Hanoi 実験では，低温での反復的失敗と高温での回復を説明する足場になる。
+\end{minipage}
+\end{center}
+
+\section{二つの論文をつなぐ見方}
+
+LLM の推論を，次の二段階で見る。
+
+\begin{itemize}
+\item 内部では，attention が文脈中の情報・中間表現・プロトタイプを検索する。
+\item 出力では，logit 分布から次トークンをサンプリングし，推論軌道を進める。
+\end{itemize}
+
+Ramsauer et al. は第一の段階に理論的な言葉を与える。
+Transformer attention は，modern Hopfield network の更新則と対応する。
+つまり attention は単なる重み付き平均ではなく，記憶パターンへの連想検索として読める。
+
+Wu et al. は第二の段階に焦点を当てる。
+同じモデル，同じ問題でも，温度を変えると生成される reasoning trace の集合が変わる。
+そのため，単一温度でサンプル数 \(K\) を増やすだけでは到達できない解が，
+別の温度で現れることがある。
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+論文 & 主対象 & 発表での役割 \\
+\midrule
+Hopfield Networks is All You Need & attention と連想記憶 & 失敗を attractor として語る \\
+Temperature Sampling in TTS & 温度と推論軌道 & 高温で別解法に届く可能性を語る \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Modern Hopfield Network}
+
+古典的 Hopfield network は，記憶したパターンをエネルギーの局所最小点として持つ
+連想記憶モデルである。Ramsauer et al. の modern Hopfield network は，
+これを連続状態に拡張し，指数的な記憶容量と attention との対応を示した。
+
+\begin{definition}[連想記憶としての検索]
+記憶パターンを列ベクトルとして並べた行列を
+\[
+  X=(\xi_1,\ldots,\xi_N)\in\mathbb{R}^{d\times N}
+\]
+とする。状態 \(x\in\mathbb{R}^d\) が与えられたとき，modern Hopfield update は
+\[
+  x^{\mathrm{new}}
+  =
+  X\,\softmax(\beta X^\top x)
+\]
+で与えられる。ここで \(\beta>0\) は inverse temperature に相当し，
+内積 \(X^\top x\) は状態 \(x\) と各記憶パターンの類似度を表す。
+\end{definition}
+
+\(\softmax(\beta X^\top x)\) は，どの記憶パターンをどれだけ読むかを決める重みである。
+\(\beta\) が大きいほど最も近い記憶に鋭く集中し，小さいほど複数の記憶を平均する。
+
+\begin{definition}[エネルギーの形]
+論文では，状態 \(x\) に対して log-sum-exp を含むエネルギーを考える。
+概念的には
+\[
+  E(x)
+  =
+  -\frac{1}{\beta}\log\sum_{i=1}^{N}
+  \exp(\beta \xi_i^\top x)
+  +\frac{1}{2}\|x\|^2
+  +\text{定数}
+\]
+という形である。更新則はこのエネルギーを下げる方向の写像として理解できる。
+\end{definition}
+
+\begin{theorem}[Ramsauer et al. の主結果]
+Modern Hopfield network は，連想空間の次元に対して指数的に多くのパターンを保存でき，
+一回の更新で記憶を検索でき，retrieval error は指数的に小さくなる。
+また，その更新則は Transformer の attention と等価に解釈できる。
+\end{theorem}
+
+論文は energy minima を三種類に分ける。
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+固定点の型 & 意味 \\
+\midrule
+global averaging & 多くのパターンの平均へ落ちる \\
+metastable state & 一部のパターン集合の平均へ落ちる \\
+single-pattern state & ほぼ一つの記憶を検索する \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Attention との対応}
+
+Transformer attention は，query \(Q\)，key \(K\)，value \(V\) に対して
+\[
+  \Att(Q,K,V)
+  =
+  \softmax\!\left(\frac{QK^\top}{\sqrt{d}}\right)V
+\]
+と書ける。これは，query と key の類似度を softmax で重みに変え，
+value の重み付き平均を返す操作である。
+
+Modern Hopfield update
+\[
+  x^{\mathrm{new}}
+  =
+  X\,\softmax(\beta X^\top x)
+\]
+と比べると，query が現在状態，key が検索対象，value が読み出される内容に対応する。
+したがって attention head は，文脈中のトークンや内部表現から，
+必要な記憶を検索する Hopfield 的な層として読める。
+
+\begin{remark}
+この論文が直接主張しているのは，
+attention の数式が modern Hopfield update と対応するということである。
+「LLM が本当に人間の記憶のように考えている」という主張ではない。
+発表では，attention を記憶検索として解釈できる，という範囲に留めるのがよい。
+\end{remark}
+
+Hanoi へつなぐなら，正しい再帰解法を一つの安定した検索先，
+反復的な誤手順を別の安定した検索先として見る。
+低温で同じ誤手順に落ち続けるなら，それは出力分布上の高確率な局所軌道であり，
+内部表現としては spurious attractor のように振る舞っている，と説明できる。
+
+\section{Temperature Sampling と Test-Time Scaling}
+
+次に，出力トークンの選び方を見る。
+言語モデルは各時刻で logit \(z_i\) を出し，温度 \(T>0\) を使って
+\[
+  p_T(i)
+  =
+  \frac{\exp(z_i/T)}
+       {\sum_j \exp(z_j/T)}
+\]
+から次トークンを選ぶ。
+
+\begin{itemize}
+\item \(T\to0\): 最大 logit のトークンに集中する。決定的で反復しやすい。
+\item \(T=1\): 元の確率分布に従う。
+\item \(T>1\): 分布が平らになり，低確率候補も選ばれやすくなる。
+\end{itemize}
+
+Test-time scaling (TTS) では，同じ問題に対して複数の reasoning trace を生成し，
+答えを選択・投票・検証する。単一温度なら
+\[
+  \mathcal{R}_{T,K}
+  =
+  \{r_1,\ldots,r_K\},\qquad
+  r_i\sim p_T(r\mid x)
+\]
+のように，温度 \(T\) を固定して \(K\) 本の推論を生成する。
+
+\begin{theorem}[Wu et al. の主張]
+単一温度でサンプル数 \(K\) を増やすだけでは，性能向上は無限には続かない。
+一方，異なる温度は異なる問題集合を解くため，温度方向に scaling すると，
+単一温度 TTS より広い reasoning boundary を探索できる。
+\end{theorem}
+
+論文は Qwen3 系列の複数サイズと，AIME 2024/2025，MATH500，
+LiveCodeBench，Hi-ToM などの reasoning benchmark で評価している。
+平均すると，温度方向の scaling は単一温度 TTS に対して追加の性能改善を与えた。
+さらに，multi-temperature voting により，複数温度を使う計算コストを抑える方法も提案している。
+
+\begin{definition}[multi-temperature voting の考え方]
+温度集合 \(\mathcal{T}=\{T_1,\ldots,T_m\}\) を用意し，各温度で少数の推論を生成する。
+\[
+  \mathcal{R}
+  =
+  \bigcup_{T\in\mathcal{T}}
+  \{r_{T,1},\ldots,r_{T,k_T}\}.
+\]
+得られた答えを集約し，多数決や検証器で最終答えを選ぶ。
+これは，サンプル数 \(K\) だけでなく温度軸にも計算資源を配る方法である。
+\end{definition}
+
+\section{Hanoi 実験での読み方}
+
+Hanoi では，低温で正答率が低く，高温で一部の \(N\) だけ正答率が上がることがある。
+この現象は，次のように読むと二つの論文を自然につなげられる。
+
+\begin{itemize}
+\item 低温では，モデルは高確率な定型手順を選び続ける。
+\item その定型手順が正しい再帰解法なら成功するが，誤った move loop なら失敗が固定化する。
+\item 高温では，次トークン選択が平らになり，別の reasoning trace に入る確率が上がる。
+\item その別軌道が正しい解法アトラクタに近ければ，正答率が回復する。
+\item ただし高すぎる温度では，軌道そのものが壊れ，合法手や一貫性が失われる。
+\end{itemize}
+
+この説明で重要なのは，高温を単なるノイズとして扱わないことである。
+Wu et al. の結果に従えば，温度は探索する推論経路の集合を変える操作である。
+また Ramsauer et al. の見方に従えば，attention は記憶・プロトタイプ・中間表現への検索として読める。
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+観測 & Hopfield 的解釈 & temperature 的解釈 \\
+\midrule
+同じ誤手順の反復 & spurious attractor & 低温で高確率軌道に固定 \\
+高温で正答率上昇 & 別 basin への遷移 & 異なる reasoning trace の探索 \\
+高温で崩壊 & 検索先が不安定化 & 分布が平らすぎて制御不能 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{発表での一言}
+
+Transformer attention は，modern Hopfield network と対応するため，
+記憶検索や attractor の言葉で解釈できる。
+一方，temperature sampling は，その内部表現から出力軌道を選ぶ段階で，
+どの reasoning trace を探索するかを変える。
+したがって Hanoi の高温回復は，
+「ノイズで偶然よくなった」というより，
+「低温で固定された誤った軌道から外れ，別の解法軌道に入った」
+可能性として話せる。
+
+\section*{参考文献}
+
+\begin{enumerate}[leftmargin=1.7em]
+\item Hubert Ramsauer et al.,
+``Hopfield Networks is All You Need,'' ICLR 2021. arXiv:2008.02217.\\
+\url{https://arxiv.org/abs/2008.02217}
+\item Yuheng Wu, Azalia Mirhoseini, Thierry Tambe,
+``On the Role of Temperature Sampling in Test-Time Scaling,'' arXiv:2510.02611, 2025.\\
+\url{https://arxiv.org/abs/2510.02611}
+\end{enumerate}
+
+\end{document}

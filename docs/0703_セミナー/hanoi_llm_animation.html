@@ -1,0 +1,1444 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hanoi LLM Debug Animation</title>
+  <style>
+    :root {
+      --bg: #071421;
+      --panel: #0d2135;
+      --panel-2: #102941;
+      --line: #24577d;
+      --line-soft: #173a57;
+      --text: #e9f4ff;
+      --muted: #9bb9d2;
+      --blue: #39a8ff;
+      --cyan: #6fe9ff;
+      --green: #48d597;
+      --yellow: #f6c85f;
+      --red: #ff6b7a;
+      --peg: #86b4d5;
+      --disk-1: #83d7ff;
+      --disk-2: #56b8f7;
+      --disk-3: #2f89df;
+      --disk-4: #1766b5;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, "Noto Sans JP", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text);
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        var(--bg);
+      background-size: 28px 28px;
+      letter-spacing: 0;
+    }
+
+    .app {
+      width: min(1440px, 100%);
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: end;
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 24px;
+      font-weight: 750;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .status-strip {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      background: rgba(16, 41, 65, 0.9);
+      color: var(--muted);
+      padding: 7px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .chip strong {
+      color: var(--text);
+      font-weight: 650;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 270px minmax(620px, 1fr) 330px;
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      background: rgba(13, 33, 53, 0.94);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.24);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 11px 13px;
+      border-bottom: 1px solid var(--line-soft);
+      background: rgba(12, 31, 50, 0.95);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .panel-title span:last-child {
+      color: var(--muted);
+      font-weight: 500;
+      font-size: 11px;
+    }
+
+    .pipeline {
+      padding: 12px;
+    }
+
+    .stage {
+      position: relative;
+      display: grid;
+      grid-template-columns: 30px 1fr;
+      gap: 10px;
+      min-height: 72px;
+      padding-bottom: 13px;
+    }
+
+    .stage:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      left: 14px;
+      top: 32px;
+      width: 2px;
+      height: calc(100% - 28px);
+      background: var(--line-soft);
+    }
+
+    .stage-dot {
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: #0a1827;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .stage.active .stage-dot {
+      background: var(--blue);
+      border-color: var(--cyan);
+      color: #031220;
+      box-shadow: 0 0 20px rgba(57, 168, 255, 0.55);
+    }
+
+    .stage.done .stage-dot {
+      background: rgba(72, 213, 151, 0.18);
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .stage-card {
+      border: 1px solid var(--line-soft);
+      border-radius: 7px;
+      padding: 9px 10px;
+      background: rgba(8, 22, 36, 0.72);
+    }
+
+    .stage.active .stage-card {
+      border-color: rgba(111, 233, 255, 0.75);
+      background: rgba(18, 55, 86, 0.9);
+    }
+
+    .stage-name {
+      font-size: 12px;
+      font-weight: 750;
+      margin-bottom: 4px;
+    }
+
+    .stage-code {
+      color: var(--cyan);
+      font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      word-break: break-word;
+    }
+
+    .stage-desc {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+      margin-top: 4px;
+    }
+
+    .center {
+      display: grid;
+      grid-template-rows: 470px 330px;
+      gap: 14px;
+    }
+
+    .vector-panel {
+      position: relative;
+      min-height: 330px;
+      overflow: hidden;
+    }
+
+    .vector-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .vector-content {
+      position: absolute;
+      inset: 50px 14px 14px;
+      display: grid;
+      grid-template-columns: 0.95fr 0.78fr 1.35fr;
+      gap: 12px;
+    }
+
+    .vector-step {
+      border: 1px solid var(--line-soft);
+      border-radius: 7px;
+      background: rgba(5, 16, 27, 0.82);
+      overflow: hidden;
+    }
+
+    .vector-step h2 {
+      margin: 0;
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line-soft);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .prompt-text {
+      padding: 12px;
+      color: #cdeaff;
+      font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      min-height: 210px;
+      white-space: pre-wrap;
+    }
+
+    .focus-token {
+      margin: 14px auto 10px;
+      width: min(170px, calc(100% - 24px));
+      min-height: 82px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(111, 233, 255, 0.68);
+      border-radius: 8px;
+      background: rgba(20, 73, 113, 0.9);
+      box-shadow: 0 0 24px rgba(57,168,255,0.25);
+      color: var(--text);
+      text-align: center;
+      font: 18px/1.25 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-weight: 800;
+    }
+
+    .focus-token small {
+      display: block;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .embedding-chip {
+      margin: 0 auto 12px;
+      width: min(210px, calc(100% - 24px));
+      border: 1px solid var(--line-soft);
+      border-radius: 7px;
+      background: rgba(4, 13, 23, 0.72);
+      padding: 9px;
+      color: #cdeaff;
+      font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      text-align: center;
+    }
+
+    .mini-vector {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 4px;
+      padding: 0 14px;
+      height: 70px;
+      align-items: end;
+    }
+
+    .mini-bar {
+      min-height: 8px;
+      border-radius: 3px 3px 0 0;
+      background: linear-gradient(180deg, var(--cyan), var(--blue));
+      opacity: 0.9;
+      transition: height 260ms ease, opacity 260ms ease;
+    }
+
+    .transformer-viz {
+      position: relative;
+      height: 236px;
+      margin: 10px 12px 12px;
+      border: 1px solid var(--line-soft);
+      border-radius: 8px;
+      background:
+        radial-gradient(circle at 18% 30%, rgba(57,168,255,0.16), transparent 26%),
+        rgba(4, 13, 23, 0.66);
+      overflow: hidden;
+    }
+
+    .transformer-viz::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(25deg, transparent 0 28%, rgba(111,233,255,0.12) 28.4% 29%, transparent 29.4% 100%),
+        linear-gradient(-22deg, transparent 0 38%, rgba(57,168,255,0.10) 38.4% 39%, transparent 39.4% 100%),
+        linear-gradient(0deg, transparent 0 49%, rgba(111,233,255,0.08) 49.4% 50%, transparent 50.4% 100%);
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    .attention-heads {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      display: grid;
+      gap: 6px;
+      width: 78px;
+    }
+
+    .head {
+      border: 1px solid rgba(111, 233, 255, 0.32);
+      border-radius: 6px;
+      padding: 6px 6px;
+      background: rgba(16, 41, 65, 0.78);
+      color: var(--muted);
+      font: 10px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .head.hot {
+      color: var(--text);
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px rgba(111,233,255,0.35);
+    }
+
+    .layer-column {
+      position: absolute;
+      top: 20px;
+      bottom: 50px;
+      width: 38px;
+      display: grid;
+      grid-template-rows: repeat(5, 1fr);
+      gap: 8px;
+    }
+
+    .layer-column.low {
+      left: 36%;
+    }
+
+    .layer-column.mid {
+      left: 56%;
+    }
+
+    .layer-column.top {
+      left: 76%;
+    }
+
+    .neuron {
+      border: 1px solid rgba(111,233,255,0.38);
+      border-radius: 50%;
+      background: rgba(57,168,255,0.15);
+      box-shadow: inset 0 0 12px rgba(57,168,255,0.08);
+      transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    }
+
+    .neuron.hot {
+      background: rgba(111,233,255,0.8);
+      box-shadow: 0 0 18px rgba(111,233,255,0.75);
+      transform: scale(1.16);
+    }
+
+    .logit-readout {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      left: 10px;
+      display: grid;
+      grid-template-columns: 96px 1fr;
+      gap: 10px;
+      align-items: center;
+      color: var(--muted);
+      font: 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .logit-bar {
+      height: 12px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--green), var(--cyan));
+      width: 18%;
+      transition: width 260ms ease;
+      box-shadow: 0 0 14px rgba(72,213,151,0.35);
+    }
+
+    .details {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding: 12px;
+    }
+
+    .codebox {
+      min-height: 166px;
+      border: 1px solid var(--line-soft);
+      border-radius: 7px;
+      background: #061423;
+      overflow: hidden;
+    }
+
+    .codebox h2 {
+      margin: 0;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line-soft);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    pre {
+      margin: 0;
+      padding: 10px;
+      color: #cdeaff;
+      font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+    }
+
+    .right {
+      display: grid;
+      grid-template-rows: 165px 330px minmax(220px, 1fr);
+      gap: 14px;
+    }
+
+    .board-wrap {
+      position: relative;
+      height: 290px;
+      padding: 10px 12px 12px;
+    }
+
+    .board-wrap.main-board {
+      height: 428px;
+      padding: 12px 14px 14px;
+    }
+
+    .board {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border: 1px solid var(--line-soft);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(11,31,51,0.85), rgba(5,15,26,0.95));
+      overflow: hidden;
+    }
+
+    .base {
+      position: absolute;
+      left: 6%;
+      right: 6%;
+      bottom: 34px;
+      height: 10px;
+      background: #315e80;
+      border-radius: 3px;
+    }
+
+    .main-board .base {
+      bottom: 52px;
+      height: 12px;
+    }
+
+    .peg {
+      position: absolute;
+      bottom: 34px;
+      width: 8px;
+      height: 190px;
+      border-radius: 6px 6px 0 0;
+      background: linear-gradient(180deg, var(--peg), #376988);
+      transform: translateX(-50%);
+    }
+
+    .main-board .peg {
+      bottom: 52px;
+      width: 10px;
+      height: 285px;
+    }
+
+    .peg-label {
+      position: absolute;
+      bottom: 8px;
+      transform: translateX(-50%);
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .main-board .peg-label {
+      bottom: 16px;
+      font-size: 16px;
+    }
+
+    .disk {
+      position: absolute;
+      height: 23px;
+      border-radius: 5px;
+      transform: translateX(-50%);
+      display: grid;
+      place-items: center;
+      color: #02101b;
+      font-size: 11px;
+      font-weight: 800;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 4px 10px rgba(0,0,0,0.25);
+      transition: left 420ms ease, bottom 420ms ease, width 420ms ease;
+    }
+
+    .main-board .disk {
+      height: 34px;
+      font-size: 14px;
+      border-radius: 7px;
+    }
+
+    .move-banner {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      top: 18px;
+      min-height: 34px;
+      border: 1px solid rgba(111, 233, 255, 0.45);
+      border-radius: 7px;
+      background: rgba(6, 20, 34, 0.85);
+      color: var(--cyan);
+      font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      padding: 7px 9px;
+      z-index: 5;
+    }
+
+    .main-board .move-banner {
+      left: 24px;
+      right: 24px;
+      top: 22px;
+      min-height: 46px;
+      font-size: 16px;
+      padding: 10px 12px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      padding: 12px;
+    }
+
+    .right .details {
+      height: calc(100% - 42px);
+      overflow: auto;
+    }
+
+    .right .codebox {
+      min-height: 126px;
+    }
+
+    .right pre {
+      font-size: 10px;
+    }
+
+    .metric {
+      border: 1px solid var(--line-soft);
+      border-radius: 7px;
+      padding: 10px;
+      background: rgba(7, 19, 32, 0.78);
+      min-height: 58px;
+    }
+
+    .metric-name {
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 5px;
+    }
+
+    .metric-value {
+      font-size: 20px;
+      font-weight: 780;
+    }
+
+    .metric-value.good {
+      color: var(--green);
+    }
+
+    .metric-value.warn {
+      color: var(--yellow);
+    }
+
+    .log {
+      padding: 10px 12px 12px;
+      height: calc(100% - 42px);
+      overflow: auto;
+      font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: #bfdcf4;
+    }
+
+    .log-entry {
+      border-left: 2px solid var(--line);
+      padding: 4px 0 4px 8px;
+      margin-bottom: 5px;
+    }
+
+    .log-entry.active {
+      border-color: var(--cyan);
+      color: #f0fbff;
+      background: rgba(57, 168, 255, 0.08);
+    }
+
+    .controls {
+      position: sticky;
+      bottom: 0;
+      z-index: 20;
+      margin-top: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(5, 16, 27, 0.96);
+      padding: 12px;
+      display: grid;
+      grid-template-columns: auto auto auto auto 1fr auto;
+      gap: 10px;
+      align-items: center;
+      box-shadow: 0 -10px 35px rgba(0,0,0,0.3);
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: 6px;
+      min-width: 42px;
+      height: 36px;
+      padding: 0 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: var(--cyan);
+    }
+
+    button.primary {
+      background: linear-gradient(180deg, #1a78bd, #105c96);
+      border-color: var(--blue);
+    }
+
+    input[type="range"] {
+      width: 160px;
+      accent-color: var(--blue);
+    }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(16px, 1fr));
+      gap: 4px;
+      align-items: center;
+    }
+
+    .tick {
+      height: 8px;
+      border-radius: 3px;
+      background: var(--line-soft);
+    }
+
+    .tick.done {
+      background: var(--blue);
+    }
+
+    .tick.active {
+      background: var(--cyan);
+      box-shadow: 0 0 12px rgba(111, 233, 255, 0.8);
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 1180px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .right {
+        grid-template-rows: 165px 330px 220px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .app {
+        padding: 10px;
+      }
+
+      header,
+      .details,
+      .controls {
+        grid-template-columns: 1fr;
+      }
+
+      .center {
+        grid-template-rows: 430px 620px;
+      }
+
+      .vector-content {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>ローカルLLMがハノイの塔を解くまで</h1>
+        <p class="subtitle">
+          `TowerOfHanoiEnv` が問題を作り、プロンプトをベクトル化し、生成中の Move 出力から内部状態を保存し、盤面評価と正答率へ戻す流れを同期表示します。
+        </p>
+      </div>
+      <div class="status-strip">
+        <div class="chip">環境 <strong>TowerOfHanoiEnv(N=3)</strong></div>
+        <div class="chip">最短手数 <strong>7</strong></div>
+        <div class="chip">保存 <strong>trial_001_hidden.npz</strong></div>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="panel">
+        <div class="panel-title"><span>実験パイプライン</span><span id="stageCounter">0 / 13</span></div>
+        <div class="pipeline" id="pipeline"></div>
+      </section>
+
+      <section class="center">
+        <div class="panel">
+          <div class="panel-title"><span>ハノイの塔: LLM出力を盤面に適用</span><span id="boardState">A:[3,2,1] B:[] C:[]</span></div>
+          <div class="board-wrap main-board">
+            <div class="board" id="board">
+              <div class="move-banner" id="moveBanner">Move 出力待ち</div>
+              <div class="base"></div>
+              <div class="peg" style="left: 18%;"></div>
+              <div class="peg" style="left: 50%;"></div>
+              <div class="peg" style="left: 82%;"></div>
+              <div class="peg-label" style="left: 18%;">A</div>
+              <div class="peg-label" style="left: 50%;">B</div>
+              <div class="peg-label" style="left: 82%;">C</div>
+              <div class="disk" id="disk1">1</div>
+              <div class="disk" id="disk2">2</div>
+              <div class="disk" id="disk3">3</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel vector-panel">
+          <div class="panel-title"><span>Prompt → Focus Token → Transformer → Output Token</span><span id="phaseName">standby</span></div>
+          <canvas class="vector-canvas" id="machineCanvas"></canvas>
+          <div class="vector-content">
+            <div class="vector-step">
+              <h2>① prompt text</h2>
+              <div class="prompt-text" id="promptText"></div>
+            </div>
+            <div class="vector-step">
+              <h2>② focus token → embedding</h2>
+              <div class="focus-token" id="focusToken">Tower<small>selected token</small></div>
+              <div class="embedding-chip" id="embeddingChip">E["Tower"] = [0.42, -0.18, ...]</div>
+              <div class="mini-vector" id="miniVector"></div>
+            </div>
+            <div class="vector-step">
+              <h2>③ attention + transformer + logits</h2>
+              <div class="transformer-viz" id="transformerViz">
+                <div class="attention-heads" id="attentionHeads"></div>
+                <div class="layer-column low" id="layerLow"></div>
+                <div class="layer-column mid" id="layerMid"></div>
+                <div class="layer-column top" id="layerTop"></div>
+                <div class="logit-readout">
+                  <span id="logitLabel">next: ...</span>
+                  <div class="logit-bar" id="logitBar"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="right">
+        <div class="panel">
+          <div class="panel-title"><span>メトリクス</span><span>trial result</span></div>
+          <div class="metrics">
+            <div class="metric">
+              <div class="metric-name">moves_extracted</div>
+              <div class="metric-value" id="movesMetric">0 / 7</div>
+            </div>
+            <div class="metric">
+              <div class="metric-name">V(x)</div>
+              <div class="metric-value warn" id="vMetric">1.000</div>
+            </div>
+            <div class="metric">
+              <div class="metric-name">reasoning_tokens</div>
+              <div class="metric-value" id="reasonMetric">0</div>
+            </div>
+            <div class="metric">
+              <div class="metric-name">accuracy</div>
+              <div class="metric-value" id="accMetric">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title"><span>現在の処理</span><span id="codePath">envs/hanoi_env.py</span></div>
+          <div class="details">
+            <div class="codebox">
+              <h2 id="snippetTitle">snippet</h2>
+              <pre id="snippet"></pre>
+            </div>
+            <div class="codebox">
+              <h2>内部状態メモ</h2>
+              <pre id="stateNote"></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title"><span>実行ログ</span><span>stream/debug</span></div>
+          <div class="log" id="log"></div>
+        </div>
+      </section>
+    </main>
+
+    <div class="controls">
+      <button id="resetBtn" title="最初に戻す">↺</button>
+      <button id="prevBtn" title="1ステップ戻る">←</button>
+      <button class="primary" id="playBtn" title="再生/一時停止">▶</button>
+      <button id="nextBtn" title="1ステップ進む">→</button>
+      <div class="timeline" id="timeline"></div>
+      <label class="small">速度 <input id="speed" type="range" min="500" max="2600" step="100" value="1300"></label>
+    </div>
+  </div>
+
+  <script>
+    const pegsX = { A: 18, B: 50, C: 82 };
+    const diskWidth = { 1: 132, 2: 196, 3: 260 };
+    const diskColor = {
+      1: "var(--disk-1)",
+      2: "var(--disk-2)",
+      3: "var(--disk-3)"
+    };
+
+    const stages = [
+      {
+        name: "環境生成",
+        code: "env = TowerOfHanoiEnv(N=3)",
+        desc: "初期状態 A=[3,2,1]、ゴール C=[3,2,1]、評価用ゴール集合 B/C を作る。",
+        file: "envs/hanoi_env.py",
+        phase: "environment",
+        snippetTitle: "TowerOfHanoiEnv.__init__",
+        snippet: "self._initial_state = {'A': [3, 2, 1], 'B': [], 'C': []}\nself._goal_state    = {'A': [], 'B': [], 'C': [3, 2, 1]}\nself._goal_states   = (full_on_B, full_on_C)\nself.min_moves      = 2 ** N - 1",
+        note: "パズル状態は dict[str, list[int]]。底に大きい円盤、末尾が top disk。\n評価では C だけでなく B/C を gauge 等価なゴールとして扱う。",
+        log: "[INIT] TowerOfHanoiEnv(N=3), min_moves=7",
+        token: "state = {A:[3,2,1], B:[], C:[]}",
+        state: { A: [3, 2, 1], B: [], C: [] },
+        moves: 0,
+        v: 1.0,
+        tokens: 0,
+        accuracy: 0
+      },
+      {
+        name: "プロンプト生成",
+        code: "prompt = env.get_prompt()",
+        desc: "ルール、初期状態、ゴール、出力形式を LLM に渡す文字列へ変換する。",
+        file: "envs/hanoi_env.py",
+        phase: "prompt",
+        snippetTitle: "get_prompt()",
+        snippet: "[Rules]\n1. There are 3 pegs (A, B, C) and 3 disks.\n2. Only the top disk can be moved.\n3. A larger disk cannot be placed on a smaller disk.\n\n[Output Format]\nMove <disk_number> from <peg> to <peg>",
+        note: "ここで LLM に与える制約が固定される。\n, 盤面状態は文字列化され、Move 出力の形式も明示される。",
+        log: "[PROMPT] rules + initial_state + goal_state + output_format",
+        token: "You are an AI solving the Tower of Hanoi puzzle...",
+        state: { A: [3, 2, 1], B: [], C: [] },
+        moves: 0,
+        v: 1.0,
+        tokens: 0,
+        accuracy: 0
+      },
+      {
+        name: "トークン/ベクトル化",
+        code: "tokenizer.apply_chat_template(...)",
+        desc: "prompt 中の token が埋め込みベクトルへ写像され、Transformer の計算入力になる。",
+        file: "runners/run_local.py",
+        phase: "vectorize",
+        snippetTitle: "_prepare_input_ids()",
+        snippet: "messages = [system_hint, user_prompt]\nformatted = tokenizer.apply_chat_template(messages, ...)\ninput_ids = tokenizer(formatted, return_tensors='pt').input_ids",
+        note: "表示では1 tokenだけを追跡しているが、実際には全token列が同時に入力される。\nDeepSeek-R1 系では <think> をプリフィルして reasoning mode を起動する。",
+        log: "[TOKENIZE] prompt -> input_ids -> embeddings",
+        token: "focus token 'Tower' -> embedding vector E[token]",
+        state: { A: [3, 2, 1], B: [], C: [] },
+        moves: 0,
+        v: 1.0,
+        tokens: 42,
+        accuracy: 0
+      },
+      {
+        name: "逐次生成開始",
+        code: "generate_with_hidden_states(...)",
+        desc: "ローカルLLMが1 tokenずつ生成し、stream/debug 表示が始まる。",
+        file: "runners/run_local.py",
+        phase: "generate",
+        snippetTitle: "generation loop",
+        snippet: "outputs = model(input_ids=cur_input, output_hidden_states=True)\nnext_token = sample(logits, temperature)\naccumulated_text += tokenizer.decode(next_token)",
+        note: "この段階ではまだ盤面は変わらない。\nTransformer は文脈化 hidden state を計算し、logits から次tokenを選ぶ。",
+        log: "[GENERATE] streaming decode started",
+        token: "<think> Need recursive strategy: move 2 disks to B...",
+        state: { A: [3, 2, 1], B: [], C: [] },
+        moves: 0,
+        v: 1.0,
+        tokens: 128,
+        accuracy: 0
+      },
+      {
+        name: "Move抽出 + 状態保存",
+        code: "extract_moves_with_position(text)",
+        desc: "Move 行が完成した位置で layer_low/mid/top の hidden state を保存する。",
+        file: "runners/run_local.py",
+        phase: "move",
+        move: "Move 1 from A to C",
+        snippetTitle: "_capture_new_move_hidden_states()",
+        snippet: "current_move_texts = env.extract_moves_with_position(accumulated_text)\nhs_tensor = outputs.hidden_states[layer_idx][0, -1, :]\nhs_buffer[layer_key].append(hs_tensor.cpu().numpy())",
+        note: "Move 文字列と、その直後の内部状態ベクトルが対応づく。\nこの対応が後段の P(q), cosine similarity 解析の材料になる。",
+        log: "[MOVE 1] captured hidden states at layer_low/mid/top",
+        token: "Move 1 from A to C",
+        state: { A: [3, 2], B: [], C: [1] },
+        moves: 1,
+        v: 0.714,
+        tokens: 176,
+        accuracy: 0
+      },
+      {
+        name: "盤面シミュレーション",
+        code: "env._apply_move(state, disk, src, dst)",
+        desc: "抽出された手を環境側で合法性チェックし、盤面状態を更新する。",
+        file: "envs/hanoi_env.py",
+        phase: "move",
+        move: "Move 2 from A to B",
+        snippetTitle: "_apply_move()",
+        snippet: "if src_stack[-1] != disk: return False\nif dst_stack and dst_stack[-1] < disk: return False\ndst_stack.append(src_stack.pop())\nreturn True",
+        note: "LLM が文章として出した手は、環境がもう一度ルールで検査する。\n違法手は state を変更せず V(x) に penalty として効く。",
+        log: "[MOVE 2] legal move applied, board state updated",
+        token: "Move 2 from A to B",
+        state: { A: [3], B: [2], C: [1] },
+        moves: 2,
+        v: 0.571,
+        tokens: 221,
+        accuracy: 0
+      },
+      {
+        name: "推論と盤面が同期",
+        code: "goal_reached(extracted_moves)",
+        desc: "生成された手列が進むほど、盤面と V(x) がゴール側へ近づく。",
+        file: "envs/hanoi_env.py",
+        phase: "move",
+        move: "Move 1 from C to B",
+        snippetTitle: "goal_reached() / evaluate_state()",
+        snippet: "moves = env.extract_moves_from_text(text)\naccuracy = 1 if env.goal_reached(moves) else 0\nv_score = env.evaluate_state(moves)",
+        note: "右の盤面は Move 抽出結果を適用した外部状態。\n中央のノードは Move 出力時点で保存した内部状態。",
+        log: "[MOVE 3] V(x) decreases as the simulated state approaches a goal",
+        token: "Move 1 from C to B",
+        state: { A: [3], B: [2, 1], C: [] },
+        moves: 3,
+        v: 0.429,
+        tokens: 264,
+        accuracy: 0
+      },
+      {
+        name: "最大円盤の移動",
+        code: "env._apply_move(state, 3, 'A', 'C')",
+        desc: "小さい2枚が中間ペグに退避できたので、最大円盤をゴールへ移動する。",
+        file: "envs/hanoi_env.py",
+        phase: "move",
+        move: "Move 3 from A to C",
+        snippetTitle: "recursive strategy checkpoint",
+        snippet: "Move N disks A -> C:\n1. move N-1 disks A -> B\n2. move disk N A -> C\n3. move N-1 disks B -> C",
+        note: "ハノイの再帰構造が見える中心ステップ。\nLLM の出力が環境の合法手判定を通過すると、盤面が一気にゴール側へ寄る。",
+        log: "[MOVE 4] largest disk moved from A to C",
+        token: "Move 3 from A to C",
+        state: { A: [], B: [2, 1], C: [3] },
+        moves: 4,
+        v: 0.429,
+        tokens: 304,
+        accuracy: 0
+      },
+      {
+        name: "サブ問題を再開",
+        code: "env.extract_moves_from_text(text)",
+        desc: "B に退避した 2 枚を C へ積むため、最小円盤を一度 A へ戻す。",
+        file: "envs/hanoi_env.py",
+        phase: "move",
+        move: "Move 1 from B to A",
+        snippetTitle: "Move extraction remains textual",
+        snippet: "matches = self.MOVE_RE.findall(text)\nreturn [f'Move {d} from {s.upper()} to {t.upper()}'\n        for d, s, t in matches]",
+        note: "LLM 出力は自然言語でも、評価器は Move 行だけを正規表現で抽出する。\n抽出された手だけが盤面シミュレーションに使われる。",
+        log: "[MOVE 5] extracted move text and updated board",
+        token: "Move 1 from B to A",
+        state: { A: [1], B: [2], C: [3] },
+        moves: 5,
+        v: 0.286,
+        tokens: 335,
+        accuracy: 0
+      },
+      {
+        name: "残り2枚をゴールへ",
+        code: "env.evaluate_state(moves)",
+        desc: "円盤2を C へ移し、V(x) がさらに小さくなる。",
+        file: "envs/hanoi_env.py",
+        phase: "move",
+        move: "Move 2 from B to C",
+        snippetTitle: "_compute_V()",
+        snippet: "d_hat = self._min_moves_from_symmetric(state) / self.min_moves\npenalty = self.LAMBDA_PENALTY * illegal_count\nreturn round(d_hat + penalty, 6)",
+        note: "V(x)=0 がゴール、V(x)=1 が初期状態の目安。\n違法手があれば penalty が足されるため、単なる距離よりデバッグ向き。",
+        log: "[MOVE 6] V(x)=0.143, one move remains",
+        token: "Move 2 from B to C",
+        state: { A: [1], B: [], C: [3, 2] },
+        moves: 6,
+        v: 0.143,
+        tokens: 368,
+        accuracy: 0
+      },
+      {
+        name: "最後のMove",
+        code: "_handle_new_moves(...); goal_reached(...)",
+        desc: "最後の円盤1が C に移動し、生成ループ側でも goal_reached を検知する。",
+        file: "runners/run_local.py",
+        phase: "move",
+        move: "Move 1 from A to C",
+        snippetTitle: "_handle_new_moves()",
+        snippet: "extracted = env.extract_moves_from_text(accumulated_text)\nif env.goal_reached(extracted):\n    return new_prev_move_count, 'goal_reached'",
+        note: "Move が完成するたびに hidden state 保存とゴール判定が走る。\n到達後は early_stop='goal_reached' として生成を止められる。",
+        log: "[MOVE 7] final move captured; stop_reason=goal_reached",
+        token: "Move 1 from A to C",
+        state: { A: [], B: [], C: [3, 2, 1] },
+        moves: 7,
+        v: 0.0,
+        tokens: 402,
+        accuracy: 1
+      },
+      {
+        name: "ゴール到達",
+        code: "env.goal_reached(moves) == True",
+        desc: "最短 7 手が出そろい、評価用ゴール集合に到達したか判定する。",
+        file: "runners/run_local.py",
+        phase: "goal",
+        move: "Move 1 from A to C ... Move 1 from A to C",
+        snippetTitle: "trial result",
+        snippet: "result = {\n  'accuracy': 1,\n  'moves_extracted': 7,\n  'v_score': 0.0,\n  'reasoning_tokens': estimated,\n  'early_stop': 'goal_reached'\n}",
+        note: "accuracy はゴール到達の 0/1。\nmin_moves はプロンプト文言と V(x) 正規化に使い、手数だけで正誤を決めるわけではない。",
+        log: "[GOAL] reached goal after 7 extracted moves",
+        token: "Move 1 A->C, Move 2 A->B, Move 1 C->B, Move 3 A->C, Move 1 B->A, Move 2 B->C, Move 1 A->C",
+        state: { A: [], B: [], C: [3, 2, 1] },
+        moves: 7,
+        v: 0.0,
+        tokens: 402,
+        accuracy: 1
+      },
+      {
+        name: "保存と集計",
+        code: "np.savez(...); print_summary(results)",
+        desc: "hidden state と trial 結果を保存し、平均正答率や token 数を集計する。",
+        file: "runners/run_local.py",
+        phase: "save",
+        snippetTitle: "save hidden states / summary",
+        snippet: "np.savez(npz_path,\n  layer_top=result.hidden_states['layer_top'],\n  layer_mid=result.hidden_states['layer_mid'],\n  layer_low=result.hidden_states['layer_low'],\n  move_steps=result.move_steps,\n)\navg_acc = sum(r['accuracy'] for r in results) / n",
+        note: "保存された npz は、後続の cosine similarity, P(q), phase classifier の入力になる。\nsummary.json は、平均正答率や token 数を集計した結果。",
+        log: "[SAVE] trial_001_hidden.npz; [SUMMARY] Accuracy=1.000",
+        token: "results -> summary.json / hidden.npz -> analysis pipeline",
+        state: { A: [], B: [], C: [3, 2, 1] },
+        moves: 7,
+        v: 0.0,
+        tokens: 402,
+        accuracy: 1
+      }
+    ];
+
+    const allMoves = [
+      "Move 1 from A to C",
+      "Move 2 from A to B",
+      "Move 1 from C to B",
+      "Move 3 from A to C",
+      "Move 1 from B to A",
+      "Move 2 from B to C",
+      "Move 1 from A to C"
+    ];
+
+    let current = 0;
+    let playing = false;
+    let timer = null;
+    let particleT = 0;
+
+    const pipelineEl = document.getElementById("pipeline");
+    const timelineEl = document.getElementById("timeline");
+    const canvas = document.getElementById("machineCanvas");
+    const ctx = canvas.getContext("2d");
+    const focusTokens = ["Tower", "Hanoi", "Move", "1", "from", "A", "to", "C"];
+    const miniVectorValues = [28, 54, 36, 66, 48, 82, 42, 72];
+
+    function init() {
+      pipelineEl.innerHTML = stages.map((stage, index) => `
+        <div class="stage" id="stage-${index}">
+          <div class="stage-dot">${index + 1}</div>
+          <div class="stage-card">
+            <div class="stage-name">${stage.name}</div>
+            <div class="stage-code">${stage.code}</div>
+            <div class="stage-desc">${stage.desc}</div>
+          </div>
+        </div>
+      `).join("");
+
+      timelineEl.innerHTML = stages.map((_, index) => `
+        <div class="tick" id="tick-${index}"></div>
+      `).join("");
+
+      for (const disk of [1, 2, 3]) {
+        const el = document.getElementById(`disk${disk}`);
+        el.style.width = `${diskWidth[disk]}px`;
+        el.style.background = diskColor[disk];
+      }
+      document.getElementById("miniVector").innerHTML = miniVectorValues
+        .map((height, index) => `<div class="mini-bar" id="miniBar-${index}" style="height:${height}px"></div>`)
+        .join("");
+      document.getElementById("attentionHeads").innerHTML = ["attn h1", "attn h2", "attn h3", "MLP"]
+        .map((label, index) => `<div class="head" id="head-${index}">${label}</div>`)
+        .join("");
+      for (const layerId of ["layerLow", "layerMid", "layerTop"]) {
+        document.getElementById(layerId).innerHTML = Array.from(
+          { length: 5 },
+          (_, index) => `<div class="neuron" id="${layerId}-${index}"></div>`
+        ).join("");
+      }
+
+      document.getElementById("resetBtn").addEventListener("click", reset);
+      document.getElementById("prevBtn").addEventListener("click", prev);
+      document.getElementById("nextBtn").addEventListener("click", next);
+      document.getElementById("playBtn").addEventListener("click", togglePlay);
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+      render();
+      requestAnimationFrame(drawMachine);
+    }
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function reset() {
+      pause();
+      current = 0;
+      render();
+    }
+
+    function prev() {
+      current = Math.max(0, current - 1);
+      render();
+    }
+
+    function next() {
+      if (current >= stages.length - 1) {
+        pause();
+        return;
+      }
+      current += 1;
+      render();
+    }
+
+    function togglePlay() {
+      playing ? pause() : play();
+    }
+
+    function play() {
+      playing = true;
+      document.getElementById("playBtn").textContent = "⏸";
+      schedule();
+    }
+
+    function pause() {
+      playing = false;
+      document.getElementById("playBtn").textContent = "▶";
+      if (timer) clearTimeout(timer);
+      timer = null;
+    }
+
+    function schedule() {
+      if (!playing) return;
+      const delay = Number(document.getElementById("speed").value);
+      timer = setTimeout(() => {
+        if (current >= stages.length - 1) {
+          pause();
+          return;
+        }
+        current += 1;
+        render();
+        schedule();
+      }, delay);
+    }
+
+    function render() {
+      const stage = stages[current];
+      document.getElementById("stageCounter").textContent = `${current + 1} / ${stages.length}`;
+      document.getElementById("phaseName").textContent = stage.phase;
+      document.getElementById("codePath").textContent = stage.file;
+      document.getElementById("snippetTitle").textContent = stage.snippetTitle;
+      document.getElementById("snippet").textContent = stage.snippet;
+      document.getElementById("stateNote").textContent = stage.note;
+      document.getElementById("moveBanner").textContent = stage.move || "Move 出力待ち";
+
+      updatePipeline();
+      updateBoard(stage.state);
+      updateMetrics(stage);
+      updateVectorization(stage);
+      updateLog();
+    }
+
+    function updatePipeline() {
+      stages.forEach((_, index) => {
+        const stageEl = document.getElementById(`stage-${index}`);
+        stageEl.classList.toggle("done", index < current);
+        stageEl.classList.toggle("active", index === current);
+        const tick = document.getElementById(`tick-${index}`);
+        tick.classList.toggle("done", index < current);
+        tick.classList.toggle("active", index === current);
+      });
+    }
+
+    function updateBoard(state) {
+      const slotHeight = 36;
+      const baseBottom = 66;
+      for (const peg of ["A", "B", "C"]) {
+        state[peg].forEach((disk, idx) => {
+          const el = document.getElementById(`disk${disk}`);
+          el.style.left = `${pegsX[peg]}%`;
+          el.style.bottom = `${baseBottom + idx * slotHeight}px`;
+        });
+      }
+      document.getElementById("boardState").textContent =
+        `A:[${state.A.join(",")}] B:[${state.B.join(",")}] C:[${state.C.join(",")}]`;
+    }
+
+    function updateVectorization(stage) {
+      const phase = stage.phase;
+      const phaseLevel = phaseIndex(phase);
+      const moveParts = stage.move ? stage.move.split(/\s+/) : [];
+      const focusIndex = Math.min(Math.max(stage.moves, 0), focusTokens.length - 1);
+      const moveTokenIndex = stage.moves > 0 && moveParts.length ? (stage.moves - 1) % moveParts.length : 0;
+      const focus = phaseLevel >= 2 && moveParts.length ? moveParts[moveTokenIndex] : focusTokens[focusIndex];
+      const promptText = phase === "environment"
+        ? "TowerOfHanoiEnv(N=3)\ninitial: A=[3,2,1]\ngoal: C=[3,2,1]"
+        : "[Rules]\n1. 3 pegs: A, B, C\n2. move only top disk\n3. larger disk cannot be placed on smaller disk\n\n[Output]\nMove <disk> from <peg> to <peg>";
+      document.getElementById("promptText").textContent = promptText;
+
+      document.getElementById("focusToken").innerHTML = `${focus}<small>selected token</small>`;
+      document.getElementById("embeddingChip").textContent =
+        phaseLevel >= 1 ? `embedding("${focus}") = [${embeddingPreview(focusIndex)}]` : "waiting for tokenizer...";
+
+      const vectorActive = phaseLevel >= 1;
+      const computeActive = ["generate", "move", "goal", "save"].includes(phase);
+      miniVectorValues.forEach((height, index) => {
+        const bar = document.getElementById(`miniBar-${index}`);
+        const boost = computeActive ? 12 * Math.sin(particleT * 4 + index + current) : 0;
+        bar.style.height = `${Math.max(8, height + boost + focusIndex * 2)}px`;
+        bar.style.opacity = vectorActive ? "1" : "0.18";
+      });
+
+      for (let index = 0; index < 4; index++) {
+        const head = document.getElementById(`head-${index}`);
+        head.classList.toggle("hot", computeActive && ((index + current) % 2 === 0 || stage.moves > index));
+      }
+
+      for (const layerId of ["layerLow", "layerMid", "layerTop"]) {
+        for (let index = 0; index < 5; index++) {
+          const neuron = document.getElementById(`${layerId}-${index}`);
+          const layerOffset = layerId === "layerLow" ? 0 : layerId === "layerMid" ? 1 : 2;
+          const hot = computeActive && ((index + current + layerOffset) % 3 === 0 || index < Math.min(stage.moves, 4));
+          neuron.classList.toggle("hot", hot);
+          neuron.style.opacity = computeActive ? "1" : "0.3";
+        }
+      }
+
+      const nextToken = moveParts.length ? moveParts[Math.min(moveTokenIndex + 1, moveParts.length - 1)] : "Move";
+      document.getElementById("logitLabel").textContent = computeActive ? `logits -> "${nextToken}"` : "logits -> ...";
+      document.getElementById("logitBar").style.width = computeActive ? `${Math.min(90, 28 + stage.moves * 8 + current * 2)}%` : "18%";
+    }
+
+    function embeddingPreview(seed) {
+      const vals = Array.from({ length: 4 }, (_, index) => {
+        const raw = Math.sin((seed + 1) * (index + 2));
+        return raw >= 0 ? ` ${raw.toFixed(2)}` : raw.toFixed(2);
+      });
+      return `${vals.join(", ")}, ...`;
+    }
+
+    function updateMetrics(stage) {
+      const moves = stage.moves;
+      const acc = stage.accuracy;
+      document.getElementById("movesMetric").textContent = `${moves} / 7`;
+      document.getElementById("vMetric").textContent = stage.v.toFixed(3);
+      document.getElementById("reasonMetric").textContent = String(stage.tokens);
+      document.getElementById("accMetric").textContent = String(acc);
+      document.getElementById("vMetric").classList.toggle("good", stage.v === 0);
+      document.getElementById("vMetric").classList.toggle("warn", stage.v > 0);
+      document.getElementById("accMetric").classList.toggle("good", acc === 1);
+    }
+
+    function updateLog() {
+      document.getElementById("log").innerHTML = stages.slice(0, current + 1)
+        .map((stage, index) => `<div class="log-entry ${index === current ? "active" : ""}">${stage.log}</div>`)
+        .join("");
+    }
+
+    function drawMachine() {
+      particleT += 0.012;
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      drawGrid(w, h);
+      drawVectorArrows(w, h);
+      drawParticles(w, h);
+
+      requestAnimationFrame(drawMachine);
+    }
+
+    function drawGrid(w, h) {
+      ctx.strokeStyle = "rgba(57,168,255,0.08)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x < w; x += 34) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+      for (let y = 0; y < h; y += 34) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+    }
+
+    function phaseIndex(phase) {
+      const order = {
+        environment: 0,
+        prompt: 0,
+        vectorize: 1,
+        generate: 2,
+        move: 3,
+        goal: 3,
+        save: 3
+      };
+      return order[phase] ?? 0;
+    }
+
+    function drawVectorArrows(w, h) {
+      const y = h * 0.5;
+      const arrowXs = [w * 0.30, w * 0.61, w * 0.88];
+      const activeCount = phaseIndex(stages[current].phase);
+      arrowXs.forEach((x, index) => {
+        const active = index < 2 ? activeCount > index : activeCount >= 2;
+        ctx.strokeStyle = active ? "rgba(111,233,255,0.72)" : "rgba(36,87,125,0.4)";
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x - 26, y);
+        ctx.lineTo(x + 26, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x + 26, y);
+        ctx.lineTo(x + 15, y - 7);
+        ctx.lineTo(x + 15, y + 7);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = active ? "rgba(205,234,255,0.75)" : "rgba(155,185,210,0.4)";
+        ctx.font = "700 10px ui-monospace, monospace";
+        ctx.textAlign = "center";
+        const labels = ["embed", "attention", "logits"];
+        ctx.fillText(labels[index], x, y - 14);
+      });
+    }
+
+    function drawParticles(w, h) {
+      const phase = stages[current].phase;
+      const y = h * 0.48;
+      const visibleCount = phase === "environment" ? 1 : phase === "prompt" ? 5 : phase === "vectorize" ? 14 : 28;
+      const start = w * 0.19;
+      const end = w * 0.91;
+      for (let i = 0; i < visibleCount; i++) {
+        const t = (particleT + i / visibleCount) % 1;
+        const x = start + (end - start) * t;
+        const wave = Math.sin((t * 8 + i) * Math.PI) * 11;
+        const radius = phase === "move" || phase === "goal" || phase === "save" ? 3.4 : 2.5;
+        ctx.beginPath();
+        ctx.arc(x, y + wave, radius, 0, Math.PI * 2);
+        ctx.fillStyle = i % 3 === 0 ? "rgba(111,233,255,0.86)" : "rgba(57,168,255,0.72)";
+        ctx.fill();
+      }
+
+      if (["move", "goal", "save"].includes(phase)) {
+        const emitted = Math.min(stages[current].moves || 0, 7);
+        for (let i = 0; i < emitted; i++) {
+          const x = w * 0.80 + i * 12;
+          const y2 = h * 0.70 + Math.sin(particleT * 8 + i) * 4;
+          ctx.beginPath();
+          ctx.roundRect(x, y2, 9, 9, 2);
+          ctx.fillStyle = "rgba(72,213,151,0.82)";
+          ctx.fill();
+        }
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -18,6 +18,44 @@
 
 ## 次の実験・実装タスク
 
+- [ ] 2026年9月末発表向けの hidden-state dynamics 計画を進める。
+      正本: `docs/research_state/roadmap_2026_09_conference.md`
+      - [x] Pancake N=3/N=4 の T* 決定用小スイープを実行し、作業温度を `T*=0.6` に固定する。
+      - [x] T* 確定後、budget 不足と能力不足を切り分ける N=5 exploratory debug sweep を走らせる。
+            初期案: `N=5, T=T*, num_predict=4096, 5 trials` と
+            `N=5, T=T*, num_predict=8192, 5 trials`。
+            現状: `T=0.6`, `num_predict=4096/8192`, seeds 1-5 は完了。
+      - [ ] N=5 exploratory の generated text / debug JSON を読み、`length_stop` を
+            `budget_censored_success_like` / `budget_censored_unknown` / `loop_trap` /
+            `search_fail` へ分離する。
+      - [x] N=3-5, `T=0.6` で `min_moves` 層化した難易度セットを作る。
+            まず seed を列挙して `(N, initial_state, min_moves)` の候補表を作り、
+            `min_moves` ごとに代表初期状態を固定する。N 効果は同じ/近い
+            `min_moves` 間で比較し、計画長効果は同じ N 内の `min_moves` 差で比較する。
+            仕様: `docs/research_state/pancake_stratified_sweep_spec.md`
+      - [x] 層化スイープ仕様に沿って `analysis/list_pancake_instances.py`,
+            `pancake_debug_sweep.py --instances-file`,
+            `run_pancake_debug_stratified_sweep.sh`,
+            `run_local.py --initial-state` を実装する。
+      - [x] `configs/pancake_instances/N3-5_T0_6_minmoves_stratified_v1.json` の
+            18 instances を `num_predict=8192` で実行する。
+            結果: `results/debug_prompt/pancake/minmoves_stratified/deepseek-r1-distill-qwen-14b/`
+            と `docs/research_state/results_summary.md`。
+      - [ ] 層化 debug sweep の代表ケースを選ぶ。
+            候補: N4_seed3_mm3（到達後 final fail）、N5_seed12_mm4（length stop after reaching goal）、
+            N5_seed23/24_mm5（到達後 final fail）、N5_seed3_mm3 または N5_seed5_mm5（final success だが
+            `goal_reached_all_mentions=false`）。
+      - [x] token hidden の relative capture を Pancake で確認する。
+            N=3, min_moves=3, `capture_timing=token:8`, `capture_mode=relative` の
+            success probe を取得済み。詳細は `docs/research_state/results_summary.md`。
+      - [x] N=3 success probe の generated 区間 hidden を層×token 格子として解析し、
+            時間発展方程式の仮説を5個に整理する。
+            メモ: `docs/research_state/pancake_hidden_dynamics_n3_success.md`
+      - [ ] final answer 末尾の move-level hidden が必要なら、同じ N=3/min_moves=3 成功条件で
+            `capture_timing=token`（token:1）を追加取得する。
+      - [ ] full hidden pilot を N=3 success / N=4 success / N=4 failure で少数取得する。
+      - [x] debug JSON と hidden NPZ の結合仕様を別ドキュメントに切り出す
+            （`docs/research_state/pancake_debug_hidden_join_spec.md`）。
 - [x] `plot_hanoi_nt_collapse.py` の出力CSVから $w_N$（遷移幅）と $C_{\rm eff}=-\log P_{\rm success}$ を
       $N$ ごとに算出する `analysis/measure_wn_ceff.py` を作成（BaseAnalyzer非依存、単純スクリプト）。
       $C_{\rm eff}$ は問題なく動作。$w_N$ は qwen3-8b/14b の全Nでほぼ`non_monotonic`判定になり、

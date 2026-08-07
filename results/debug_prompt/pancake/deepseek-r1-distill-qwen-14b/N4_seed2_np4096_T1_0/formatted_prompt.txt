@@ -1,0 +1,28 @@
+<｜begin▁of▁sentence｜>You are an expert at Pancake Sorting. Track the stack exactly after each prefix reversal. Use only legal moves of the form "Flip k". Put the final submitted move sequence only inside <final>...</final>.<｜User｜>You are an AI solving a Pancake Sorting puzzle.
+
+[Rules]
+1. The stack contains 4 pancakes labeled 1 to 4.
+2. The stack is shown from top to bottom.
+3. A move "Flip k" reverses the top k pancakes.
+4. Only moves with 2 <= k <= 4 are legal.
+5. Goal: sort the stack into [1, 2, 3, 4] from top to bottom.
+
+[Initial State]
+  Stack: [4, 2, 3, 1]
+
+[Goal State]
+  Stack: [1, 2, 3, 4]
+
+[Output Format]
+You may reason freely in the search phase.
+After searching, put the final submitted move sequence inside <final>...</final>.
+Only moves inside <final>...</final> will be graded.
+Inside <final>, output each step as "Flip k" on its own line.
+Example:
+<final>
+Flip 3
+</final>
+
+Solve in the minimum number of moves (4 moves). Begin:
+<｜Assistant｜><think>
+<think>
