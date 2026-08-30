@@ -1,0 +1,7 @@
+cell_id,N,min_moves,n_trials,success_final,accuracy,search_success_final_fail,search_fail,length_censored
+N3_mm3,3,3,100,100,1.00,0,0,0
+N4_mm3,4,3,100,86,0.86,9,4,1
+N4_mm4,4,4,100,92,0.92,6,2,0
+N5_mm3,5,3,100,76,0.76,10,9,5
+N5_mm4,5,4,100,38,0.38,22,18,22
+N5_mm5,5,5,100,38,0.38,17,30,15
