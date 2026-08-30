@@ -6,6 +6,12 @@ __pycache__/
 dist/
 build/
 
+# Driveから取得する解析用hidden data cache（大容量）
+local_data/
+
+# 結果関連
+results/
+
 # 実験結果バイナリ（隠れ状態 npz、大容量）
 results/**/*.npz
 

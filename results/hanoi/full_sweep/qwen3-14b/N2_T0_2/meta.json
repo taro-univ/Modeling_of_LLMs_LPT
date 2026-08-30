@@ -1,7 +1,0 @@
-{
-  "environment": "hanoi",
-  "model": "Qwen/Qwen3-14B",
-  "N": 2,
-  "temperature": 0.2,
-  "sweep_type": "full_sweep"
-}

@@ -1,4 +1,0 @@
-N,temperature,runs,final_accuracy,goal_reached_all_mentions,no_final,length_stop,loop_trap,repeated_state_ratio,success_final_count,search_success_final_fail_count,search_fail_count,no_final_count,length_stop_count,loop_trap_count
-3,0.6,3,1,1.0,0.0,0.0,1.0,0.8375178062678063,3,0,0,0,0,0
-4,0.6,6,0.8333333333333334,0.8333333333333334,0.0,0.0,1.0,0.5063762234341838,5,0,0,0,0,1
-5,0.6,9,0.4444444444444444,0.6666666666666666,0.0,0.1111111111111111,0.8888888888888888,0.43012166551278846,4,0,0,0,1,4

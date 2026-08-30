@@ -1,8 +1,0 @@
-{
-  "environment": "frog_jump",
-  "model": "Qwen/Qwen3-14B",
-  "N": 2,
-  "temperature": 0.4,
-  "sweep_type": "frog_jump_smoke_lowT",
-  "system_hint": "none"
-}
